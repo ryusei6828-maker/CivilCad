@@ -31,6 +31,9 @@ public sealed class AppSettings
     /// <summary>レイヤパネルのフロート状態と位置。</summary>
     public PanelState LayerPanel { get; set; } = new();
 
+    /// <summary>座標読込の前回の設定。</summary>
+    public CivilCad.App.IO.PointImportOptions PointImport { get; set; } = new();
+
     /// <summary>図枠ダイアログの前回の入力。</summary>
     public DrawingFrameOptions FrameDefaults { get; set; } = new();
 
@@ -49,6 +52,7 @@ public sealed class AppSettings
         }
         settings.KeyBindings ??= [];
         settings.FrameDefaults ??= new();
+        settings.PointImport ??= new();
         settings.PropertiesPanel ??= new();
         settings.LayerPanel ??= new();
         // 後から増えたコマンドには初期値を入れる (ユーザーが消したものは "" で残っている)

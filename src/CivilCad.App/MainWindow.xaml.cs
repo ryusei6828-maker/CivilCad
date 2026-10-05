@@ -117,6 +117,7 @@ public partial class MainWindow : Window
             case "A": StartTool(new ArcTool(), c); break;
             case "T": StartTool(new TextTool(), c); break;
             case "H": StartTool(new HatchTool(), c); break;
+            case "PI": ImportPoints(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
             case "DI": StartTool(new DistanceTool(), c); break;
@@ -742,6 +743,52 @@ public partial class MainWindow : Window
             Log($"図枠の入力内容を保存できませんでした: {ex.Message}");
         }
         StartTool(new FrameTool(options.Clone()), "FR");
+    }
+
+    // ---- 座標読込 ----
+
+    /// <summary>SIMA (.sim) / CSV の座標を読み、点の印と点名を図面に置く (元に戻すで一度に消せる)。</summary>
+    private void ImportPoints()
+    {
+        var open = new OpenFileDialog
+        {
+            Title = "座標ファイルを開く",
+            Filter = "座標ファイル (*.sim;*.csv;*.txt)|*.sim;*.csv;*.txt|SIMA (*.sim)|*.sim|CSV (*.csv;*.txt)|*.csv;*.txt|すべてのファイル (*.*)|*.*",
+        };
+        if (open.ShowDialog(this) != true) return;
+
+        PointFile file;
+        try
+        {
+            file = PointImport.Load(open.FileName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, $"{Path.GetFileName(open.FileName)} を読み込めませんでした。\n{ex.Message}", "座標読込", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (file.Points.Count == 0)
+        {
+            MessageBox.Show(this, $"{Path.GetFileName(open.FileName)} に座標が見つかりませんでした。\n" +
+                                  "SIMA は A01,点番号,点名,X,Y,H の行、CSV は 点名,X,Y[,Z] などの行を読みます。",
+                "座標読込", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dlg = new PointImportWindow(open.FileName, file, _settings.PointImport, _doc.ScaleText) { Owner = this };
+        if (dlg.ShowDialog() != true || dlg.Result is not { } options) return;
+        _settings.PointImport = options;
+        SaveSettingsQuietly();
+
+        var entities = options.Build(_doc, file);
+        _doc.History.Execute(new AddEntitiesCommand(entities, $"座標読込 ({file.Points.Count} 点)"));
+        var box = entities.Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
+        if (!Canvas.VisibleWorldBox.Contains(box)) // 読み込んだ点が画面に収まっていなければ表示を合わせる
+            Canvas.ZoomTo(box.Inflate(Math.Max(Math.Max(box.Width, box.Height) * 0.05, _doc.PaperMmToMeters(10))));
+        Log($"座標読込: {Path.GetFileName(open.FileName)} から {file.Points.Count} 点" +
+            (file.Lots.Count > 0 && options.DrawLots ? $"、画地 {file.Lots.Count} 区画" : "") +
+            $" をレイヤ「{entities[0].Layer.Name}」に配置しました。" +
+            (file.SkippedLines > 0 ? $" (読めなかった行 {file.SkippedLines})" : ""));
     }
 
     // ---- 路線 ----

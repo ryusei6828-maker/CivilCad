@@ -70,6 +70,18 @@
         <GeometryDrawing Brush="{StaticResource IcoInk}" Geometry="{StaticResource PencilTip}"/>
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
+    <DrawingImage x:Key="IconPoints" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Brush="#FFE8F1FB" Pen="{StaticResource IcoInkPen}" Geometry="M3,3 L15,3 L19,7 L19,21 L3,21 Z"/>
+        <GeometryDrawing Pen="{StaticResource IcoBluePen}">
+            <GeometryDrawing.Geometry><GeometryGroup>
+                <EllipseGeometry Center="7,9" RadiusX="1.6" RadiusY="1.6"/>
+                <EllipseGeometry Center="14,12" RadiusX="1.6" RadiusY="1.6"/>
+                <EllipseGeometry Center="9,17" RadiusX="1.6" RadiusY="1.6"/>
+            </GeometryGroup></GeometryDrawing.Geometry>
+        </GeometryDrawing>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <DrawingImage x:Key="IconCircle" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
         <GeometryDrawing Pen="{StaticResource IcoBluePen}">
