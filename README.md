@@ -95,7 +95,10 @@ dotnet publish src/CivilCad.App -c Release -r win-x64 --self-contained true -p:P
 
 ### ファイル
 
-- 開く・保存: DXF / DWG / JWW (Jw_cad) / SFC (SXF レベル2)。
+- 開く・保存: DXF / DWG / JWW (Jw_cad) / SFC・P21 (SXF レベル2)。P2Z (P21 の ZIP) も開けます。
+- P21: STEP AP202 (ISO 10303-21)。SCADEC のライブラリの書き方 (SFC のフィーチャ 1 つ = 決まった形のインスタンスの組) に合わせ、
+  保存は SFC と同じ内容を AP202 に直したもの、読み込みは AP202 を SFC のフィーチャに直して SFC と同じ取り込み方をします。
+  寸法は SFC と同じく、長さ寸法の寸法線と値・引出線と文字・その他の寸法とバルーンの文字を取り込みます。
 - DWG: AutoCAD R14 以降の形式を読み込み (ACadSharp)。線・ポリライン・円・円弧・楕円・スプライン (折れ線)・文字・MTEXT・
   ハッチングとレイヤ・色・線幅を DXF と同じ対応で取り込み、ブロック参照は分解します。保存は AutoCAD 2013 形式。
 - JWW: Jw_cad の公開データ形式 (jwdatafmt.txt) による。JWW の座標は用紙 mm (原点は用紙の中心) なので、

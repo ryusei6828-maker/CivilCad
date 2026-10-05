@@ -19,7 +19,8 @@ public static partial class SfcIO
     /// <param name="Sheet">用紙の範囲 (図面座標 m)。drawing_sheet_feature が無ければ null。</param>
     public sealed record LoadResult(int Entities, int Skipped, double ScaleDenominator, IReadOnlyDictionary<string, int> SkippedKinds, Box2? Sheet = null);
 
-    private sealed record Feature(string Name, List<string> Args);
+    /// <summary>SXF のフィーチャ (名前と引数。文字列は X2 表記を戻したもの)。P21 の読み書きでも使う。</summary>
+    internal sealed record Feature(string Name, List<string> Args);
 
     /// <summary>SXF 既定義色 (コード 1〜16)。黒は暗い背景で見えるよう白で表示する。</summary>
     private static readonly RgbColor[] PredefinedColors =
@@ -43,9 +44,12 @@ public static partial class SfcIO
         return new Builder(doc).Build(features);
     }
 
+    /// <summary>フィーチャの列から図面を作る (P21 の読み込みで、AP202 をフィーチャに直したもの)。</summary>
+    internal static LoadResult Build(CadDocument doc, List<Feature> features) => new Builder(doc).Build(features);
+
     // ---- 構文解析 ----
 
-    private static List<Feature> Parse(string text)
+    internal static List<Feature> Parse(string text)
     {
         var list = new List<Feature>();
         foreach (Match m in EntityRegex().Matches(text))

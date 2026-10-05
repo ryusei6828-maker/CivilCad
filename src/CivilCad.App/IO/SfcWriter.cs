@@ -38,6 +38,14 @@ public static class SfcWriter
         File.WriteAllBytes(path, sjis.GetBytes(w.Build(Path.GetFileName(path))));
     }
 
+    /// <summary>SFC の本文 (P21 の書き出しで、このフィーチャを AP202 に直す)。</summary>
+    internal static string BuildText(CadDocument doc, string sheetName, string fileName)
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        var sjis = Encoding.GetEncoding(932, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
+        return new Writer(doc, sheetName, sjis).Build(fileName);
+    }
+
     /// <summary>用紙の選び方と、図面 (m) → 用紙 (mm) の原点。</summary>
     public static (PaperSize? Paper, double Width, double Height, Vec2 Origin) Layout(CadDocument doc)
     {

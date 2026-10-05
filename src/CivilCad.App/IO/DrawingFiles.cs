@@ -10,7 +10,7 @@ public static class DrawingFiles
 {
     /// <summary>開くダイアログのフィルタ。</summary>
     public const string OpenFilter =
-        "図面ファイル (*.dxf;*.dwg;*.jww;*.sfc)|*.dxf;*.dwg;*.jww;*.sfc|DXF ファイル (*.dxf)|*.dxf|DWG ファイル (*.dwg)|*.dwg|Jw_cad ファイル (*.jww)|*.jww|SXF (SFC) ファイル (*.sfc)|*.sfc";
+        "図面ファイル (*.dxf;*.dwg;*.jww;*.sfc;*.p21;*.p2z)|*.dxf;*.dwg;*.jww;*.sfc;*.p21;*.p2z|DXF ファイル (*.dxf)|*.dxf|DWG ファイル (*.dwg)|*.dwg|Jw_cad ファイル (*.jww)|*.jww|SXF (SFC) ファイル (*.sfc)|*.sfc|SXF (P21) ファイル (*.p21;*.p2z)|*.p21;*.p2z";
 
     /// <summary>保存ダイアログの形式 (拡張子とフィルタの表示名)。順番がフィルタの番号になる。</summary>
     public static IReadOnlyList<(string Ext, string Label)> SaveFormats { get; } =
@@ -19,6 +19,7 @@ public static class DrawingFiles
         (".dwg", "DWG ファイル (AutoCAD 2013 形式) (*.dwg)|*.dwg"),
         (".jww", "Jw_cad ファイル (*.jww)|*.jww"),
         (".sfc", "SXF (SFC) ファイル (*.sfc)|*.sfc"),
+        (".p21", "SXF (P21) ファイル (*.p21)|*.p21"),
     ];
 
     public static string SaveFilter => string.Join("|", SaveFormats.Select(f => f.Label));
@@ -43,6 +44,13 @@ public static class DrawingFiles
             case ".sfc":
             {
                 var r = SfcIO.Load(doc, path);
+                var note = $"  縮尺 {doc.ScaleText} として実寸 (m) に換算しました。";
+                if (r.Skipped > 0) note += $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}"));
+                return new OpenResult(note, r.Sheet);
+            }
+            case ".p21" or ".p2z":
+            {
+                var r = P21IO.Load(doc, path);
                 var note = $"  縮尺 {doc.ScaleText} として実寸 (m) に換算しました。";
                 if (r.Skipped > 0) note += $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}"));
                 return new OpenResult(note, r.Sheet);
@@ -77,6 +85,12 @@ public static class DrawingFiles
                 SfcWriter.Save(doc, path);
                 var (paper, pw, ph, _) = SfcWriter.Layout(doc);
                 return $"SFC で保存しました: {path}  (用紙 {PaperText(paper, pw, ph)} 横, 縮尺 {doc.ScaleText})";
+            }
+            case ".p21":
+            {
+                P21IO.Save(doc, path);
+                var (paper, pw, ph, _) = SfcWriter.Layout(doc);
+                return $"SXF (P21) で保存しました: {path}  (用紙 {PaperText(paper, pw, ph)} 横, 縮尺 {doc.ScaleText})";
             }
             case ".jww":
             {
