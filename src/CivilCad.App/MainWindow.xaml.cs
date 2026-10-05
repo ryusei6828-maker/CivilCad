@@ -229,6 +229,24 @@ public partial class MainWindow : Window
             return;
         }
 
+        // 作図中: Tab で作図入力バーの数値の欄へ、Shift+Tab で長さの単位 (mm → cm → m)
+        // (入力バーの欄の中での Tab / Shift+Tab は入力バー自身が処理する)
+        if (e.Key == Key.Tab && !InputBar.IsKeyboardFocusWithin
+            && (CommandBox.IsKeyboardFocused || Canvas.IsKeyboardFocusWithin || Keyboard.FocusedElement is null || Keyboard.FocusedElement == this))
+        {
+            if (Keyboard.Modifiers == ModifierKeys.None && InputBar.FocusFirstField())
+            {
+                e.Handled = true;
+                return;
+            }
+            if (Keyboard.Modifiers == ModifierKeys.Shift && InputBar.HasLengthField)
+            {
+                InputBar.CycleUnit();
+                e.Handled = true;
+                return;
+            }
+        }
+
         // 設定で割り当てたショートカット (F3 スナップ / F8 直交 もここ)
         if (TryRunShortcut(e))
         {

@@ -11,15 +11,23 @@ namespace CivilCad.App.Views;
 /// <summary>
 /// 作図入力バー。線・円などの作図中だけ作図領域の上に出て、長さ・角度・半径・文字高と、
 /// 線幅・色 (これから描く図形の設定) を入力できる。数値の欄は空欄なら「マウスで決める」。
+/// キー操作: Tab で数値の欄へ (欄の中では次の欄へ)、Shift+Tab で長さの単位 (mm → cm → m)、
+/// Enter で確定して作図に戻る、Esc で取り消し。下の段に今使えるキーのガイドを出す。
 /// </summary>
 public sealed class DrawInputBar : Border
 {
     private static readonly Brush LabelBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC)));
     private static readonly Brush LiveBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x9C, 0xDC, 0xFE)));
+    private static readonly Brush GuideBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xA0, 0xA0, 0xA8)));
+    private static readonly Brush KeyCapBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x3C, 0x3C, 0x44)));
+    private static readonly Brush KeyCapBorder = Frozen(new SolidColorBrush(Color.FromRgb(0x6A, 0x6A, 0x75)));
+    private static readonly Brush UnitBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xFF, 0xD2, 0x6A)));
     private static readonly double[] StandardWeights = [0.13, 0.18, 0.25, 0.35, 0.5, 0.7, 1.0, 1.4, 2.0];
 
-    private readonly StackPanel _panel = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 3, 8, 3) };
+    private readonly StackPanel _panel = new() { Orientation = Orientation.Horizontal };
+    private readonly WrapPanel _guide = new() { Margin = new Thickness(0, 3, 0, 0) };
     private readonly TextBlock _live = new() { Foreground = LiveBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 0, 0), FontFamily = new FontFamily("Consolas, Yu Gothic UI") };
+    private readonly List<NumberField> _fields = [];
     private CadCanvas? _canvas;
     private CadDocument? _doc;
 
@@ -28,12 +36,18 @@ public sealed class DrawInputBar : Border
         Background = new SolidColorBrush(Color.FromRgb(0x25, 0x25, 0x26));
         BorderBrush = new SolidColorBrush(Color.FromRgb(0x3F, 0x3F, 0x46));
         BorderThickness = new Thickness(0, 0, 0, 1);
-        Child = _panel;
+        var rows = new StackPanel { Margin = new Thickness(8, 3, 8, 3) };
+        rows.Children.Add(_panel);
+        rows.Children.Add(_guide);
+        Child = rows;
         Visibility = Visibility.Collapsed;
     }
 
     /// <summary>値を確定した (コマンド欄にフォーカスを戻すのに使う)。</summary>
     public event EventHandler? Committed;
+
+    /// <summary>今のツールに長さ・半径の欄がある (Shift+Tab で単位を切り替えられる)。</summary>
+    public bool HasLengthField => Visibility == Visibility.Visible && _fields.Any(f => f.IsLength);
 
     public void Attach(CadCanvas canvas)
     {
@@ -42,6 +56,28 @@ public sealed class DrawInputBar : Border
         canvas.DocumentReplaced += (_, _) => WatchDocument();
         canvas.CursorMoved += (_, _) => UpdateLive();
         WatchDocument();
+    }
+
+    /// <summary>最初の数値の欄にカーソルを移す (Tab)。欄が無ければ false。</summary>
+    public bool FocusFirstField()
+    {
+        if (Visibility != Visibility.Visible || _fields.Count == 0) return false;
+        _fields[0].Focus();
+        return true;
+    }
+
+    /// <summary>長さの単位を次へ (mm → cm → m)。入力中の欄があれば、その数字を新しい単位で読み直す。</summary>
+    public void CycleUnit()
+    {
+        DrawInputMemory.Unit = DrawInputMemory.Unit.Next();
+        foreach (var f in _fields.Where(f => f.IsLength))
+        {
+            if (f.Box.IsKeyboardFocused) f.Commit(force: true); // 打った数字はそのまま、単位だけ変える
+            else f.Refresh();
+        }
+        _canvas?.RedrawOverlay();
+        UpdateGuide();
+        UpdateLive();
     }
 
     private void WatchDocument()
@@ -61,6 +97,7 @@ public sealed class DrawInputBar : Border
     private void Rebuild()
     {
         _panel.Children.Clear();
+        _fields.Clear();
         var tool = _canvas?.Tool;
         if (tool is not IStyledDrawTool || _doc is not { } doc)
         {
@@ -81,18 +118,18 @@ public sealed class DrawInputBar : Border
         switch (tool)
         {
             case ILengthAngleInput la:
-                AddNumber("長さ (m)", la.FixedLength, v => la.FixedLength = v, "次の点までの長さ。入れておくとクリックした方向にこの長さで線を引く");
-                AddNumber("角度 (°)", la.FixedAngleDeg, v => la.FixedAngleDeg = v, "線の向き。東 = 0°、反時計回り (北 = 90°)");
+                AddNumber("長さ", () => la.FixedLength, v => la.FixedLength = v, "次の点までの長さ。入れておくとクリックした方向にこの長さで線を引く", isLength: true);
+                AddNumber("角度 (°)", () => la.FixedAngleDeg, v => la.FixedAngleDeg = v, "線の向き。東 = 0°、反時計回り (北 = 90°)", allowNegative: true);
                 break;
             case ArcTool arcTool:
-                AddNumber("半径 (m)", arcTool.FixedRadius, v => arcTool.FixedRadius = v,
-                    "入れておくと 始点 → 終点 → 膨らむ側 の指定で、この半径の円弧を作図\n空欄なら 3 点 (始点・通過点・終点) で作図");
+                AddNumber("半径", () => arcTool.FixedRadius, v => arcTool.FixedRadius = v,
+                    "入れておくと 始点 → 終点 → 膨らむ側 の指定で、この半径の円弧を作図\n空欄なら 3 点 (始点・通過点・終点) で作図", isLength: true);
                 break;
             case IRadiusInput ri:
-                AddNumber("半径 (m)", ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図");
+                AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
                 break;
             case TextTool:
-                AddNumber($"文字高 (mm, {doc.ScaleText})", TextTool.DefaultHeightMm, v => { if (v is double h) TextTool.DefaultHeightMm = h; },
+                AddNumber($"文字高 (mm, {doc.ScaleText})", () => TextTool.DefaultHeightMm, v => { if (v is double h) TextTool.DefaultHeightMm = h; },
                     "用紙上の文字の高さ。図面の縮尺で m に換算", allowEmpty: false);
                 break;
         }
@@ -102,18 +139,74 @@ public sealed class DrawInputBar : Border
         AddColor(doc);
         _panel.Children.Add(_live);
         UpdateLive();
+        UpdateGuide();
     }
 
     /// <summary>今の長さ・角度・半径を表示する (固定していなくても目安になるように)。</summary>
     private void UpdateLive()
     {
         if (Visibility != Visibility.Visible || _canvas == null) return;
+        var u = DrawInputMemory.Unit;
+        string L(double m) => $"{FormatNumber(m / u.Meters())} {u.Label()}";
         _live.Text = _canvas.Tool switch
         {
-            ILengthAngleInput { Live: var (len, ang) } => $"現在 長さ {len:F3} m  角度 {ang:F2}°",
-            IRadiusInput { LiveRadius: double r } => $"現在 半径 {r:F3} m  直径 {r * 2:F3} m",
-            _ => "空欄の項目はマウスで決めます",
+            ILengthAngleInput { Live: var (len, ang) } => $"現在 長さ {L(len)}  角度 {ang:F2}°",
+            IRadiusInput { LiveRadius: double r } => $"現在 半径 {L(r)}  直径 {L(r * 2)}",
+            _ => "",
         };
+    }
+
+    // ---- キーのガイド ----
+
+    private void UpdateGuide()
+    {
+        _guide.Children.Clear();
+        if (_fields.Count == 0)
+        {
+            AddGuideText("線幅・色は一覧から選択");
+            return;
+        }
+
+        var editing = _fields.FirstOrDefault(f => f.Box.IsKeyboardFocused);
+        var unit = DrawInputMemory.Unit.Label();
+        if (editing == null)
+        {
+            AddGuide("Tab", "数値を入力");
+            if (HasLengthField) AddGuide("Shift+Tab", $"長さの単位を切替 mm→cm→m (今: {unit})");
+            AddGuideText("空欄はマウスで決める");
+            return;
+        }
+
+        AddGuide("Enter", "確定して作図に戻る");
+        if (_fields.Count > 1) AddGuide("Tab", "次の欄へ");
+        if (editing.IsLength) AddGuide("Shift+Tab", $"単位を切替 mm→cm→m (今: {unit})");
+        AddGuide("Esc", "取り消して作図に戻る");
+        AddGuideText(editing.AllowEmpty ? "空欄で確定するとマウスで決める" : "");
+    }
+
+    private void AddGuide(string key, string text)
+    {
+        var cap = new Border
+        {
+            Background = KeyCapBrush,
+            BorderBrush = KeyCapBorder,
+            BorderThickness = new Thickness(1, 1, 1, 2),
+            CornerRadius = new CornerRadius(3),
+            Padding = new Thickness(5, 0, 5, 0),
+            Margin = new Thickness(0, 0, 4, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new TextBlock { Text = key, Foreground = Brushes.White, FontSize = 11, FontFamily = new FontFamily("Consolas, Yu Gothic UI") },
+        };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 14, 0) };
+        row.Children.Add(cap);
+        row.Children.Add(new TextBlock { Text = text, Foreground = GuideBrush, FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
+        _guide.Children.Add(row);
+    }
+
+    private void AddGuideText(string text)
+    {
+        if (text.Length > 0)
+            _guide.Children.Add(new TextBlock { Text = text, Foreground = GuideBrush, FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
     }
 
     // ---- 部品 ----
@@ -124,48 +217,131 @@ public sealed class DrawInputBar : Border
     private void AddSeparator() =>
         _panel.Children.Add(new Border { Width = 1, Background = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x5A)), Margin = new Thickness(10, 2, 10, 2) });
 
-    /// <summary>数値の欄。Enter かフォーカス移動で確定、空欄なら固定しない (null)、Esc で元に戻す。</summary>
-    private void AddNumber(string label, double? value, Action<double?> set, string tip, bool allowEmpty = true)
+    private static string FormatNumber(double v) => v.ToString("0.######", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// 数値の欄。値は get/set (長さは m)。表示と入力は今の単位。
+    /// Enter で確定、Tab で次の欄、Shift+Tab で単位切替 (長さだけ)、Esc で元に戻す。空欄なら固定しない (null)。
+    /// </summary>
+    private void AddNumber(string label, Func<double?> get, Action<double?> set, string tip,
+        bool isLength = false, bool allowEmpty = true, bool allowNegative = false)
     {
         AddLabel(label);
         var box = new TextBox
         {
             Width = 76,
-            Margin = new Thickness(0, 0, 12, 0),
-            Text = value?.ToString("0.###", CultureInfo.InvariantCulture) ?? "",
-            ToolTip = tip + (allowEmpty ? "\n空欄 = マウスで決める" : "") + "\nEnter で確定",
+            Margin = new Thickness(0, 0, isLength ? 3 : 12, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
+            ToolTip = tip + (allowEmpty ? "\n空欄 = マウスで決める" : "") + "\nEnter で確定 / Tab で次の欄" + (isLength ? " / Shift+Tab で単位 (mm→cm→m)" : ""),
         };
-        var current = box.Text;
-        void Commit()
+        var field = new NumberField(box, isLength, allowEmpty, allowNegative, get, set);
+        _fields.Add(field);
+        _panel.Children.Add(box);
+
+        if (isLength)
         {
-            var text = box.Text.Trim();
-            if (text == current) return;
-            if (text.Length == 0 && allowEmpty)
+            var unitButton = new Button
             {
-                set(null);
-            }
-            else if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) && (label.StartsWith("角度") || v > 0))
+                Content = field.UnitLabel,
+                MinWidth = 30,
+                Padding = new Thickness(4, 0, 4, 0),
+                Margin = new Thickness(0, 0, 12, 0),
+                Foreground = UnitBrush,
+                Background = KeyCapBrush,
+                BorderBrush = KeyCapBorder,
+                Focusable = false,
+                ToolTip = "長さの単位 (クリックか Shift+Tab で mm → cm → m)",
+            };
+            unitButton.Click += (_, _) => CycleUnit();
+            field.UnitLabel = unitButton;
+            _panel.Children.Add(unitButton);
+        }
+        field.Refresh();
+
+        box.GotKeyboardFocus += (_, _) => { box.SelectAll(); UpdateGuide(); };
+        box.LostKeyboardFocus += (_, _) =>
+        {
+            field.Commit();
+            UpdateGuide();
+        };
+        box.PreviewKeyDown += (_, e) =>
+        {
+            switch (e.Key)
             {
-                set(v);
-                box.Text = v.ToString("0.###", CultureInfo.InvariantCulture);
+                case Key.Enter:
+                    if (field.Commit()) Committed?.Invoke(this, EventArgs.Empty);
+                    e.Handled = true;
+                    break;
+                case Key.Escape:
+                    field.Refresh();
+                    Committed?.Invoke(this, EventArgs.Empty);
+                    e.Handled = true;
+                    break;
+                case Key.Tab when Keyboard.Modifiers == ModifierKeys.Shift:
+                    if (field.IsLength) CycleUnit();
+                    e.Handled = true;
+                    break;
+                case Key.Tab when Keyboard.Modifiers == ModifierKeys.None:
+                    if (field.Commit())
+                    {
+                        var next = _fields[(_fields.IndexOf(field) + 1) % _fields.Count];
+                        if (next == field) box.SelectAll();
+                        else next.Focus();
+                    }
+                    e.Handled = true;
+                    break;
             }
+        };
+    }
+
+    private sealed class NumberField(TextBox box, bool isLength, bool allowEmpty, bool allowNegative, Func<double?> get, Action<double?> set)
+    {
+        public TextBox Box { get; } = box;
+        public bool IsLength { get; } = isLength;
+        public bool AllowEmpty { get; } = allowEmpty;
+        public Button? UnitLabel { get; set; }
+        private string _shown = "";
+
+        private double Factor => IsLength ? DrawInputMemory.Unit.Meters() : 1;
+
+        public void Focus()
+        {
+            Box.Focus();
+            Keyboard.Focus(Box);
+            Box.SelectAll();
+        }
+
+        /// <summary>今の値を今の単位で表示し直す。</summary>
+        public void Refresh()
+        {
+            _shown = get() is double v ? FormatNumber(v / Factor) : "";
+            Box.Text = _shown;
+            if (UnitLabel != null) UnitLabel.Content = DrawInputMemory.Unit.Label();
+        }
+
+        /// <summary>入力を確定する。不正な値なら元に戻して false。force なら同じ文字でも (単位を変えたとき) 読み直す。</summary>
+        public bool Commit(bool force = false)
+        {
+            var text = Box.Text.Trim();
+            if (text == _shown && !force)
+            {
+                Refresh();
+                return true;
+            }
+            double? value;
+            if (text.Length == 0 && AllowEmpty) value = null;
+            else if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) && (allowNegative || v > 0)) value = v * Factor;
             else
             {
-                box.Text = current; // 不正な値は戻す
-                return;
+                Refresh(); // 不正な値は戻す
+                return false;
             }
-            current = box.Text;
-            _canvas?.RedrawOverlay();
-            Committed?.Invoke(this, EventArgs.Empty);
+            if (!Nullable.Equals(get(), value)) set(value); // 同じ値なら設定し直さない (円弧の点がリセットされないように)
+            var focused = Box.IsKeyboardFocused;
+            Refresh();
+            if (focused) Box.SelectAll();
+            return true;
         }
-        box.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Enter) { Commit(); e.Handled = true; }
-            else if (e.Key == Key.Escape) { box.Text = current; e.Handled = true; Committed?.Invoke(this, EventArgs.Empty); }
-        };
-        box.LostKeyboardFocus += (_, _) => Commit();
-        _panel.Children.Add(box);
     }
 
     private void AddWeight(CadDocument doc)

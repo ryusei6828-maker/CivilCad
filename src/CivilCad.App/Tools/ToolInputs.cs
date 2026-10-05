@@ -38,6 +38,22 @@ public static class DrawInputMemory
 
     /// <summary>円弧の半径 (円とは別に覚える)。</summary>
     public static double? ArcRadius { get; set; }
+
+    /// <summary>作図入力バーの長さ・半径の入力単位 (値そのものは常に m で持つ)。</summary>
+    public static LengthUnit Unit { get; set; } = LengthUnit.M;
+}
+
+public enum LengthUnit { Mm, Cm, M }
+
+public static class LengthUnits
+{
+    /// <summary>1 単位が何 m か。</summary>
+    public static double Meters(this LengthUnit u) => u switch { LengthUnit.Mm => 0.001, LengthUnit.Cm => 0.01, _ => 1 };
+
+    public static string Label(this LengthUnit u) => u switch { LengthUnit.Mm => "mm", LengthUnit.Cm => "cm", _ => "m" };
+
+    /// <summary>mm → cm → m → mm の順に切り替える。</summary>
+    public static LengthUnit Next(this LengthUnit u) => u switch { LengthUnit.Mm => LengthUnit.Cm, LengthUnit.Cm => LengthUnit.M, _ => LengthUnit.Mm };
 }
 
 public static class LengthAngle
