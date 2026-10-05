@@ -371,7 +371,42 @@ public sealed class CadCanvas : FrameworkElement
             case TextEntity t:
                 DrawText(dc, t, color, selected);
                 break;
+            case HatchEntity h:
+                DrawHatch(dc, h, color, selected, pen);
+                break;
         }
+    }
+
+    /// <summary>ハッチング: 線 (または塗り) を 1 つの図形として描く。選択中は境界も描く。</summary>
+    private void DrawHatch(DrawingContext dc, HatchEntity h, RgbColor color, bool selected, Pen pen)
+    {
+        if (h.Solid || selected)
+        {
+            var outline = new StreamGeometry { FillRule = FillRule.EvenOdd };
+            using (var ctx = outline.Open())
+            {
+                foreach (var loop in h.Loops)
+                {
+                    ctx.BeginFigure(WorldToScreen(loop[0]), h.Solid, true);
+                    for (var i = 1; i < loop.Count; i++) ctx.LineTo(WorldToScreen(loop[i]), true, false);
+                }
+            }
+            outline.Freeze();
+            dc.DrawGeometry(h.Solid ? GetBrush(color) : null, selected ? pen : null, outline);
+        }
+        if (h.Solid || h.Lines.Count == 0) return;
+
+        var g = new StreamGeometry();
+        using (var ctx = g.Open())
+        {
+            foreach (var (a, b) in h.Lines)
+            {
+                ctx.BeginFigure(WorldToScreen(a), false, false);
+                ctx.LineTo(WorldToScreen(b), true, false);
+            }
+        }
+        g.Freeze();
+        dc.DrawGeometry(null, pen, g);
     }
 
     public void DrawWorldLine(DrawingContext dc, Pen pen, Vec2 a, Vec2 b) => dc.DrawLine(pen, WorldToScreen(a), WorldToScreen(b));

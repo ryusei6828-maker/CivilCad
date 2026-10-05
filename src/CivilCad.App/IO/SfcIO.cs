@@ -331,23 +331,114 @@ public static partial class SfcIO
                     break;
 
                 case "fill_area_style_colour_feature":
-                    // 塗りつぶし: 外形の複合曲線を塗りつぶしポリラインにする
-                    if (int.TryParse(a[2], out var outer)) EmitComposite(outer, L(a[0]), a[1], t, fill: true);
+                    // 塗りつぶし (レイヤ, 色, 外形ID, 中抜き数, 中抜きID): 中抜きが無ければ塗りつぶしポリライン、あれば塗りのハッチング
+                    if (!int.TryParse(a[2], out var outer)) break;
+                    if (I(a.ElementAtOrDefault(3) ?? "0") > 0 && Loops(outer, a.ElementAtOrDefault(4), t) is { Count: > 0 } fillLoops)
+                        Add(new HatchEntity(L(a[0]), fillLoops, [], solid: true), a[1], null);
+                    else
+                        EmitComposite(outer, L(a[0]), a[1], t, fill: true);
                     break;
 
-                case "fill_area_style_hatching_feature" or "fill_area_style_tiles_feature":
-                    if (int.TryParse(a[2], out var hatchOuter)) EmitComposite(hatchOuter, L(a[0]), null, t);
-                    Skip(f.Name + " (ハッチ線は省略)");
+                case "fill_area_style_hatching_feature":
+                    EmitHatching(a, t);
+                    break;
+
+                case "externally_defined_hatch_feature":
+                    // 既定義ハッチ (レイヤ, 名前, 外形ID, 中抜き数, 中抜きID): 模様は名前だけなので 45° の斜線 (用紙 2mm 間隔) で表す。
+                    // "Area_control" は CAD が用紙の外に置く管理用のダミー (図面の内容ではない) なので読まない
+                    if (a[1].Equals("Area_control", StringComparison.OrdinalIgnoreCase)) break;
+                    if (int.TryParse(a[2], out var extOuter) && Loops(extOuter, a.ElementAtOrDefault(4), t) is { Count: > 0 } extLoops)
+                    {
+                        var origin = extLoops[0][0];
+                        _output.Add(new HatchEntity(L(a[0]), extLoops, [new HatchPattern(Math.PI / 4, 2 * _paperMmToMeter, origin)])
+                        {
+                            PatternName = a[1],
+                        });
+                    }
+                    break;
+
+                case "fill_area_style_tiles_feature":
+                    if (int.TryParse(a[2], out var tileOuter)) EmitComposite(tileOuter, L(a[0]), null, t);
+                    Skip(f.Name + " (模様は省略)");
                     break;
 
                 case "drawing_sheet_feature" or "drawing_attribute_feature" or "pre_defined_colour_feature" or "pre_defined_font_feature"
-                    or "user_defined_font_feature" or "text_font_feature" or "externally_defined_hatch_feature" or "externally_defined_symbol_feature":
+                    or "user_defined_font_feature" or "text_font_feature" or "externally_defined_symbol_feature":
                     break; // 定義情報のみ
 
                 default:
                     Skip(f.Name);
                     break;
             }
+        }
+
+        /// <summary>
+        /// ハッチング (レイヤ, パターン数 n, パターン × n, 外形ID, 中抜き数, 中抜きID)。
+        /// パターンは (色, 線種, 線幅, 基準点x, 基準点y, 間隔, 角度)。
+        /// </summary>
+        private void EmitHatching(List<string> a, Affine t)
+        {
+            var n = I(a[1]);
+            if (n < 1 || a.Count < 4 + n || !int.TryParse(a[2 + n], out var outer))
+            {
+                Skip("fill_area_style_hatching_feature");
+                return;
+            }
+            var loops = Loops(outer, a.ElementAtOrDefault(4 + n), t);
+            if (loops.Count == 0)
+            {
+                Skip("fill_area_style_hatching_feature (外形なし)");
+                return;
+            }
+            var patterns = new List<HatchPattern>();
+            string? color = null, width = null;
+            for (var k = 0; k < n; k++)
+            {
+                var p = List(a[2 + k]);
+                if (p.Length < 7) continue;
+                color ??= ((int)p[0]).ToString(CultureInfo.InvariantCulture);
+                width ??= ((int)p[2]).ToString(CultureInfo.InvariantCulture);
+                patterns.Add(new HatchPattern(t.MapAngle(p[6] * Math.PI / 180), p[5] * t.LengthScale, t.Apply(new Vec2(p[3], p[4]))));
+            }
+            Add(new HatchEntity(L(a[0]), loops, patterns), color ?? "0", width);
+        }
+
+        /// <summary>外形と中抜き (ID の並び "(3,4)") の複合曲線を、閉じた点列の組にする。</summary>
+        private List<List<Vec2>> Loops(int outer, string? innerIds, Affine t)
+        {
+            var ids = new List<int> { outer };
+            if (innerIds != null)
+                ids.AddRange(innerIds.Trim('(', ')', ' ').Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(s => int.TryParse(s, out var v) ? v : 0).Where(v => v > 0));
+            var loops = new List<List<Vec2>>();
+            foreach (var id in ids)
+            {
+                var pts = CompositePoints(id, t);
+                if (pts.Count >= 2 && pts[0].DistanceTo(pts[^1]) < 1e-9) pts.RemoveAt(pts.Count - 1);
+                if (pts.Count >= 3) loops.Add(pts);
+            }
+            return loops;
+        }
+
+        private List<Vec2> CompositePoints(int index, Affine t)
+        {
+            var pts = new List<Vec2>();
+            if (index < 1 || index > _composites.Count) return pts;
+            foreach (var m in _composites[index - 1].Members)
+            {
+                var a = m.Args;
+                IEnumerable<Vec2> seg = m.Name switch
+                {
+                    "line_feature" => [t.Apply(P(a[4], a[5])), t.Apply(P(a[6], a[7]))],
+                    "polyline_feature" => Points(a[5], a[6]).Select(t.Apply),
+                    "arc_feature" => ArcPoints(P(a[4], a[5]), D(a[6]), a[7] == "1", D(a[8]), D(a[9])).Select(t.Apply),
+                    "circle_feature" => Enumerable.Range(0, 72).Select(k => t.Apply(P(a[4], a[5]) + Vec2.FromAngle(k * Math.PI / 36) * D(a[6]))),
+                    _ => [],
+                };
+                foreach (var p in seg)
+                    if (pts.Count == 0 || pts[^1].DistanceTo(p) > 1e-9) pts.Add(p);
+            }
+            return pts;
         }
 
         private void EmitComposite(int index, Layer? layer, string? colorCode, Affine t, bool fill = false)

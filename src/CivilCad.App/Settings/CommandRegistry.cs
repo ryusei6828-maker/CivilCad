@@ -12,6 +12,7 @@ public static class CommandRegistry
         new("C", "円", "IconCircle"),
         new("A", "円弧 (3点)", "IconArc"),
         new("T", "文字", "IconText"),
+        new("H", "ハッチング", "IconHatch", "閉じた図形の内側をクリック、または点を指定して Enter"),
         new("FR", "図枠 (外枠・表題欄)", "IconFrame"),
         new("SC", "縮尺設定", "IconScale", "文字高・図枠・路線注記の換算に使う"),
         new("CS", "座標設定", "IconCoord", "基準点を測量座標に合わせて図面を移動・回転"),

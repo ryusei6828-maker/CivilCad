@@ -1,9 +1,11 @@
-using CivilCad.Core.Geometry;
+﻿using CivilCad.Core.Geometry;
 using CivilCad.Core.Model;
 using netDxf;
 using netDxf.Entities;
 using DxfLayer = netDxf.Tables.Layer;
 using Layer = CivilCad.Core.Model.Layer;
+using DxfHatchPattern = netDxf.Entities.HatchPattern;
+using HatchPattern = CivilCad.Core.Model.HatchPattern;
 
 namespace CivilCad.App.IO;
 
@@ -35,6 +37,7 @@ public static class DxfIO
                 CircleEntity c => new Circle(V(c.Center), c.Radius),
                 ArcEntity a => new Arc(V(a.Center), a.Radius, GeoMath.NormalizeAngle(a.StartAngle) * Deg, GeoMath.NormalizeAngle(a.EndAngle) * Deg),
                 TextEntity t => ToDxfText(t),
+                HatchEntity h when h.Loops.Count > 0 => ToDxfHatch(h),
                 _ => null,
             };
             if (de == null) continue;
@@ -100,6 +103,8 @@ public static class DxfIO
             Add(o, FromDxfText(o, LayerOf(o)));
         foreach (var o in dxf.Entities.MTexts)
             Add(o, [.. FromDxfMText(o, LayerOf(o))]);
+        foreach (var o in dxf.Entities.Hatches)
+            if (FromDxfHatch(o, LayerOf(o)) is { } hatch) Add(o, hatch);
 
         doc.Entities.AddRange(list);
         doc.NotifyChanged();
@@ -188,6 +193,93 @@ public static class DxfIO
                 HAlign = halign,
                 VAlign = TextVAlign.Top,
             };
+        }
+    }
+
+    /// <summary>ハッチング: 境界は閉じたポリライン、模様はパターンの線の定義 (破線は無視) か塗りつぶし。</summary>
+    private static Hatch ToDxfHatch(HatchEntity h)
+    {
+        var paths = h.Loops.Select(l => new HatchBoundaryPath([new Polyline2D(l.Select(p => new Polyline2DVertex(V(p))), true)]));
+        DxfHatchPattern pattern;
+        if (h.Solid || h.Patterns.Count == 0)
+        {
+            pattern = DxfHatchPattern.Solid;
+        }
+        else
+        {
+            var defs = h.Patterns.Select(p => new HatchPatternLineDefinition
+            {
+                Angle = GeoMath.NormalizeAngle(p.Angle) * Deg,
+                Origin = V(p.Origin),
+                Delta = new Vector2(0, p.Spacing),
+            });
+            pattern = new DxfHatchPattern(string.IsNullOrEmpty(h.PatternName) ? "CIVILCAD" : SafePatternName(h.PatternName), defs) { Type = HatchType.Custom };
+        }
+        return new Hatch(pattern, paths, false);
+    }
+
+    private static string SafePatternName(string name)
+    {
+        var s = new string(name.Where(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-').ToArray());
+        return s.Length > 0 ? s.ToUpperInvariant() : "CIVILCAD";
+    }
+
+    /// <summary>
+    /// HATCH の取り込み。境界の辺 (線・円弧・楕円・ポリライン・スプライン) をつないで閉じた点列にし、
+    /// パターンの線の定義から角度・間隔を求める (netDxf では定義は尺度 1・回転 0 の値で、全体の尺度と角度が別にある)。
+    /// </summary>
+    private static HatchEntity? FromDxfHatch(Hatch o, Layer layer)
+    {
+        var loops = new List<List<Vec2>>();
+        foreach (var path in o.BoundaryPaths)
+        {
+            var loop = new List<Vec2>();
+            foreach (var edge in path.Edges)
+            {
+                var seg = EdgePoints(edge.ConvertTo()).ToList();
+                if (seg.Count == 0) continue;
+                // 辺の向きがそろっていないことがあるので、近い方の端からつなぐ
+                if (loop.Count > 0 && loop[^1].DistanceTo(seg[^1]) < loop[^1].DistanceTo(seg[0])) seg.Reverse();
+                foreach (var p in seg)
+                    if (loop.Count == 0 || loop[^1].DistanceTo(p) > 1e-9) loop.Add(p);
+            }
+            if (loop.Count >= 2 && loop[0].DistanceTo(loop[^1]) < 1e-9) loop.RemoveAt(loop.Count - 1);
+            if (loop.Count >= 3) loops.Add(loop);
+        }
+        if (loops.Count == 0) return null;
+
+        var pat = o.Pattern;
+        var solid = pat.Fill == HatchFillType.SolidFill || pat.LineDefinitions.Count == 0;
+        var scale = pat.Scale > 0 ? pat.Scale : 1;
+        var patterns = solid
+            ? []
+            : pat.LineDefinitions.Select(d => new HatchPattern(
+                (d.Angle + pat.Angle) / Deg,
+                Math.Abs(d.Delta.Y) * scale,
+                V(pat.Origin) + V(d.Origin).Rotate(pat.Angle / Deg) * scale)).Where(p => p.Spacing > 0).ToList();
+        return new HatchEntity(layer, loops, patterns, solid || patterns.Count == 0) { PatternName = pat.Name };
+    }
+
+    private static IEnumerable<Vec2> EdgePoints(EntityObject e)
+    {
+        switch (e)
+        {
+            case Line l:
+                return [V(l.StartPoint), V(l.EndPoint)];
+            case Arc a:
+                var sweep = GeoMath.SweepAngle(a.StartAngle / Deg, a.EndAngle / Deg);
+                var n = Math.Max(4, (int)(sweep / (Math.PI / 36)));
+                return Enumerable.Range(0, n + 1).Select(k => V(a.Center) + Vec2.FromAngle(a.StartAngle / Deg + sweep * k / n) * a.Radius);
+            case Polyline2D pl:
+                var pts = ExpandBulges(pl).ToList();
+                if (pl.IsClosed && pts.Count > 0) pts.Add(pts[0]);
+                return pts;
+            case Ellipse el:
+                return el.PolygonalVertexes(72).Select(v => V(el.Center) + new Vec2(v.X, v.Y).Rotate(el.Rotation / Deg));
+            case Spline sp:
+                return sp.PolygonalVertexes(64).Select(V);
+            default:
+                return [];
         }
     }
 

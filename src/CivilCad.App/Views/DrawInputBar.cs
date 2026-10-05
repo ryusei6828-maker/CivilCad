@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -126,6 +126,13 @@ public sealed class DrawInputBar : Border
                 break;
             case IRadiusInput ri:
                 AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
+                break;
+            case HatchTool:
+                AddHatchStyle();
+                AddNumber("角度 (°)", () => HatchSettings.AngleDeg, v => { if (v is double a) { HatchSettings.AngleDeg = a; _canvas?.Tool.RefreshPrompt(); } },
+                    "ハッチ線の向き。東 = 0°、反時計回り (45° = 右上がり)", allowEmpty: false, allowNegative: true);
+                AddNumber($"間隔 (mm, {doc.ScaleText})", () => HatchSettings.SpacingMm, v => { if (v is double s) { HatchSettings.SpacingMm = s; _canvas?.Tool.RefreshPrompt(); } },
+                    "用紙上の線の間隔。図面の縮尺で m に換算", allowEmpty: false);
                 break;
             case TextTool:
                 AddNumber($"文字高 (mm, {doc.ScaleText})", () => TextTool.DefaultHeightMm, v => { if (v is double h) TextTool.DefaultHeightMm = h; },
@@ -341,6 +348,28 @@ public sealed class DrawInputBar : Border
             if (focused) Box.SelectAll();
             return true;
         }
+    }
+
+    private void AddHatchStyle()
+    {
+        AddLabel("種類");
+        var box = new ComboBox
+        {
+            Width = 90,
+            Margin = new Thickness(0, 0, 12, 0),
+            ItemsSource = Enum.GetValues<HatchStyle>().Select(HatchSettings.StyleName).ToList(),
+            SelectedIndex = (int)HatchSettings.Style,
+            ToolTip = "斜線 = 1 方向の平行線、クロス = 直交する 2 方向、塗りつぶし = 中を塗る",
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0) return;
+            HatchSettings.Style = (HatchStyle)box.SelectedIndex;
+            _canvas?.Tool.RefreshPrompt();
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
     }
 
     private void AddWeight(CadDocument doc)

@@ -204,6 +204,35 @@ public sealed class PropertiesPanel : UserControl
                 AddReadOnly("弦長", $"{a.StartPoint.DistanceTo(a.EndPoint):F3} m");
                 break;
 
+            case HatchEntity h:
+                AddReadOnly("種類", (h.Solid ? "塗りつぶし" : h.Patterns.Count >= 2 ? $"線 {h.Patterns.Count} 方向" : "斜線")
+                                   + (string.IsNullOrEmpty(h.PatternName) ? "" : $" ({h.PatternName})"));
+                AddReadOnly("境界", h.Loops.Count > 1 ? $"{h.Loops.Count} 個 (中抜きあり)" : "1 個");
+                AddReadOnly("面積", $"{h.Area:F3} m²");
+                if (h.Solid || h.Patterns.Count == 0) break;
+                var p0 = h.Patterns[0];
+                AddEditable("角度 (°)", Deg(p0.Angle).ToString("0.###", CultureInfo.InvariantCulture), s =>
+                    double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var deg) &&
+                    Apply(x =>
+                    {
+                        // 全パターンを同じだけ回す (クロスの直交関係を保つ)
+                        var hx = (HatchEntity)x;
+                        var delta = deg * Math.PI / 180 - p0.Angle;
+                        hx.SetPatterns(hx.Patterns.Select(p => p with { Angle = p.Angle + delta }));
+                    }, "ハッチ角度変更"));
+                var mmPerSpacing = Doc.PaperMmToMeters(1);
+                AddEditable($"間隔 (mm, {Doc.ScaleText})", (p0.Spacing / mmPerSpacing).ToString("0.###", CultureInfo.InvariantCulture), s =>
+                    TryPositive(s, out var mm) &&
+                    Apply(x =>
+                    {
+                        var hx = (HatchEntity)x;
+                        var ratio = mm * mmPerSpacing / p0.Spacing;
+                        hx.SetPatterns(hx.Patterns.Select(p => p with { Spacing = p.Spacing * ratio }));
+                    }, "ハッチ間隔変更"));
+                AddReadOnly("間隔 (図面上)", $"{p0.Spacing:F3} m");
+                AddReadOnly("線の本数", h.Lines.Count.ToString());
+                break;
+
             case TextEntity t:
                 AddEditable("文字", t.Text, s =>
                     s.Length > 0 && Apply(x => ((TextEntity)x).Text = s, "文字変更"));
@@ -460,6 +489,7 @@ public sealed class PropertiesPanel : UserControl
         CircleEntity => "円",
         ArcEntity => "円弧",
         TextEntity => "文字",
+        HatchEntity => "ハッチング",
         _ => e.GetType().Name,
     };
 

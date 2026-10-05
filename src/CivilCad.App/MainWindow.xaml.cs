@@ -116,6 +116,7 @@ public partial class MainWindow : Window
             case "C": StartTool(new CircleTool(), c); break;
             case "A": StartTool(new ArcTool(), c); break;
             case "T": StartTool(new TextTool(), c); break;
+            case "H": StartTool(new HatchTool(), c); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
             case "DI": StartTool(new DistanceTool(), c); break;

@@ -172,6 +172,35 @@ public static class SfcWriter
                     }
                     break;
 
+                case HatchEntity h when h.Loops.Count > 0:
+                    // 境界ごとに複合曲線を書き、外形 (1 つ目) と中抜き (2 つ目以降) として参照する
+                    var ids = new List<int>();
+                    foreach (var loop in h.Loops)
+                    {
+                        var lp = loop.Select(map).ToList();
+                        lp.Add(lp[0]);
+                        Feature($"polyline_feature({Q(0)},{Q(0)},{Q(0)},{Q(0)},{Q(lp.Count)},{List(lp, p => p.X)},{List(lp, p => p.Y)})");
+                        Feature($"composite_curve_org_feature({Q(color)},{Q(1)},{Q(width)},{Q(0)})");
+                        ids.Add(++_compositeCount);
+                    }
+                    var inner = $"'({string.Join(",", ids.Skip(1))})'";
+                    if (h.Solid || h.Patterns.Count == 0)
+                    {
+                        Feature($"fill_area_style_colour_feature({Q(layer)},{Q(color)},{Q(ids[0])},{Q(ids.Count - 1)},{inner})");
+                    }
+                    else
+                    {
+                        // パターン: (色, 線種, 線幅, 基準点x, 基準点y, 間隔, 角度)
+                        var patterns = h.Patterns.Select(p =>
+                        {
+                            var o = map(p.Origin);
+                            var deg = GeoMath.NormalizeAngle(p.Angle) * 180 / Math.PI;
+                            return "'(" + string.Join(",", color, 1, width, N(o.X), N(o.Y), N(p.Spacing * lengthScale), N(deg)) + ")'";
+                        });
+                        Feature($"fill_area_style_hatching_feature({Q(layer)},{Q(h.Patterns.Count)},{string.Join(",", patterns)},{Q(ids[0])},{Q(ids.Count - 1)},{inner})");
+                    }
+                    break;
+
                 case CircleEntity c:
                     var cc = map(c.Center);
                     Feature($"circle_feature({head},{Q(cc.X)},{Q(cc.Y)},{Q(c.Radius * lengthScale)})");
@@ -235,6 +264,7 @@ public static class SfcWriter
 
         private static string Q(double v, int decimals = 6) => "'" + v.ToString("F" + decimals, CultureInfo.InvariantCulture) + "'";
         private static string Q(int v) => "'" + v.ToString(CultureInfo.InvariantCulture) + "'";
+        private static string N(double v) => v.ToString("F6", CultureInfo.InvariantCulture);
 
         private static string List(IReadOnlyList<Vec2> pts, Func<Vec2, double> f) =>
             "'(" + string.Join(",", pts.Select(p => f(p).ToString("F6", CultureInfo.InvariantCulture))) + ")'";
