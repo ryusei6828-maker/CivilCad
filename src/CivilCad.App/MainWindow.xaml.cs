@@ -180,7 +180,7 @@ public partial class MainWindow : Window
     /// <summary>実行中のコマンドのボタンを色付けして、今どのモードかを分かるようにする。</summary>
     private void UpdateToolbarHighlight()
     {
-        foreach (var b in MainToolBar.Items.OfType<Button>())
+        foreach (var b in ToolbarButtons())
         {
             if (b.Tag is string code && (code == Canvas.Tool.CommandCode || IsPanelOpen(code))) b.Background = ActiveToolBrush;
             else b.ClearValue(BackgroundProperty);
@@ -560,7 +560,7 @@ public partial class MainWindow : Window
         {
             if (item.Tag is string code) item.InputGestureText = _settings.KeyFor(code) ?? "";
         }
-        foreach (var b in MainToolBar.Items.OfType<Button>())
+        foreach (var b in ToolbarButtons())
         {
             if (b.Tag is not string code || CommandRegistry.Find(code) is not { } info) continue;
             var key = _settings.KeyFor(code);
@@ -568,6 +568,18 @@ public partial class MainWindow : Window
         }
         SnapToggle.Content = $"スナップ{(_settings.KeyFor("SNAP") is { } s ? $" [{s}]" : "")}";
         OrthoToggle.Content = $"直交{(_settings.KeyFor("ORTHO") is { } o ? $" [{o}]" : "")}";
+    }
+
+    /// <summary>ツールバー (タブの中も含む) のボタン。</summary>
+    private IEnumerable<Button> ToolbarButtons() => LogicalButtons(RibbonArea);
+
+    private static IEnumerable<Button> LogicalButtons(DependencyObject root)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        {
+            if (child is Button b) yield return b;
+            foreach (var inner in LogicalButtons(child)) yield return inner;
+        }
     }
 
     private static IEnumerable<MenuItem> AllMenuItems(ItemCollection items)

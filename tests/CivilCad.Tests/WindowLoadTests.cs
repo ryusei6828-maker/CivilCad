@@ -23,6 +23,13 @@ public class WindowLoadTests
                 // レイヤパネルは既定で閉じ、プロパティは開いている
                 Assert.Equal(System.Windows.Visibility.Collapsed, ((System.Windows.FrameworkElement)main.FindName("LayerHost")).Visibility);
                 Assert.Equal(System.Windows.Visibility.Visible, ((System.Windows.FrameworkElement)main.FindName("PropsHost")).Visibility);
+                // ツールバーのタブ: 最初は「描画」で、線・ポリライン・円・円弧・文字が入っている
+                var tabs = (System.Windows.Controls.TabControl)main.FindName("RibbonTabs");
+                var draw = (System.Windows.Controls.TabItem)tabs.Items[0];
+                Assert.Equal("描画", draw.Header);
+                Assert.Equal(0, tabs.SelectedIndex);
+                Assert.Equal(["L", "PL", "C", "A", "T"],
+                    ((System.Windows.Controls.Panel)draw.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
                 Assert.NotNull(settings.Content);
                 Assert.NotNull(frame.Content);
                 frame.Close();
