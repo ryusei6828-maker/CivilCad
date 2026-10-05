@@ -10,7 +10,7 @@ public static class SnapFinder
 
     public static IReadOnlySet<SnapKind> DefaultKinds { get; } = new HashSet<SnapKind>
     {
-        SnapKind.Endpoint, SnapKind.Midpoint, SnapKind.Center, SnapKind.Quadrant, SnapKind.Node,
+        SnapKind.Endpoint, SnapKind.Vertex, SnapKind.Midpoint, SnapKind.Center, SnapKind.Quadrant, SnapKind.Node,
         SnapKind.Intersection, SnapKind.Perpendicular, SnapKind.Tangent,
     };
 
@@ -30,6 +30,13 @@ public static class SnapFinder
         {
             var d = p.DistanceTo(raw);
             if (d <= bestD) (best, bestD) = (new SnapPoint(p, kind), d);
+        }
+        // 交点などの計算で求めた点は、端点・頂点と同じ位置なら端点・頂点を優先する
+        // (ポリラインの角は隣り合う辺の交点でもあるので、そのままだと「交点」になってしまう)
+        void ConsiderComputed(Vec2 p, SnapKind kind)
+        {
+            if (best is { Kind: SnapKind.Endpoint or SnapKind.Vertex } b && b.Point.DistanceTo(p) <= tol * 1e-6) return;
+            Consider(p, kind);
         }
 
         // 端点・中点・中心など、図形が持っている点
@@ -54,16 +61,16 @@ public static class SnapFinder
             for (var i = 0; i < curves.Count; i++)
                 for (var j = i + 1; j < curves.Count; j++)
                     foreach (var p in SnapGeometry.Intersections(curves[i], curves[j]))
-                        Consider(p, SnapKind.Intersection);
+                        ConsiderComputed(p, SnapKind.Intersection);
 
         if (basePoint is Vec2 b)
         {
             foreach (var c in curves)
             {
                 if (kinds.Contains(SnapKind.Perpendicular))
-                    foreach (var p in SnapGeometry.PerpendicularFeet(c, b)) Consider(p, SnapKind.Perpendicular);
+                    foreach (var p in SnapGeometry.PerpendicularFeet(c, b)) ConsiderComputed(p, SnapKind.Perpendicular);
                 if (kinds.Contains(SnapKind.Tangent))
-                    foreach (var p in SnapGeometry.TangentPoints(c, b)) Consider(p, SnapKind.Tangent);
+                    foreach (var p in SnapGeometry.TangentPoints(c, b)) ConsiderComputed(p, SnapKind.Tangent);
             }
         }
 
@@ -76,6 +83,7 @@ public static class SnapFinder
     public static string Label(SnapKind kind) => kind switch
     {
         SnapKind.Endpoint => "端点",
+        SnapKind.Vertex => "頂点",
         SnapKind.Midpoint => "中点",
         SnapKind.Center => "中心",
         SnapKind.Quadrant => "四半円点",

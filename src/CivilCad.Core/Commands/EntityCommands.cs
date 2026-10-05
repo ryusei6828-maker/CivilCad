@@ -138,3 +138,27 @@ public sealed class CompositeCommand(string name, params IUndoableCommand[] comm
         for (var i = commands.Length - 1; i >= 0; i--) commands[i].Undo(doc);
     }
 }
+
+/// <summary>1 つの図形を 0 個以上の図形に置き換える (トリムなど)。描画順は元の位置を保つ。</summary>
+public sealed class SplitEntityCommand(Entity original, IEnumerable<Entity> pieces, string name) : IUndoableCommand
+{
+    private readonly List<Entity> _pieces = [.. pieces];
+    private int _index = -1;
+
+    public string Name => name;
+
+    public void Do(CadDocument doc)
+    {
+        _index = doc.Entities.IndexOf(original);
+        if (_index < 0) return;
+        doc.Entities.RemoveAt(_index);
+        doc.Entities.InsertRange(_index, _pieces);
+    }
+
+    public void Undo(CadDocument doc)
+    {
+        if (_index < 0) return;
+        doc.Entities.RemoveRange(_index, _pieces.Count);
+        doc.Entities.Insert(_index, original);
+    }
+}

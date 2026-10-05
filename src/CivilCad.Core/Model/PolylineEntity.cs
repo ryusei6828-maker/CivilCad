@@ -61,7 +61,8 @@ public sealed class PolylineEntity(Layer layer, IEnumerable<Vec2> points, bool i
 
     public override Entity Clone() => CopyPropertiesTo(new PolylineEntity(Layer, Points, IsClosed) { Filled = Filled });
 
+    /// <summary>開いたポリラインの始点・終点は端点、途中の点 (閉じたものは全点) は頂点。</summary>
     public override IEnumerable<SnapPoint> SnapPoints =>
-        Points.Select(p => new SnapPoint(p, SnapKind.Endpoint))
+        Points.Select((p, i) => new SnapPoint(p, !IsClosed && (i == 0 || i == Points.Count - 1) ? SnapKind.Endpoint : SnapKind.Vertex))
             .Concat(Segments.Select(s => new SnapPoint((s.A + s.B) / 2, SnapKind.Midpoint)));
 }

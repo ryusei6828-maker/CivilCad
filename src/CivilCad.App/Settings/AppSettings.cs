@@ -19,6 +19,9 @@ public sealed class AppSettings
     /// <summary>有効にするスナップの種類 (SnapKind の名前)。null なら既定。</summary>
     public List<string>? SnapKinds { get; set; }
 
+    /// <summary>SnapKinds を保存したときの種類の版。0 = 「頂点」が無かった頃 (ポリラインの頂点は端点に含まれていた)。</summary>
+    public int SnapKindsVersion { get; set; }
+
     /// <summary>範囲選択の方法 ("Inside" = 全体選択 / "Crossing" = 一部選択)。</summary>
     public string? BoxSelectMode { get; set; }
 

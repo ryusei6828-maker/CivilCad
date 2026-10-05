@@ -56,6 +56,13 @@
             <MenuItem Header="修正(_M)">
                 <MenuItem Header="移動 (M)" Tag="M" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconMove}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="複写 (CO)" Tag="CO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCopy}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="回転 (RO)" Tag="RO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRotate}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <Separator/>
+                <MenuItem Header="オフセット (O)" Tag="O" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconOffset}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="トリム (TR)" Tag="TR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconTrim}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="延長 (EX)" Tag="EX" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconExtend}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="連結 (J)" Tag="J" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconJoin}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <Separator/>
                 <MenuItem Header="削除モード (E)" Tag="E" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconErase}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
             <MenuItem Header="表示(_V)">
@@ -114,6 +121,11 @@
                     <StackPanel Orientation="Horizontal">
                         <Button Style="{StaticResource ToolButton}" Tag="M" Click="Tool_Click" ToolTip="移動 (M) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconMove}" Width="24" Height="24"/><TextBlock Text="移動" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="CO" Click="Tool_Click" ToolTip="複写 (CO) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconCopy}" Width="24" Height="24"/><TextBlock Text="複写" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="RO" Click="Tool_Click" ToolTip="回転 (RO) ※先に図形を選択。角度は度 (反時計回りが +)、C で元を残す"><StackPanel><Image Source="{StaticResource IconRotate}" Width="24" Height="24"/><TextBlock Text="回転" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="O" Click="Tool_Click" ToolTip="オフセット (O): 距離を入力 → 図形 → ずらす側をクリック"><StackPanel><Image Source="{StaticResource IconOffset}" Width="24" Height="24"/><TextBlock Text="オフセット" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="TR" Click="Tool_Click" ToolTip="トリム (TR): 境界を選んで Enter → 切り取る部分をクリック (Shift+クリックで延長)"><StackPanel><Image Source="{StaticResource IconTrim}" Width="24" Height="24"/><TextBlock Text="トリム" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="EX" Click="Tool_Click" ToolTip="延長 (EX): 境界を選んで Enter → 伸ばす端をクリック (Shift+クリックでトリム)"><StackPanel><Image Source="{StaticResource IconExtend}" Width="24" Height="24"/><TextBlock Text="延長" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="J" Click="Tool_Click" ToolTip="連結 (J) ※先に図形を選択。分かれた線を 1 本の線・ポリラインにつなぎ直す"><StackPanel><Image Source="{StaticResource IconJoin}" Width="24" Height="24"/><TextBlock Text="連結" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="E" Click="Tool_Click" ToolTip="削除モード (E): クリックした図形を消す。Esc で終了"><StackPanel><Image Source="{StaticResource IconErase}" Width="24" Height="24"/><TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>

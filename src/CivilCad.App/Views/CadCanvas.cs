@@ -479,6 +479,11 @@ public sealed class CadCanvas : FrameworkElement
             case SnapKind.Endpoint:
                 dc.DrawRectangle(null, SnapPen, new Rect(c.X - s, c.Y - s, s * 2, s * 2));
                 break;
+            case SnapKind.Vertex:
+                // □ の中に点
+                dc.DrawRectangle(null, SnapPen, new Rect(c.X - s, c.Y - s, s * 2, s * 2));
+                dc.DrawEllipse(SnapPen.Brush, null, c, 2, 2);
+                break;
             case SnapKind.Midpoint:
                 var g = new StreamGeometry();
                 using (var ctx = g.Open())

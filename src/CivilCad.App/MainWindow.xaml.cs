@@ -120,6 +120,11 @@ public partial class MainWindow : Window
             case "PI": ImportPoints(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
+            case "RO": StartTool(new RotateTool(), c); break;
+            case "O": StartTool(new OffsetTool(), c); break;
+            case "TR": StartTool(new TrimTool(), c); break;
+            case "EX": StartTool(new ExtendTool(), c); break;
+            case "J": Log(JoinCommand.Run(Canvas)); break;
             case "DI": StartTool(new DistanceTool(), c); break;
             case "AA": StartTool(new AreaTool(), c); break;
             case "E" or "DEL":
@@ -907,11 +912,15 @@ public partial class MainWindow : Window
         Canvas.SnapKinds.Clear();
         foreach (var name in _settings.SnapKinds)
             if (Enum.TryParse<SnapKind>(name, out var k)) Canvas.SnapKinds.Add(k);
+        // 頂点が端点から分かれる前の設定: 端点がオンなら頂点もオン (今までどおりポリラインの頂点に吸着する)
+        if (_settings.SnapKindsVersion < 1 && Canvas.SnapKinds.Contains(SnapKind.Endpoint))
+            Canvas.SnapKinds.Add(SnapKind.Vertex);
     }
 
     private void SaveSnapKinds()
     {
         _settings.SnapKinds = [.. Canvas.SnapKinds.OrderBy(k => k).Select(k => k.ToString())];
+        _settings.SnapKindsVersion = 1;
         SaveSettingsQuietly();
     }
 
