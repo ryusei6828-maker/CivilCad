@@ -7,8 +7,8 @@ using CivilCad.Core.Model;
 namespace CivilCad.App.Tools;
 
 /// <summary>
-/// 削除モード (消しゴム)。図形をクリックするとすぐ消える。空き部分クリック→2点目で範囲内をまとめて消す
-/// (左→右は窓、右→左は交差)。Esc か右クリックで終了するまで続く。
+/// 削除モード (消しゴム)。図形をクリックするとすぐ消える。ドラッグで範囲に完全に入る図形をまとめて消す
+/// (向きは問わない)。Esc か右クリックで終了するまで続く。
 /// </summary>
 public sealed class EraseTool : CadTool
 {
@@ -23,7 +23,7 @@ public sealed class EraseTool : CadTool
     public override bool IsDragging => _drag.IsMouseDrag;
 
     protected override void OnActivated() =>
-        SetPrompt("消す図形をクリック / ドラッグで範囲内をまとめて削除 (左→右 = 窓、右→左 = 交差) / Esc・右クリックで終了");
+        SetPrompt("消す図形をクリック / ドラッグで範囲に完全に入る図形をまとめて削除 / Esc・右クリックで終了");
 
     public override void OnPress(Vec2 p) => _drag.Press(p);
 
@@ -82,7 +82,7 @@ public sealed class EraseTool : CadTool
     {
         // カーソル下の図形を赤く強調 (クリックで消える図形)
         if (_hover != null && Doc.Entities.Contains(_hover)) Canvas.DrawEntity(dc, _hover, HighlightColor, true);
-        _drag.Draw(Canvas, dc, WindowFill, WindowFill);
+        _drag.Draw(Canvas, dc, WindowFill);
     }
 
     private static Brush Frozen(Brush b)

@@ -36,7 +36,7 @@ public class DragSelectTests
     }
 
     [Fact]
-    public void Select_DragWindowAndCrossing_ClickEmptyClears() => RunSta(() =>
+    public void Select_DragEitherDirection_FullyInside_ClickEmptyClears() => RunSta(() =>
     {
         var (_, canvas, a, b) = Setup();
         var tool = new SelectTool();
@@ -55,9 +55,14 @@ public class DragSelectTests
         tool.OnRelease(new Vec2(50.5, 50));
         Assert.Empty(canvas.Selection);
 
-        // 右→左の交差: b にかかれば選ばれる
+        // 右→左でも同じ: かかるだけの図形は選ばれない
         tool.OnPress(new Vec2(25, 5));
         tool.OnRelease(new Vec2(15, -5));
+        Assert.Empty(canvas.Selection);
+
+        // 右→左で完全に囲めば選ばれる
+        tool.OnPress(new Vec2(31, 5));
+        tool.OnRelease(new Vec2(19, -5));
         Assert.Same(b, Assert.Single(canvas.Selection));
 
         // 図形のクリックで追加

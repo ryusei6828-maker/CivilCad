@@ -8,13 +8,12 @@ using CivilCad.Core.Model;
 namespace CivilCad.App.Tools;
 
 /// <summary>
-/// 選択。図形クリックで選択、ドラッグで範囲選択、空き部分クリックで選択解除。
-/// 左→右へのドラッグは窓 (完全に含まれる図形)、右→左は交差 (かかる図形)。Shift で選択解除。
+/// 選択。図形クリックで選択、ドラッグで範囲選択 (範囲に完全に入る図形、向きは問わない)、
+/// 空き部分クリックで選択解除。Shift で選択解除。
 /// </summary>
 public sealed class SelectTool : CadTool
 {
-    private static readonly Brush WindowFill = Frozen(new SolidColorBrush(Color.FromArgb(40, 80, 140, 255)));
-    private static readonly Brush CrossingFill = Frozen(new SolidColorBrush(Color.FromArgb(40, 80, 255, 120)));
+    private static readonly Brush BoxFill = Frozen(new SolidColorBrush(Color.FromArgb(40, 80, 140, 255)));
 
     private readonly BoxDrag _drag = new();
 
@@ -23,7 +22,7 @@ public sealed class SelectTool : CadTool
     public override bool IsDragging => _drag.IsMouseDrag;
 
     protected override void OnActivated() =>
-        SetPrompt("図形をクリックで選択 / ドラッグで範囲選択 (左→右 = 窓、右→左 = 交差) / Shift で解除、またはコマンドを入力");
+        SetPrompt("図形をクリックで選択 / ドラッグで範囲選択 (範囲に完全に入る図形) / Shift で解除、またはコマンドを入力");
 
     public override void OnPress(Vec2 p) => _drag.Press(p);
 
@@ -67,7 +66,7 @@ public sealed class SelectTool : CadTool
         }
     }
 
-    public override void DrawPreview(DrawingContext dc) => _drag.Draw(Canvas, dc, WindowFill, CrossingFill);
+    public override void DrawPreview(DrawingContext dc) => _drag.Draw(Canvas, dc, BoxFill);
 
     private static Brush Frozen(Brush b)
     {
@@ -113,15 +112,14 @@ internal sealed class BoxDrag
     public static bool IsMoved(CadCanvas canvas, Vec2 a, Vec2 b) =>
         a.DistanceTo(b) * canvas.Scale >= ClickTolerancePx;
 
-    /// <summary>範囲内の図形。a → b が右向きなら窓 (完全に含まれる)、左向きなら交差 (かかる)。</summary>
+    /// <summary>範囲内に完全に含まれる図形 (ドラッグの向きは問わない)。</summary>
     public static List<Entity> Hits(CadDocument doc, Vec2 a, Vec2 b)
     {
         var box = Box2.FromPoints(a, b);
-        var crossing = b.X < a.X;
-        return doc.Entities.Where(e => doc.IsEditable(e) && (crossing ? e.IntersectsBox(box) : box.Contains(e.Bounds))).ToList();
+        return doc.Entities.Where(e => doc.IsEditable(e) && box.Contains(e.Bounds)).ToList();
     }
 
-    public void Draw(CadCanvas canvas, DrawingContext dc, Brush windowFill, Brush crossingFill)
+    public void Draw(CadCanvas canvas, DrawingContext dc, Brush fill)
     {
         Vec2 corner;
         if (Start is Vec2 s)
@@ -132,9 +130,6 @@ internal sealed class BoxDrag
         else if (TypedCorner is Vec2 t) corner = t;
         else return;
 
-        var crossing = Current.X < corner.X;
-        dc.DrawRectangle(crossing ? crossingFill : windowFill,
-            crossing ? CadCanvas.PreviewDashPen : CadCanvas.PreviewPen,
-            new Rect(canvas.WorldToScreen(corner), canvas.WorldToScreen(Current)));
+        dc.DrawRectangle(fill, CadCanvas.PreviewPen, new Rect(canvas.WorldToScreen(corner), canvas.WorldToScreen(Current)));
     }
 }
