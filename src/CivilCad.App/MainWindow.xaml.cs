@@ -325,7 +325,7 @@ public partial class MainWindow : Window
     {
         var dlg = new OpenFileDialog
         {
-            Filter = "図面ファイル (*.dxf;*.sfc)|*.dxf;*.sfc|DXF ファイル (*.dxf)|*.dxf|SXF (SFC) ファイル (*.sfc)|*.sfc",
+            Filter = DrawingFiles.OpenFilter,
         };
         if (dlg.ShowDialog(this) != true) return;
 
@@ -343,21 +343,7 @@ public partial class MainWindow : Window
         ActivateSheet(created ? AddSheet() : _active);
         try
         {
-            string note;
-            Box2? sheet = null;
-            if (Path.GetExtension(dlg.FileName).Equals(".sfc", StringComparison.OrdinalIgnoreCase))
-            {
-                var r = SfcIO.Load(_doc, dlg.FileName);
-                sheet = r.Sheet;
-                note = $"  縮尺 {_doc.ScaleText} として実寸 (m) に換算しました。";
-                if (r.Skipped > 0)
-                    note += $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}"));
-            }
-            else
-            {
-                var skipped = DxfIO.Load(_doc, dlg.FileName);
-                note = skipped > 0 ? $"  ※未対応の図形 {skipped} 個は読み込んでいません (ブロック・寸法・ハッチング等)" : "";
-            }
+            var (note, sheet) = DrawingFiles.Open(_doc, dlg.FileName);
             if (_doc.PlaneZone == null && _settings.DefaultPlaneZone is int defZone)
             {
                 _doc.PlaneZone = defZone;
@@ -381,27 +367,16 @@ public partial class MainWindow : Window
     private void Save_Executed(object sender, ExecutedRoutedEventArgs e)
     {
         // 開いたファイルと同じ形式を初期値にする
-        var isSfc = _filePath != null && Path.GetExtension(_filePath).Equals(".sfc", StringComparison.OrdinalIgnoreCase);
         var dlg = new SaveFileDialog
         {
-            Filter = "DXF ファイル (*.dxf)|*.dxf|SXF (SFC) ファイル (*.sfc)|*.sfc",
-            FilterIndex = isSfc ? 2 : 1,
+            Filter = DrawingFiles.SaveFilter,
+            FilterIndex = DrawingFiles.SaveFilterIndex(_filePath),
             FileName = _filePath != null ? Path.GetFileName(_filePath) : _active.FileName + ".dxf",
         };
         if (dlg.ShowDialog(this) != true) return;
         try
         {
-            if (Path.GetExtension(dlg.FileName).Equals(".sfc", StringComparison.OrdinalIgnoreCase))
-            {
-                SfcWriter.Save(_doc, dlg.FileName);
-                var (paper, pw, ph, _) = SfcWriter.Layout(_doc);
-                Log($"SFC で保存しました: {dlg.FileName}  (用紙 {paper?.Name ?? $"自由 {pw:0}×{ph:0}mm"} 横, 縮尺 {_doc.ScaleText})");
-            }
-            else
-            {
-                DxfIO.Save(_doc, dlg.FileName);
-                Log($"保存しました: {dlg.FileName}");
-            }
+            Log(DrawingFiles.Save(_doc, dlg.FileName));
             _filePath = dlg.FileName;
             _active.MarkSaved();
             UpdateTitle();

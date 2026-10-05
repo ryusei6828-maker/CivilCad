@@ -6,6 +6,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ACadSharp" Version="3.8.0" />
     <PackageReference Include="netDxf.netstandard" Version="3.0.1" />
   </ItemGroup>
 
