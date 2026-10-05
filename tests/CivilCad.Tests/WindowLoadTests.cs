@@ -1,0 +1,48 @@
+using System.Runtime.ExceptionServices;
+using CivilCad.App.Settings;
+
+namespace CivilCad.Tests;
+
+/// <summary>画面 (XAML) が例外なく組み立てられるかの確認。WPF は STA スレッドが必要。</summary>
+public class WindowLoadTests
+{
+    [Fact]
+    public void MainAndSettingsWindows_Construct()
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var app = new CivilCad.App.App();
+                app.InitializeComponent(); // アイコン等のリソースを読み込む
+                var main = new CivilCad.App.MainWindow();
+                var settings = new SettingsWindow(new AppSettings());
+                var frame = new CivilCad.App.Drawing.FrameWindow(new CivilCad.App.Drawing.DrawingFrameOptions());
+                Assert.NotNull(main.Content);
+                // レイヤパネルは既定で閉じ、プロパティは開いている
+                Assert.Equal(System.Windows.Visibility.Collapsed, ((System.Windows.FrameworkElement)main.FindName("LayerHost")).Visibility);
+                Assert.Equal(System.Windows.Visibility.Visible, ((System.Windows.FrameworkElement)main.FindName("PropsHost")).Visibility);
+                Assert.NotNull(settings.Content);
+                Assert.NotNull(frame.Content);
+                frame.Close();
+                var zoneWin = new CivilCad.App.Drawing.ZoneWindow(2, false, new CivilCad.Core.Geometry.Vec2(-60760, -95537));
+                Assert.NotNull(zoneWin.Content);
+                zoneWin.Close();
+                var scale = new CivilCad.App.Drawing.ScaleWindow(500);
+                Assert.NotNull(scale.Content);
+                scale.Close();
+                main.Close();
+                settings.Close();
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error != null) ExceptionDispatchInfo.Capture(error).Throw();
+    }
+}

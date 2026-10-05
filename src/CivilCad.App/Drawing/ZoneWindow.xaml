@@ -1,0 +1,30 @@
+<Window x:Class="CivilCad.App.Drawing.ZoneWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="平面直角座標系" Width="640" Height="560" ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8"
+                   Text="図面の測量座標が属する系を選んでください (平成14年国土交通省告示第9号、世界測地系 JGD2011)。設定すると、ステータスバーにカーソル位置の緯度・経度を表示します。"/>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <TextBlock x:Name="CheckText" Foreground="#FF0066CC" TextWrapping="Wrap" MinHeight="34"/>
+            <CheckBox x:Name="DefaultCheck" Content="新しい図面・系の入っていない図面を開いたときも、この系にする" Margin="0,6,0,0"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                <Button Content="OK" Width="90" Margin="0,0,8,0" IsDefault="True" Click="Ok_Click"/>
+                <Button Content="キャンセル" Width="90" IsCancel="True"/>
+            </StackPanel>
+        </StackPanel>
+
+        <ListBox x:Name="ZoneList" SelectionChanged="ZoneList_SelectionChanged" MouseDoubleClick="ZoneList_MouseDoubleClick">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Margin="2,3">
+                        <TextBlock Text="{Binding Title}" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding Detail}" Foreground="Gray" TextWrapping="Wrap" MaxWidth="560"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </DockPanel>
+</Window>

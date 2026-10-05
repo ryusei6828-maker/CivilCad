@@ -1,0 +1,300 @@
+<Window x:Class="CivilCad.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="clr-namespace:CivilCad.App.Views"
+        xmlns:m="clr-namespace:CivilCad.Core.Model;assembly=CivilCad.Core"
+        Title="CivilCad" Icon="civilcad.ico" Width="1400" Height="900" WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <v:RgbColorToBrushConverter x:Key="ColorBrush"/>
+        <DataTemplate x:Key="ColorSwatch" DataType="{x:Type m:RgbColor}">
+            <Border Width="28" Height="12" BorderBrush="Gray" BorderThickness="1"
+                    Background="{Binding Converter={StaticResource ColorBrush}}"/>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Window.CommandBindings>
+        <CommandBinding Command="New" Executed="New_Executed"/>
+        <CommandBinding Command="Open" Executed="Open_Executed"/>
+        <CommandBinding Command="Save" Executed="Save_Executed"/>
+        <CommandBinding Command="Undo" Executed="Undo_Executed"/>
+        <CommandBinding Command="Redo" Executed="Redo_Executed"/>
+        <CommandBinding Command="SelectAll" Executed="SelectAll_Executed"/>
+    </Window.CommandBindings>
+
+    <DockPanel>
+        <Menu x:Name="MainMenu" DockPanel.Dock="Top">
+            <MenuItem Header="ファイル(_F)">
+                <MenuItem Header="新規(_N)" Command="New"><MenuItem.Icon><Image Source="{StaticResource IconNew}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="開く DXF / SFC(_O)..." Command="Open"><MenuItem.Icon><Image Source="{StaticResource IconOpen}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="名前を付けて保存 DXF / SFC(_S)..." Command="Save"><MenuItem.Icon><Image Source="{StaticResource IconSave}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <Separator/>
+                <MenuItem Header="終了(_X)" Click="Exit_Click"/>
+            </MenuItem>
+            <MenuItem Header="編集(_E)">
+                <MenuItem Header="元に戻す(_U)" Command="Undo"><MenuItem.Icon><Image Source="{StaticResource IconUndo}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="やり直し(_R)" Command="Redo"><MenuItem.Icon><Image Source="{StaticResource IconRedo}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <Separator/>
+                <MenuItem Header="すべて選択(_A)" Command="SelectAll"/>
+                <MenuItem Header="削除モード (E)" Tag="E" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconErase}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+            </MenuItem>
+            <MenuItem Header="作図(_D)">
+                <MenuItem Header="線 (L)" Tag="L" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconLine}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="ポリライン (PL)" Tag="PL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPolyline}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="円 (C)" Tag="C" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCircle}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="円弧 3点 (A)" Tag="A" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconArc}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="文字 (T)" Tag="T" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconText}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <Separator/>
+                <MenuItem Header="図枠 (外枠・表題欄) (FR)..." Tag="FR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFrame}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="縮尺設定 (SC)..." Tag="SC" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconScale}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="座標設定 (CS)" Tag="CS" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCoord}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="平面直角座標系の系番号 (ZN)..." Tag="ZN" Click="Tool_Click"/>
+            </MenuItem>
+            <MenuItem Header="修正(_M)">
+                <MenuItem Header="移動 (M)" Tag="M" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconMove}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="複写 (CO)" Tag="CO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCopy}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="削除モード (E)" Tag="E" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconErase}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+            </MenuItem>
+            <MenuItem Header="表示(_V)">
+                <MenuItem Header="全体表示 (ZE / ホイールダブルクリック)" Tag="ZE" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconZoomExtents}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <Separator/>
+                <MenuItem Header="レイヤパネル (LA)" Tag="LA" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconLayers}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="プロパティ (PR)" Tag="PR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconProperties}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="プロパティをフロート (PRF)" Tag="PRF" Click="Tool_Click"/>
+                <MenuItem Header="レイヤパネルをフロート (LAF)" Tag="LAF" Click="Tool_Click"/>
+            </MenuItem>
+            <MenuItem Header="計測(_I)">
+                <MenuItem Header="距離・方向角 (DI)" Tag="DI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconDistance}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="面積 (AA)" Tag="AA" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconArea}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+            </MenuItem>
+            <MenuItem Header="路線(_R)">
+                <MenuItem Header="路線計算 IP法 (RC)..." Tag="RC" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="路線 XML (LandXML) 読込 (RX)..." Tag="RX" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="測点照会 (ST)" Tag="ST" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconStation}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+            </MenuItem>
+            <MenuItem Header="設定(_S)">
+                <MenuItem Header="キー割り当て(_K)..." Click="Settings_Click"/>
+                <MenuItem x:Name="SnapKindsMenu" Header="スナップの種類(_N)" SubmenuOpened="SnapKindsMenu_SubmenuOpened">
+                    <MenuItem Header="(読み込み中)"/>
+                </MenuItem>
+            </MenuItem>
+        </Menu>
+
+        <ToolBarTray DockPanel.Dock="Top">
+            <ToolBar x:Name="MainToolBar">
+                <Button Style="{StaticResource ToolButton}" Command="New" ToolTip="新規 (Ctrl+N)"><StackPanel><Image Source="{StaticResource IconNew}" Width="24" Height="24"/><TextBlock Text="新規" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Command="Open" ToolTip="DXF / SFC を開く (Ctrl+O)"><StackPanel><Image Source="{StaticResource IconOpen}" Width="24" Height="24"/><TextBlock Text="開く" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Command="Save" ToolTip="DXF / SFC で保存 (Ctrl+S)"><StackPanel><Image Source="{StaticResource IconSave}" Width="24" Height="24"/><TextBlock Text="保存" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolButton}" Command="Undo" ToolTip="元に戻す (Ctrl+Z)"><StackPanel><Image Source="{StaticResource IconUndo}" Width="24" Height="24"/><TextBlock Text="戻す" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Command="Redo" ToolTip="やり直し (Ctrl+Y)"><StackPanel><Image Source="{StaticResource IconRedo}" Width="24" Height="24"/><TextBlock Text="やり直し" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolButton}" Tag="L" Click="Tool_Click" ToolTip="線 (L)"><StackPanel><Image Source="{StaticResource IconLine}" Width="24" Height="24"/><TextBlock Text="線" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="PL" Click="Tool_Click" ToolTip="ポリライン (PL)"><StackPanel><Image Source="{StaticResource IconPolyline}" Width="24" Height="24"/><TextBlock Text="ポリライン" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="C" Click="Tool_Click" ToolTip="円 (C)"><StackPanel><Image Source="{StaticResource IconCircle}" Width="24" Height="24"/><TextBlock Text="円" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="A" Click="Tool_Click" ToolTip="3点円弧 (A)"><StackPanel><Image Source="{StaticResource IconArc}" Width="24" Height="24"/><TextBlock Text="円弧" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="T" Click="Tool_Click" ToolTip="文字 (T)"><StackPanel><Image Source="{StaticResource IconText}" Width="24" Height="24"/><TextBlock Text="文字" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="FR" Click="Tool_Click" ToolTip="図枠 (FR)"><StackPanel><Image Source="{StaticResource IconFrame}" Width="24" Height="24"/><TextBlock Text="図枠" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="SC" Click="Tool_Click" ToolTip="縮尺設定 (SC)"><StackPanel><Image Source="{StaticResource IconScale}" Width="24" Height="24"/><TextBlock Text="縮尺" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="CS" Click="Tool_Click" ToolTip="座標設定 (CS)"><StackPanel><Image Source="{StaticResource IconCoord}" Width="24" Height="24"/><TextBlock Text="座標" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolButton}" Tag="M" Click="Tool_Click" ToolTip="移動 (M) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconMove}" Width="24" Height="24"/><TextBlock Text="移動" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="CO" Click="Tool_Click" ToolTip="複写 (CO) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconCopy}" Width="24" Height="24"/><TextBlock Text="複写" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="E" Click="Tool_Click" ToolTip="削除モード (E): クリックした図形を消す。Esc で終了"><StackPanel><Image Source="{StaticResource IconErase}" Width="24" Height="24"/><TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolButton}" Tag="DI" Click="Tool_Click" ToolTip="距離・方向角 (DI)"><StackPanel><Image Source="{StaticResource IconDistance}" Width="24" Height="24"/><TextBlock Text="距離" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="AA" Click="Tool_Click" ToolTip="面積 (AA)"><StackPanel><Image Source="{StaticResource IconArea}" Width="24" Height="24"/><TextBlock Text="面積" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolButton}" Tag="RC" Click="Tool_Click" ToolTip="路線計算 IP法 (RC)"><StackPanel><Image Source="{StaticResource IconRoute}" Width="24" Height="24"/><TextBlock Text="路線計算" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="ST" Click="Tool_Click" ToolTip="測点照会 (ST)"><StackPanel><Image Source="{StaticResource IconStation}" Width="24" Height="24"/><TextBlock Text="測点照会" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolButton}" Tag="ZE" Click="Tool_Click" ToolTip="全体表示 (ZE)"><StackPanel><Image Source="{StaticResource IconZoomExtents}" Width="24" Height="24"/><TextBlock Text="全体表示" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolButton}" Tag="LA" Click="Tool_Click" ToolTip="レイヤパネル (LA)"><StackPanel><Image Source="{StaticResource IconLayers}" Width="24" Height="24"/><TextBlock Text="レイヤ" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Tag="PR" Click="Tool_Click" ToolTip="プロパティ (PR)"><StackPanel><Image Source="{StaticResource IconProperties}" Width="24" Height="24"/><TextBlock Text="プロパティ" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+            </ToolBar>
+        </ToolBarTray>
+
+        <!-- ステータスバー -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="CoordText" FontFamily="Consolas, Yu Gothic UI" MinWidth="360"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
+                <Button x:Name="ScaleButton" Focusable="False" Click="ScaleButton_Click" Padding="6,0" ToolTip="図面の縮尺 (クリックで変更)"/>
+            </StatusBarItem>
+            <StatusBarItem>
+                <Button x:Name="ZoneButton" Focusable="False" Click="ZoneButton_Click" Padding="6,0" ToolTip="平面直角座標系の系番号 (クリックで変更)"/>
+            </StatusBarItem>
+            <StatusBarItem>
+                <Button x:Name="LayerButton" Focusable="False" Click="LayerButton_Click" Padding="6,0" ToolTip="現在レイヤ (クリックでレイヤパネルを開く/閉じる)"/>
+            </StatusBarItem>
+            <StatusBarItem>
+                <ToggleButton x:Name="SnapToggle" Content="スナップ [F3]" IsChecked="True" Focusable="False" Click="Toggle_Click"
+                              ToolTip="クリックでオン/オフ、右クリックでスナップの種類を選ぶ">
+                    <ToggleButton.ContextMenu>
+                        <ContextMenu x:Name="SnapContextMenu" Opened="SnapContextMenu_Opened"/>
+                    </ToggleButton.ContextMenu>
+                </ToggleButton>
+            </StatusBarItem>
+            <StatusBarItem>
+                <ToggleButton x:Name="OrthoToggle" Content="直交 [F8]" Focusable="False" Click="Toggle_Click"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
+                <TextBlock x:Name="SelectionText"/>
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- コマンドライン -->
+        <Grid DockPanel.Dock="Bottom" Background="#FF252526">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBox x:Name="MessageLog" Height="54" IsReadOnly="True" Background="#FF252526" Foreground="#FFCCCCCC"
+                     BorderThickness="0" FontFamily="Consolas, Yu Gothic UI" VerticalScrollBarVisibility="Auto" Padding="4,2"/>
+            <DockPanel Grid.Row="1">
+                <TextBlock x:Name="PromptText" DockPanel.Dock="Left" Foreground="#FF9CDCFE" VerticalAlignment="Center"
+                           Margin="6,0,6,0" FontFamily="Yu Gothic UI"/>
+                <TextBox x:Name="CommandBox" Background="#FF1E1E1E" Foreground="White" CaretBrush="White"
+                         BorderBrush="#FF3C3C3C" FontFamily="Consolas, Yu Gothic UI" Padding="2"/>
+            </DockPanel>
+        </Grid>
+
+        <!-- レイヤパネル -->
+        <Border x:Name="LayerHost" DockPanel.Dock="Left" Visibility="Collapsed">
+        <DockPanel x:Name="LayerPanel" Width="320" Margin="4" Background="White">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4" Background="Transparent"
+                       ToolTip="ダブルクリックでフロート / ドッキング切り替え" MouseLeftButtonDown="LayerHeader_MouseDown">
+                <Button x:Name="LayerFloatButton" DockPanel.Dock="Right" Content="⧉" Padding="6,0" BorderThickness="0"
+                        Background="Transparent" Focusable="False" Click="LayerFloat_Click" ToolTip="フロート (別ウィンドウに切り離す)"/>
+                <TextBlock Text="レイヤ" FontWeight="Bold"/>
+            </DockPanel>
+            <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
+                <CheckBox x:Name="OnlyCurrentCheck" Content="現在レイヤのみ編集 (他はグレー表示・選択不可)" Margin="0,0,0,6"
+                          Click="OnlyCurrent_Click"/>
+                <WrapPanel>
+                    <Button Content="新規" Width="72" Margin="0,0,4,4" Click="LayerAdd_Click"/>
+                    <Button Content="削除" Width="72" Margin="0,0,4,4" Click="LayerRemove_Click"/>
+                    <Button Content="現在にする" Width="72" Margin="0,0,4,4" Click="LayerSetCurrent_Click"/>
+                    <Button Content="単独表示" Width="72" Margin="0,0,4,4" Click="LayerIsolate_Click"
+                            ToolTip="選択レイヤ以外を非表示にします"/>
+                    <Button Content="全表示" Width="72" Margin="0,0,4,4" Click="LayerShowAll_Click"/>
+                    <Button Content="全選択" Width="72" Margin="0,0,4,4" Click="LayerSelectEntities_Click"
+                            ToolTip="選択レイヤ上の図形をすべて選択します"/>
+                    <Button Content="図形を移す" Width="148" Margin="0,0,4,4" Click="LayerMoveEntities_Click"
+                            ToolTip="選択中の図形を、一覧で選んだレイヤへ移します"/>
+                </WrapPanel>
+            </StackPanel>
+            <DataGrid x:Name="LayerGrid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                      HeadersVisibility="Column" SelectionMode="Single" GridLinesVisibility="Horizontal"
+                      MouseDoubleClick="LayerGrid_MouseDoubleClick">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="" Width="22">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="●" Foreground="LimeGreen" HorizontalAlignment="Center"
+                                           ToolTip="現在レイヤ">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Hidden"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="表示" Width="40">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsVisible, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="ロック" Width="44">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsLocked, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="色" Width="64">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ComboBox SelectedItem="{Binding Color, UpdateSourceTrigger=PropertyChanged}"
+                                          ItemsSource="{x:Static m:RgbColor.Palette}"
+                                          ItemTemplate="{StaticResource ColorSwatch}" Padding="2"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="名前" Binding="{Binding Name}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
+        </Border>
+
+        <Border x:Name="PropsHost" DockPanel.Dock="Right" Width="290" BorderBrush="#FFCCCCCC" BorderThickness="1,0,0,0">
+            <v:PropertiesPanel x:Name="PropsPanel"/>
+        </Border>
+
+        <!-- シートタブ + 作図領域 -->
+        <DockPanel>
+            <Border DockPanel.Dock="Top" Background="#FF2D2D30" BorderBrush="#FF3F3F46" BorderThickness="0,0,0,1">
+                <DockPanel>
+                    <!-- 右端: 表示中のシートの縮尺と平面直角座標系 (クリックで変更) -->
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,6,0">
+                        <Button x:Name="TabScaleButton" Click="ScaleButton_Click" Focusable="False" Style="{StaticResource SheetInfoButton}"
+                                ToolTip="表示中のシートの縮尺 (クリックで変更)"/>
+                        <Button x:Name="TabZoneButton" Click="ZoneButton_Click" Focusable="False" Style="{StaticResource SheetInfoButton}"
+                                ToolTip="表示中のシートの平面直角座標系 (クリックで変更)"/>
+                    </StackPanel>
+                    <Button DockPanel.Dock="Right" Content="＋" Command="New" Focusable="False" Style="{StaticResource SheetInfoButton}"
+                            ToolTip="新しいシート (Ctrl+N)" FontWeight="Bold"/>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="SheetTabs">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border x:Name="Tab" Margin="0,3,1,0" Padding="10,3,4,3" CornerRadius="4,4,0,0" Cursor="Hand"
+                                            Background="#FF3E3E42" MouseLeftButtonUp="SheetTab_Click" MouseDown="SheetTab_MouseDown"
+                                            ToolTip="{Binding FilePath}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <StackPanel>
+                                                <TextBlock x:Name="TabTitle" Text="{Binding Title}" Foreground="#FFCCCCCC" FontSize="12"/>
+                                                <TextBlock x:Name="TabInfo" Text="{Binding Info}" Foreground="#FF999999" FontSize="10"/>
+                                            </StackPanel>
+                                            <Button Content="×" Click="SheetTabClose_Click" Focusable="False" Margin="8,0,0,0" Padding="4,0"
+                                                    VerticalAlignment="Center" Background="Transparent" BorderThickness="0"
+                                                    Foreground="#FFAAAAAA" ToolTip="このシートを閉じる"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                            <Setter TargetName="Tab" Property="Background" Value="#FF1E1E1E"/>
+                                            <Setter TargetName="TabTitle" Property="Foreground" Value="White"/>
+                                            <Setter TargetName="TabTitle" Property="FontWeight" Value="Bold"/>
+                                            <Setter TargetName="TabInfo" Property="Foreground" Value="#FF9CDCFE"/>
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+            <!-- 作図入力バー (線・円などの作図中だけ表示) -->
+            <v:DrawInputBar x:Name="InputBar" DockPanel.Dock="Top"/>
+            <v:CadCanvas x:Name="Canvas"/>
+        </DockPanel>
+    </DockPanel>
+</Window>

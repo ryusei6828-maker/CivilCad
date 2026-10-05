@@ -1,0 +1,88 @@
+<Window x:Class="CivilCad.App.Alignment.AlignmentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="路線計算 (IP法)" Width="1000" Height="720"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="8">
+        <!-- 路線の基本情報 -->
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+            <TextBlock Text="路線名" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="NameBox" Width="120" Margin="0,0,12,0"/>
+            <TextBlock Text="開始追加距離 (m)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="StartBox" Width="80" Margin="0,0,12,0"/>
+            <TextBlock Text="測点間隔 (m)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="PitchBox" Width="60" Margin="0,0,12,0"/>
+            <TextBlock x:Name="TextHeightLabel" Text="文字高 (mm)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="TextHeightBox" Width="60"/>
+        </WrapPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <TextBlock x:Name="ErrorText" Foreground="Firebrick" VerticalAlignment="Center" Margin="0,0,16,0" TextWrapping="Wrap" MaxWidth="600"/>
+            <Button Content="計算" Width="90" Margin="0,0,8,0" Click="Compute_Click"/>
+            <Button Content="作図して閉じる" Width="120" Margin="0,0,8,0" Click="Draw_Click" IsDefault="True"/>
+            <Button Content="キャンセル" Width="90" IsCancel="True"/>
+        </StackPanel>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="2*"/>
+                <RowDefinition Height="5"/>
+                <RowDefinition Height="3*"/>
+            </Grid.RowDefinitions>
+
+            <!-- IP 入力表 -->
+            <GroupBox Header="IP 表  (座標は測量座標 X=北 / Y=東、R=0 は曲線なし、A=0 はクロソイドなし)">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Margin="6,0,0,0" Width="90">
+                        <Button Content="行を挿入" Margin="0,0,0,4" Click="InsertRow_Click"/>
+                        <Button Content="行を削除" Margin="0,0,0,4" Click="DeleteRow_Click"/>
+                        <Button Content="CSV 貼付" Margin="0,0,0,4" Click="PasteCsv_Click"
+                                ToolTip="Excel 等からコピーした 名称,X,Y,R,A1,A2 の表を貼り付けます"/>
+                        <Button Content="XML 読込" Margin="0,0,0,4" Click="LoadXml_Click"
+                                ToolTip="路線の LandXML (J-LandXML) を読み込み、IP 表・路線名・開始追加距離・測点間隔を置き換えます"/>
+                    </StackPanel>
+                    <DataGrid x:Name="IpGrid" AutoGenerateColumns="False" CanUserAddRows="True" CanUserSortColumns="False"
+                              HeadersVisibility="Column" SelectionUnit="FullRow">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="80"/>
+                            <DataGridTextColumn Header="X (北)" Binding="{Binding X, StringFormat=F3}" Width="*"/>
+                            <DataGridTextColumn Header="Y (東)" Binding="{Binding Y, StringFormat=F3}" Width="*"/>
+                            <DataGridTextColumn Header="R" Binding="{Binding R}" Width="90"/>
+                            <DataGridTextColumn Header="A1 (入口)" Binding="{Binding A1}" Width="90"/>
+                            <DataGridTextColumn Header="A2 (出口)" Binding="{Binding A2}" Width="90"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </GroupBox>
+
+            <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"/>
+
+            <!-- 計算結果 -->
+            <TabControl Grid.Row="2">
+                <TabItem Header="主要点">
+                    <DataGrid x:Name="MainPointGrid" IsReadOnly="True" AutoGenerateColumns="True" HeadersVisibility="Column"/>
+                </TabItem>
+                <TabItem Header="曲線諸元">
+                    <DataGrid x:Name="CurveGrid" IsReadOnly="True" AutoGenerateColumns="True" HeadersVisibility="Column"/>
+                </TabItem>
+                <TabItem Header="中心線座標 (測点ごと)">
+                    <DataGrid x:Name="StationGrid" IsReadOnly="True" AutoGenerateColumns="True" HeadersVisibility="Column"/>
+                </TabItem>
+                <TabItem Header="任意点計算">
+                    <StackPanel Margin="8">
+                        <TextBlock Text="測点と幅から座標を求めます (測点は No.3+12.5 / 3+12.5 / 追加距離 の形式、幅は右側が +)" Margin="0,0,0,6"/>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="測点" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <TextBox x:Name="QueryStationBox" Width="120" Margin="0,0,12,0" Text="No.5"/>
+                            <TextBlock Text="幅 (m)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <TextBox x:Name="QueryOffsetBox" Width="80" Margin="0,0,12,0" Text="0"/>
+                            <Button Content="計算" Width="80" Click="Query_Click"/>
+                        </StackPanel>
+                        <TextBox x:Name="QueryResult" Margin="0,8,0,0" IsReadOnly="True" FontFamily="Consolas" Height="80"
+                                 TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+                    </StackPanel>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </DockPanel>
+</Window>

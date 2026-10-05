@@ -1,0 +1,71 @@
+<Window x:Class="CivilCad.App.Drawing.FrameWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="図枠の作成" Width="520" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="12">
+        <GroupBox Header="用紙・縮尺" Padding="6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="90"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="用紙" VerticalAlignment="Center"/>
+                <ComboBox x:Name="PaperBox" Grid.Column="1" Margin="0,2" SelectionChanged="Input_Changed"/>
+                <TextBlock Grid.Row="1" Text="縮尺  1 :" VerticalAlignment="Center"/>
+                <ComboBox x:Name="ScaleBox" Grid.Row="1" Grid.Column="1" Margin="0,2" IsEditable="True" Width="120"
+                          HorizontalAlignment="Left" TextBoxBase.TextChanged="Input_Changed"/>
+                <TextBlock Grid.Row="2" Text="余白 (mm)" VerticalAlignment="Center"/>
+                <TextBox x:Name="MarginBox" Grid.Row="2" Grid.Column="1" Margin="0,2" Width="120" HorizontalAlignment="Left"
+                         TextChanged="Input_Changed"/>
+                <TextBlock x:Name="SizeText" Grid.Row="3" Grid.ColumnSpan="2" Foreground="Gray" Margin="0,4,0,0"/>
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Margin="0,8,0,0" Padding="6">
+            <GroupBox.Header>
+                <CheckBox x:Name="TitleCheck" Content="表題欄 (右下 100×60mm)" IsChecked="True" Click="TitleCheck_Click"/>
+            </GroupBox.Header>
+            <Grid x:Name="TitleFields">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="90"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="工事名" VerticalAlignment="Center"/>
+                <TextBox x:Name="ProjectBox" Grid.Column="1" Margin="0,2"/>
+                <TextBlock Grid.Row="1" Text="図面名" VerticalAlignment="Center"/>
+                <TextBox x:Name="DrawingNameBox" Grid.Row="1" Grid.Column="1" Margin="0,2"/>
+                <TextBlock Grid.Row="2" Text="作成年月日" VerticalAlignment="Center"/>
+                <TextBox x:Name="DateBox" Grid.Row="2" Grid.Column="1" Margin="0,2"/>
+                <TextBlock Grid.Row="3" Text="図面番号" VerticalAlignment="Center"/>
+                <TextBox x:Name="NumberBox" Grid.Row="3" Grid.Column="1" Margin="0,2" ToolTip="例: 1 / 19"/>
+                <TextBlock Grid.Row="4" Text="会社名" VerticalAlignment="Center"/>
+                <TextBox x:Name="CompanyBox" Grid.Row="4" Grid.Column="1" Margin="0,2"/>
+                <TextBlock Grid.Row="5" Text="事業者名" VerticalAlignment="Center"/>
+                <TextBox x:Name="ClientBox" Grid.Row="5" Grid.Column="1" Margin="0,2" ToolTip="発注者 (例: 九州地方整備局 八代河川国道事務所)"/>
+            </Grid>
+        </GroupBox>
+
+        <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="Gray"
+                   Text="OK の後、図面上で外枠の左下の位置をクリックしてください (座標入力も可)。入力内容は次回も使えるよう保存されます。"/>
+        <TextBlock x:Name="ErrorText" Foreground="Firebrick" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="OK" Width="90" Margin="0,0,8,0" IsDefault="True" Click="Ok_Click"/>
+            <Button Content="キャンセル" Width="90" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
