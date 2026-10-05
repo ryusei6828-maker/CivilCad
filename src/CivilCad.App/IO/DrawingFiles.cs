@@ -10,13 +10,14 @@ public static class DrawingFiles
 {
     /// <summary>開くダイアログのフィルタ。</summary>
     public const string OpenFilter =
-        "図面ファイル (*.dxf;*.dwg;*.sfc)|*.dxf;*.dwg;*.sfc|DXF ファイル (*.dxf)|*.dxf|DWG ファイル (*.dwg)|*.dwg|SXF (SFC) ファイル (*.sfc)|*.sfc";
+        "図面ファイル (*.dxf;*.dwg;*.jww;*.sfc)|*.dxf;*.dwg;*.jww;*.sfc|DXF ファイル (*.dxf)|*.dxf|DWG ファイル (*.dwg)|*.dwg|Jw_cad ファイル (*.jww)|*.jww|SXF (SFC) ファイル (*.sfc)|*.sfc";
 
     /// <summary>保存ダイアログの形式 (拡張子とフィルタの表示名)。順番がフィルタの番号になる。</summary>
     public static IReadOnlyList<(string Ext, string Label)> SaveFormats { get; } =
     [
         (".dxf", "DXF ファイル (*.dxf)|*.dxf"),
         (".dwg", "DWG ファイル (AutoCAD 2013 形式) (*.dwg)|*.dwg"),
+        (".jww", "Jw_cad ファイル (*.jww)|*.jww"),
         (".sfc", "SXF (SFC) ファイル (*.sfc)|*.sfc"),
     ];
 
@@ -46,6 +47,13 @@ public static class DrawingFiles
                 if (r.Skipped > 0) note += $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}"));
                 return new OpenResult(note, r.Sheet);
             }
+            case ".jww":
+            {
+                var r = JwwIO.Load(doc, path);
+                var note = $"  Jw_cad のデータ版 {r.Version}。縮尺 {doc.ScaleText} として実寸 (m) に換算しました。";
+                if (r.Skipped > 0) note += "  ※" + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}"));
+                return new OpenResult(note, r.Sheet);
+            }
             case ".dwg":
             {
                 var skipped = DwgIO.Load(doc, path);
@@ -69,6 +77,12 @@ public static class DrawingFiles
                 SfcWriter.Save(doc, path);
                 var (paper, pw, ph, _) = SfcWriter.Layout(doc);
                 return $"SFC で保存しました: {path}  (用紙 {PaperText(paper, pw, ph)} 横, 縮尺 {doc.ScaleText})";
+            }
+            case ".jww":
+            {
+                JwwIO.Save(doc, path);
+                var (paper, pw, ph, _) = SfcWriter.Layout(doc);
+                return $"Jw_cad (JWW) で保存しました: {path}  (用紙 {PaperText(paper, pw, ph)}, 縮尺 {doc.ScaleText})";
             }
             case ".dwg":
                 DwgIO.Save(doc, path);
