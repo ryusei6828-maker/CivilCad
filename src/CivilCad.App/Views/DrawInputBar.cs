@@ -66,15 +66,14 @@ public sealed class DrawInputBar : Border
         return true;
     }
 
-    /// <summary>長さの単位を次へ (mm → cm → m)。入力中の欄があれば、その数字を新しい単位で読み直す。</summary>
+    /// <summary>
+    /// 長さの単位を次へ (mm → cm → m)。欄の数字はそのままで単位だけ変える
+    /// (500 mm → 500 cm → 500 m)。確定済みの値も入力中の値も同じ扱い。
+    /// </summary>
     public void CycleUnit()
     {
         DrawInputMemory.Unit = DrawInputMemory.Unit.Next();
-        foreach (var f in _fields.Where(f => f.IsLength))
-        {
-            if (f.Box.IsKeyboardFocused) f.Commit(force: true); // 打った数字はそのまま、単位だけ変える
-            else f.Refresh();
-        }
+        foreach (var f in _fields.Where(f => f.IsLength)) f.Commit(force: true);
         _canvas?.RedrawOverlay();
         UpdateGuide();
         UpdateLive();
