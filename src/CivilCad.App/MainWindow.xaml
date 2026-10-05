@@ -160,19 +160,40 @@
                 <Button x:Name="LayerButton" Focusable="False" Click="LayerButton_Click" Padding="6,0" ToolTip="現在レイヤ (クリックでレイヤパネルを開く/閉じる)"/>
             </StatusBarItem>
             <StatusBarItem>
-                <ToggleButton x:Name="SnapToggle" Content="スナップ [F3]" IsChecked="True" Focusable="False" Click="Toggle_Click"
-                              ToolTip="クリックでオン/オフ、右クリックでスナップの種類を選ぶ">
-                    <ToggleButton.ContextMenu>
-                        <ContextMenu x:Name="SnapContextMenu" Opened="SnapContextMenu_Opened"/>
-                    </ToggleButton.ContextMenu>
-                </ToggleButton>
-            </StatusBarItem>
-            <StatusBarItem>
                 <ToggleButton x:Name="OrthoToggle" Content="直交 [F8]" Focusable="False" Click="Toggle_Click"/>
             </StatusBarItem>
             <Separator/>
             <StatusBarItem>
                 <TextBlock x:Name="SelectionText"/>
+            </StatusBarItem>
+
+            <!-- 右下: 選択方法ツールバーとスナップツールバー -->
+            <StatusBarItem HorizontalAlignment="Right">
+                <StackPanel Orientation="Horizontal">
+                    <Border BorderBrush="#FFB8BCC4" BorderThickness="1" CornerRadius="2" Padding="3,1" Margin="0,0,10,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="範囲選択" VerticalAlignment="Center" Margin="2,0,6,0" Foreground="#FF505560"/>
+                            <RadioButton x:Name="BoxInsideButton" GroupName="BoxMode" Style="{StaticResource {x:Type ToggleButton}}" Focusable="False"
+                                         Content="全体" Padding="8,0" Checked="BoxMode_Checked"
+                                         ToolTip="全体選択: ドラッグした範囲に完全に入った図形だけを選ぶ (削除モードも同じ)"/>
+                            <RadioButton x:Name="BoxCrossingButton" GroupName="BoxMode" Style="{StaticResource {x:Type ToggleButton}}" Focusable="False"
+                                         Content="一部" Padding="8,0" Margin="2,0,0,0" Checked="BoxMode_Checked"
+                                         ToolTip="一部選択: ドラッグした範囲に少しでもかかった図形を選ぶ (削除モードも同じ)"/>
+                        </StackPanel>
+                    </Border>
+                    <Border BorderBrush="#FFB8BCC4" BorderThickness="1" CornerRadius="2" Padding="3,1">
+                        <StackPanel Orientation="Horizontal">
+                            <ToggleButton x:Name="SnapToggle" Content="スナップ [F3]" IsChecked="True" Focusable="False" Click="Toggle_Click" Padding="6,0"
+                                          ToolTip="スナップ全体のオン/オフ。右の各ボタンで種類ごとに切り替え (右クリックでまとめて設定)">
+                                <ToggleButton.ContextMenu>
+                                    <ContextMenu x:Name="SnapContextMenu" Opened="SnapContextMenu_Opened"/>
+                                </ToggleButton.ContextMenu>
+                            </ToggleButton>
+                            <StackPanel x:Name="SnapKindBar" Orientation="Horizontal" Margin="4,0,0,0"
+                                        IsEnabled="{Binding IsChecked, ElementName=SnapToggle}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </StatusBarItem>
         </StatusBar>
 

@@ -22,7 +22,7 @@ public sealed class SelectTool : CadTool
     public override bool IsDragging => _drag.IsMouseDrag;
 
     protected override void OnActivated() =>
-        SetPrompt("図形をクリックで選択 / ドラッグで範囲選択 (範囲に完全に入る図形) / Shift で解除、またはコマンドを入力");
+        SetPrompt($"図形をクリックで選択 / ドラッグで範囲選択 ({BoxDrag.ModeText}) / Shift で解除、またはコマンドを入力");
 
     public override void OnPress(Vec2 p) => _drag.Press(p);
 
@@ -79,7 +79,16 @@ public sealed class SelectTool : CadTool
 /// 選択・削除で使う範囲指定。マウスは押した位置からドラッグした範囲、コマンド欄からは 2 点。
 /// 数ピクセル以内しか動かさなければドラッグではなくクリックとみなす。
 /// </summary>
-internal sealed class BoxDrag
+public enum BoxSelectMode
+{
+    /// <summary>全体選択: 範囲に完全に入る図形。</summary>
+    Inside,
+
+    /// <summary>一部選択: 範囲に少しでもかかる図形。</summary>
+    Crossing,
+}
+
+public sealed class BoxDrag
 {
     private const double ClickTolerancePx = 4;
 
@@ -112,11 +121,18 @@ internal sealed class BoxDrag
     public static bool IsMoved(CadCanvas canvas, Vec2 a, Vec2 b) =>
         a.DistanceTo(b) * canvas.Scale >= ClickTolerancePx;
 
-    /// <summary>範囲内に完全に含まれる図形 (ドラッグの向きは問わない)。</summary>
+    /// <summary>範囲選択の方法 (選択方法ツールバーで切り替え。選択と削除モードに共通)。</summary>
+    public static BoxSelectMode Mode { get; set; } = BoxSelectMode.Inside;
+
+    /// <summary>プロンプト用の説明。</summary>
+    public static string ModeText => Mode == BoxSelectMode.Inside ? "範囲に完全に入る図形" : "範囲に少しでもかかる図形";
+
+    /// <summary>範囲内の図形。全体選択なら完全に含まれるもの、一部選択ならかかるもの (ドラッグの向きは問わない)。</summary>
     public static List<Entity> Hits(CadDocument doc, Vec2 a, Vec2 b)
     {
         var box = Box2.FromPoints(a, b);
-        return doc.Entities.Where(e => doc.IsEditable(e) && box.Contains(e.Bounds)).ToList();
+        var crossing = Mode == BoxSelectMode.Crossing;
+        return doc.Entities.Where(e => doc.IsEditable(e) && (crossing ? e.IntersectsBox(box) : box.Contains(e.Bounds))).ToList();
     }
 
     public void Draw(CadCanvas canvas, DrawingContext dc, Brush fill)
@@ -130,6 +146,7 @@ internal sealed class BoxDrag
         else if (TypedCorner is Vec2 t) corner = t;
         else return;
 
-        dc.DrawRectangle(fill, CadCanvas.PreviewPen, new Rect(canvas.WorldToScreen(corner), canvas.WorldToScreen(Current)));
+        // 一部選択は破線の枠で区別する
+        dc.DrawRectangle(fill, Mode == BoxSelectMode.Crossing ? CadCanvas.PreviewDashPen : CadCanvas.PreviewPen, new Rect(canvas.WorldToScreen(corner), canvas.WorldToScreen(Current)));
     }
 }

@@ -72,6 +72,26 @@ public class DragSelectTests
     });
 
     [Fact]
+    public void Select_CrossingMode_PicksTouchingEntities() => RunSta(() =>
+    {
+        var (_, canvas, a, b) = Setup();
+        var tool = new SelectTool();
+        canvas.SetTool(tool);
+        BoxDrag.Mode = BoxSelectMode.Crossing;
+        try
+        {
+            // a の右端と b の左端にかかる範囲 (どちらも完全には入っていない)
+            tool.OnPress(new Vec2(5, -5));
+            tool.OnRelease(new Vec2(25, 5));
+            Assert.Equal(2, canvas.Selection.Count);
+        }
+        finally
+        {
+            BoxDrag.Mode = BoxSelectMode.Inside;
+        }
+    });
+
+    [Fact]
     public void Erase_DragRemovesInsideBox_ClickRemovesHit() => RunSta(() =>
     {
         var (doc, canvas, a, b) = Setup();

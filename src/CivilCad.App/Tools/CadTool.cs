@@ -44,6 +44,9 @@ public abstract class CadTool
     }
 
     protected virtual void OnActivated() { }
+
+    /// <summary>プロンプトを出し直す (選択・削除モードで、範囲選択の方法を切り替えたとき)。</summary>
+    internal void RefreshPrompt() => OnActivated();
     public virtual void OnPoint(Vec2 p) { }
 
     /// <summary>マウスの左ボタンを押した。既定はクリック = 点の指定 (コマンド欄の座標入力は OnPoint に直接来る)。</summary>

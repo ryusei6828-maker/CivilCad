@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using CivilCad.Alignment;
@@ -56,6 +57,8 @@ public partial class MainWindow : Window
         };
         ApplyKeyBindings();
         LoadSnapKinds();
+        BuildSnapBar();
+        LoadBoxSelectMode();
 
         // レイヤパネルは既定で閉じておき、現在レイヤはステータスバーに出す
         PropsPanel.Attach(Canvas);
@@ -882,6 +885,7 @@ public partial class MainWindow : Window
                 if (item.IsChecked) Canvas.SnapKinds.Add(kind);
                 else Canvas.SnapKinds.Remove(kind);
                 SaveSnapKinds();
+                RefreshSnapBar();
             };
             items.Add(item);
         }
@@ -899,6 +903,7 @@ public partial class MainWindow : Window
         Canvas.SnapKinds.Clear();
         Canvas.SnapKinds.UnionWith(kinds);
         SaveSnapKinds();
+        RefreshSnapBar();
         Log("スナップ: " + string.Join("・", Canvas.SnapKinds.OrderBy(k => k).Select(SnapFinder.Label)));
     }
 
@@ -907,6 +912,72 @@ public partial class MainWindow : Window
     private void SnapKindsMenu_SubmenuOpened(object sender, RoutedEventArgs e)
     {
         if (e.OriginalSource == SnapKindsMenu) FillSnapMenu(SnapKindsMenu.Items);
+    }
+
+    /// <summary>右下のスナップツールバーに、種類ごとのオン/オフボタンを並べる。</summary>
+    private void BuildSnapBar()
+    {
+        SnapKindBar.Children.Clear();
+        foreach (var kind in Enum.GetValues<SnapKind>())
+        {
+            var button = new ToggleButton
+            {
+                Content = SnapShortLabel(kind),
+                Tag = kind,
+                Focusable = false,
+                Padding = new Thickness(5, 0, 5, 0),
+                Margin = new Thickness(1, 0, 1, 0),
+                ToolTip = $"{SnapFinder.Label(kind)}スナップ (クリックでオン/オフ)" + kind switch
+                {
+                    SnapKind.Perpendicular or SnapKind.Tangent => "\n直前に指定した点 (線の始点など) が基準",
+                    SnapKind.Nearest => "\n他に候補が無いときだけ使う",
+                    _ => "",
+                },
+            };
+            button.Click += (_, _) =>
+            {
+                if (button.IsChecked == true) Canvas.SnapKinds.Add(kind);
+                else Canvas.SnapKinds.Remove(kind);
+                SaveSnapKinds();
+            };
+            SnapKindBar.Children.Add(button);
+        }
+        RefreshSnapBar();
+    }
+
+    private static string SnapShortLabel(SnapKind kind) => kind switch
+    {
+        SnapKind.Quadrant => "四半円",
+        SnapKind.Perpendicular => "垂線",
+        SnapKind.Nearest => "近接",
+        _ => SnapFinder.Label(kind),
+    };
+
+    private void RefreshSnapBar()
+    {
+        foreach (var b in SnapKindBar.Children.OfType<ToggleButton>())
+            b.IsChecked = b.Tag is SnapKind k && Canvas.SnapKinds.Contains(k);
+    }
+
+    // ---- 範囲選択の方法 (全体 / 一部) ----
+
+    private void LoadBoxSelectMode()
+    {
+        BoxDrag.Mode = Enum.TryParse<BoxSelectMode>(_settings.BoxSelectMode, out var m) ? m : BoxSelectMode.Inside;
+        (BoxDrag.Mode == BoxSelectMode.Inside ? BoxInsideButton : BoxCrossingButton).IsChecked = true;
+        Canvas.Tool.RefreshPrompt();
+    }
+
+    private void BoxMode_Checked(object sender, RoutedEventArgs e)
+    {
+        var mode = sender == BoxCrossingButton ? BoxSelectMode.Crossing : BoxSelectMode.Inside;
+        if (BoxDrag.Mode == mode) return;
+        BoxDrag.Mode = mode;
+        _settings.BoxSelectMode = mode.ToString();
+        SaveSettingsQuietly();
+        if (Canvas.Tool is SelectTool or EraseTool) Canvas.Tool.RefreshPrompt(); // プロンプトの説明を更新
+        Log(mode == BoxSelectMode.Inside ? "範囲選択: 全体 (範囲に完全に入る図形)" : "範囲選択: 一部 (範囲に少しでもかかる図形)");
+        FocusCommandBox();
     }
 
     // ---- 表示範囲 ----

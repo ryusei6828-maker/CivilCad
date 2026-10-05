@@ -23,7 +23,7 @@ public sealed class EraseTool : CadTool
     public override bool IsDragging => _drag.IsMouseDrag;
 
     protected override void OnActivated() =>
-        SetPrompt("消す図形をクリック / ドラッグで範囲に完全に入る図形をまとめて削除 / Esc・右クリックで終了");
+        SetPrompt($"消す図形をクリック / ドラッグで{BoxDrag.ModeText}をまとめて削除 / Esc・右クリックで終了");
 
     public override void OnPress(Vec2 p) => _drag.Press(p);
 
