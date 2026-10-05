@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\CivilCad.Core\CivilCad.Core.csproj" />
@@ -18,7 +18,7 @@
     <AssemblyName>CivilCad</AssemblyName>
     <ApplicationIcon>civilcad.ico</ApplicationIcon>
     <Product>CivilCad</Product>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
