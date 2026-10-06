@@ -127,6 +127,16 @@ public sealed class DrawInputBar : Border
             case IRadiusInput ri:
                 AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
                 break;
+            case MeasureToolBase:
+                AddCheck("結果を文字で記入", MeasureSettings.PlaceText, v => MeasureSettings.PlaceText = v,
+                    "オンなら、計測のあと結果の文字がカーソルに付いて動き、クリックした位置に置ける (Enter で置かずに次へ)");
+                AddNumber($"文字高 (mm, {doc.ScaleText})", () => MeasureSettings.TextHeightMm, v => { if (v is double h) MeasureSettings.TextHeightMm = h; },
+                    "記入する文字の高さ (用紙上の mm)", allowEmpty: false);
+                AddNumber("小数桁", () => MeasureSettings.Decimals, v => { if (v is double d) MeasureSettings.Decimals = (int)Math.Round(d); },
+                    "小数点以下の桁数 (0〜6)", allowEmpty: false, allowNegative: true);
+                AddCheck(tool is DistanceTool ? "方向角も記入" : "周長も記入", MeasureSettings.Detail, v => MeasureSettings.Detail = v,
+                    tool is DistanceTool ? "例: L=12.345m  θ=45°00'00\"" : "例: A=123.456m²  (周長 45.678m)");
+                break;
             case PerpendicularTool:
                 AddNumber("長さ", () => PerpendicularTool.FixedLength, v => { PerpendicularTool.FixedLength = v; _canvas?.Tool.RefreshPrompt(); },
                     "垂線の長さ。入れておくと、終点はクリックした側にこの長さで決まる", isLength: true);
@@ -358,6 +368,27 @@ public sealed class DrawInputBar : Border
             if (focused) Box.SelectAll();
             return true;
         }
+    }
+
+    private void AddCheck(string label, bool value, Action<bool> set, string tip)
+    {
+        var box = new CheckBox
+        {
+            Content = label,
+            IsChecked = value,
+            Foreground = LabelBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 14, 0),
+            Focusable = false,
+            ToolTip = tip,
+        };
+        box.Click += (_, _) =>
+        {
+            set(box.IsChecked == true);
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
     }
 
     private void AddHatchStyle()
