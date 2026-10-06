@@ -44,6 +44,7 @@
                 <MenuItem Header="ポリライン (PL)" Tag="PL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPolyline}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="円 (C)" Tag="C" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCircle}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="円弧 3点 (A)" Tag="A" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconArc}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="垂線 (PE)" Tag="PE" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPerpendicular}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="文字 (T)" Tag="T" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconText}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="ハッチング (H)" Tag="H" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconHatch}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
@@ -106,6 +107,7 @@
                         <Button Style="{StaticResource ToolButton}" Tag="PL" Click="Tool_Click" ToolTip="ポリライン (PL)"><StackPanel><Image Source="{StaticResource IconPolyline}" Width="24" Height="24"/><TextBlock Text="ポリライン" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="C" Click="Tool_Click" ToolTip="円 (C)"><StackPanel><Image Source="{StaticResource IconCircle}" Width="24" Height="24"/><TextBlock Text="円" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="A" Click="Tool_Click" ToolTip="円弧 (A)"><StackPanel><Image Source="{StaticResource IconArc}" Width="24" Height="24"/><TextBlock Text="円弧" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="PE" Click="Tool_Click" ToolTip="垂線 (PE)"><StackPanel><Image Source="{StaticResource IconPerpendicular}" Width="24" Height="24"/><TextBlock Text="垂線" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="T" Click="Tool_Click" ToolTip="文字 (T)"><StackPanel><Image Source="{StaticResource IconText}" Width="24" Height="24"/><TextBlock Text="文字" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="H" Click="Tool_Click" ToolTip="ハッチング (H)"><StackPanel><Image Source="{StaticResource IconHatch}" Width="24" Height="24"/><TextBlock Text="ハッチング" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>

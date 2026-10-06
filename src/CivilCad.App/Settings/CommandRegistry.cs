@@ -11,6 +11,7 @@ public static class CommandRegistry
         new("PL", "ポリライン", "IconPolyline"),
         new("C", "円", "IconCircle"),
         new("A", "円弧 (3点)", "IconArc"),
+        new("PE", "垂線", "IconPerpendicular", "基準の線 → 線上の点 → 終点 の順に指定"),
         new("T", "文字", "IconText"),
         new("H", "ハッチング", "IconHatch", "閉じた図形の内側をクリック、または点を指定して Enter"),
         new("FR", "図枠 (外枠・表題欄)", "IconFrame"),

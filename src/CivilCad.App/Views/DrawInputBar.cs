@@ -127,6 +127,10 @@ public sealed class DrawInputBar : Border
             case IRadiusInput ri:
                 AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
                 break;
+            case PerpendicularTool:
+                AddNumber("長さ", () => PerpendicularTool.FixedLength, v => { PerpendicularTool.FixedLength = v; _canvas?.Tool.RefreshPrompt(); },
+                    "垂線の長さ。入れておくと、終点はクリックした側にこの長さで決まる", isLength: true);
+                break;
             case HatchTool:
                 AddHatchStyle();
                 AddNumber("角度 (°)", () => HatchSettings.AngleDeg, v => { if (v is double a) { HatchSettings.AngleDeg = a; _canvas?.Tool.RefreshPrompt(); } },
