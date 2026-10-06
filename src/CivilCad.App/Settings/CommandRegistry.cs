@@ -13,6 +13,8 @@ public static class CommandRegistry
         new("A", "円弧 (3点)", "IconArc"),
         new("PE", "垂線", "IconPerpendicular", "基準の線 → 線上の点 → 終点 の順に指定"),
         new("T", "文字", "IconText"),
+        new("FI", "塗りつぶし", "IconFill", "閉じた図形を選択してから実行、または内側をクリック"),
+        new("J", "結合", "IconJoin", "つながった線を選択して実行すると 1 本の線になる"),
         new("H", "ハッチング", "IconHatch", "閉じた図形の内側をクリック、または点を指定して Enter"),
         new("FR", "図枠 (外枠・表題欄)", "IconFrame"),
         new("SC", "縮尺設定", "IconScale", "文字高・図枠・路線注記の換算に使う"),

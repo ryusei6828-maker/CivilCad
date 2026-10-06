@@ -118,6 +118,8 @@ public partial class MainWindow : Window
             case "A": StartTool(new ArcTool(), c); break;
             case "T": StartTool(new TextTool(), c); break;
             case "PE": StartTool(new PerpendicularTool(), c); break;
+            case "FI": StartTool(new HatchTool(fill: true), c); break;
+            case "J": JoinSelection(); break;
             case "H": StartTool(new HatchTool(), c); break;
             case "PI": ImportPoints(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
@@ -180,6 +182,28 @@ public partial class MainWindow : Window
         tool.CommandCode = code;
         Canvas.SetTool(tool);
         CommandBox.Focus();
+    }
+
+    /// <summary>結合: 選択中の、端点がつながった線・ポリライン・円弧を 1 本のポリラインにする。</summary>
+    private void JoinSelection()
+    {
+        if (Canvas.Selection.Count < 2)
+        {
+            Log("結合: つなげたい線を 2 本以上選択してから実行してください。");
+            return;
+        }
+        var tolerance = Math.Max(_doc.PaperMmToMeters(0.05), 1e-6); // 用紙上 0.05mm までの隙間はつながっているとみなす
+        var result = Joiner.Join(Canvas.Selection.ToList(), tolerance);
+        if (result.Joined.Count == 0)
+        {
+            Log("結合: 端点どうしがつながっている線がありません (線・開いたポリライン・円弧が対象です)。");
+            return;
+        }
+        _doc.History.Execute(new CompositeCommand($"結合 ({result.Consumed.Count} → {result.Joined.Count})",
+            new RemoveEntitiesCommand(result.Consumed), new AddEntitiesCommand(result.Joined)));
+        Canvas.SetSelection(result.Joined);
+        Log($"結合: {result.Consumed.Count} 本を {result.Joined.Count} 本の線にまとめました" +
+            (result.ClosedCount > 0 ? $" (閉じた図形 {result.ClosedCount} 個。塗りつぶし (FI) で中を塗れます)" : "") + "。");
     }
 
     // ---- 右クリックメニュー ----

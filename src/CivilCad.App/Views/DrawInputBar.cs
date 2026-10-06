@@ -131,12 +131,18 @@ public sealed class DrawInputBar : Border
                 AddNumber("長さ", () => PerpendicularTool.FixedLength, v => { PerpendicularTool.FixedLength = v; _canvas?.Tool.RefreshPrompt(); },
                     "垂線の長さ。入れておくと、終点はクリックした側にこの長さで決まる", isLength: true);
                 break;
-            case HatchTool:
-                AddHatchStyle();
-                AddNumber("角度 (°)", () => HatchSettings.AngleDeg, v => { if (v is double a) { HatchSettings.AngleDeg = a; _canvas?.Tool.RefreshPrompt(); } },
-                    "ハッチ線の向き。東 = 0°、反時計回り (45° = 右上がり)", allowEmpty: false, allowNegative: true);
-                AddNumber($"間隔 (mm, {doc.ScaleText})", () => HatchSettings.SpacingMm, v => { if (v is double s) { HatchSettings.SpacingMm = s; _canvas?.Tool.RefreshPrompt(); } },
-                    "用紙上の線の間隔。図面の縮尺で m に換算", allowEmpty: false);
+            case HatchTool hatchTool:
+                if (!hatchTool.IsFill)
+                {
+                    AddHatchStyle();
+                    AddNumber("角度 (°)", () => HatchSettings.AngleDeg, v => { if (v is double a) { HatchSettings.AngleDeg = a; _canvas?.Tool.RefreshPrompt(); } },
+                        "ハッチ線の向き。東 = 0°、反時計回り (45° = 右上がり)", allowEmpty: false, allowNegative: true);
+                    AddNumber($"間隔 (mm, {doc.ScaleText})", () => HatchSettings.SpacingMm, v => { if (v is double s) { HatchSettings.SpacingMm = s; _canvas?.Tool.RefreshPrompt(); } },
+                        "用紙上の線の間隔。図面の縮尺で m に換算", allowEmpty: false);
+                }
+                AddNumber("透明度 (%)", () => HatchSettings.TransparencyPercent,
+                    v => { if (v is double t) { HatchSettings.TransparencyPercent = t; _canvas?.Tool.RefreshPrompt(); } },
+                    "0 = 不透明、50 = 半透明、100 = 透明。下の線や文字を透かして見せたいときに", allowEmpty: false, allowNegative: true);
                 break;
             case TextTool:
                 AddNumber($"文字高 (mm, {doc.ScaleText})", () => TextTool.DefaultHeightMm, v => { if (v is double h) TextTool.DefaultHeightMm = h; },

@@ -337,14 +337,20 @@ public sealed class CadCanvas : FrameworkElement
         using var dc = _scene.RenderOpen();
         if (ActualWidth <= 0) return;
         var view = VisibleWorldBox;
-        foreach (var e in Document.Entities)
+        // 塗りつぶしは先 (下) に描き、線や文字が塗りに隠れないようにする
+        foreach (var fillPass in new[] { true, false })
         {
-            if (!Document.IsVisible(e) || !e.Bounds.Intersects(view)) continue;
-            var dim = Document.OnlyCurrentLayerEditable && e.Layer != Document.CurrentLayer;
-            var color = dim ? DimColor : e.EffectiveColor;
-            DrawEntity(dc, e, color, Selection.Contains(e));
+            foreach (var e in Document.Entities)
+            {
+                if (IsFill(e) != fillPass || !Document.IsVisible(e) || !e.Bounds.Intersects(view)) continue;
+                var dim = Document.OnlyCurrentLayerEditable && e.Layer != Document.CurrentLayer;
+                var color = dim ? DimColor : e.EffectiveColor;
+                DrawEntity(dc, e, color, Selection.Contains(e));
+            }
         }
     }
+
+    private static bool IsFill(Entity e) => e is HatchEntity { Solid: true } or PolylineEntity { Filled: true };
 
     public void RedrawOverlay()
     {
@@ -380,12 +386,16 @@ public sealed class CadCanvas : FrameworkElement
         }
     }
 
-    /// <summary>ハッチング: 線 (または塗り) を 1 つの図形として描く。選択中は境界も描く。</summary>
+    /// <summary>
+    /// ハッチング: 線 (または塗り) を 1 つの図形として描く。透明度があれば透かして描く。
+    /// 選択中は境界も (透かさずに) 描く。
+    /// </summary>
     private void DrawHatch(DrawingContext dc, HatchEntity h, RgbColor color, bool selected, Pen pen)
     {
+        StreamGeometry? outline = null;
         if (h.Solid || selected)
         {
-            var outline = new StreamGeometry { FillRule = FillRule.EvenOdd };
+            outline = new StreamGeometry { FillRule = FillRule.EvenOdd };
             using (var ctx = outline.Open())
             {
                 foreach (var loop in h.Loops)
@@ -395,21 +405,30 @@ public sealed class CadCanvas : FrameworkElement
                 }
             }
             outline.Freeze();
-            dc.DrawGeometry(h.Solid ? GetBrush(color) : null, selected ? pen : null, outline);
         }
-        if (h.Solid || h.Lines.Count == 0) return;
 
-        var g = new StreamGeometry();
-        using (var ctx = g.Open())
+        var translucent = h.Opacity < 1;
+        if (translucent) dc.PushOpacity(h.Opacity);
+        if (h.Solid)
         {
-            foreach (var (a, b) in h.Lines)
-            {
-                ctx.BeginFigure(WorldToScreen(a), false, false);
-                ctx.LineTo(WorldToScreen(b), true, false);
-            }
+            dc.DrawGeometry(GetBrush(color), null, outline);
         }
-        g.Freeze();
-        dc.DrawGeometry(null, pen, g);
+        else if (h.Lines.Count > 0)
+        {
+            var g = new StreamGeometry();
+            using (var ctx = g.Open())
+            {
+                foreach (var (a, b) in h.Lines)
+                {
+                    ctx.BeginFigure(WorldToScreen(a), false, false);
+                    ctx.LineTo(WorldToScreen(b), true, false);
+                }
+            }
+            g.Freeze();
+            dc.DrawGeometry(null, pen, g);
+        }
+        if (translucent) dc.Pop();
+        if (selected) dc.DrawGeometry(null, pen, outline);
     }
 
     public void DrawWorldLine(DrawingContext dc, Pen pen, Vec2 a, Vec2 b) => dc.DrawLine(pen, WorldToScreen(a), WorldToScreen(b));

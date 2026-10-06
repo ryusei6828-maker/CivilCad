@@ -19,6 +19,15 @@ public static class HatchSettings
 
     public static HatchStyle Style { get; set; } = HatchStyle.Single;
 
+    /// <summary>透明度 (%)。0 = 不透明。</summary>
+    public static double TransparencyPercent
+    {
+        get => _transparency;
+        set => _transparency = Math.Clamp(value, 0, 100);
+    }
+
+    private static double _transparency;
+
     public static string StyleName(HatchStyle s) => s switch { HatchStyle.Cross => "クロス", HatchStyle.Solid => "塗りつぶし", _ => "斜線" };
 
     public static List<HatchPattern> Patterns(CadDocument doc)
@@ -38,21 +47,77 @@ public static class HatchSettings
 /// ハッチング。閉じた図形 (閉じたポリライン・円) の内側をクリックするとその範囲にハッチングを作る
 /// (内側にある閉じた図形は中抜き)。閉じた図形が無い所では、クリックした点を頂点とする範囲を作り Enter で確定。
 /// Esc で終了するまで続けて作れる。
+/// fill = true なら「塗りつぶし」コマンド: 線ではなく色で塗る。開始時に閉じた図形を選択していれば、それらをすぐ塗る。
 /// </summary>
-public sealed class HatchTool : CadTool, IStyledDrawTool
+public sealed class HatchTool(bool fill = false) : CadTool, IStyledDrawTool
 {
     private static readonly RgbColor PreviewColor = new(0x66, 0xCC, 0xFF);
     private readonly List<Vec2> _points = [];
     private Vec2 _cursor;
     private List<List<Vec2>>? _hoverLoops;
+    private bool _selectionHandled;
 
-    public override string Name => "ハッチング";
+    public override string Name => fill ? "塗りつぶし" : "ハッチング";
     public override Vec2? BasePoint => _points.Count > 0 ? _points[^1] : null;
 
-    protected override void OnActivated() =>
+    /// <summary>塗りつぶしコマンドとして動いている。</summary>
+    public bool IsFill => fill;
+
+    private bool Solid => fill || HatchSettings.Style == HatchStyle.Solid;
+
+    protected override void OnActivated()
+    {
+        if (fill && !_selectionHandled && Canvas.Selection.Count > 0)
+        {
+            _selectionHandled = true;
+            FillSelection();
+        }
         SetPrompt(_points.Count > 0
             ? "次の点を指定 (Enter で確定、Esc で取り消し / 右クリックで一つ戻す・やり直し)"
-            : $"閉じた図形の内側をクリック、または範囲の 1 点目を指定 [{HatchSettings.StyleName(HatchSettings.Style)} {HatchSettings.AngleDeg:0.##}° 間隔 {HatchSettings.SpacingMm:0.##}mm]");
+            : fill
+                ? $"塗る範囲 (閉じた図形) の内側をクリック、または範囲の 1 点目を指定 [透明度 {HatchSettings.TransparencyPercent:0.#}%]"
+                : $"閉じた図形の内側をクリック、または範囲の 1 点目を指定 [{HatchSettings.StyleName(HatchSettings.Style)} {HatchSettings.AngleDeg:0.##}° 間隔 {HatchSettings.SpacingMm:0.##}mm]");
+    }
+
+    /// <summary>選択中の閉じた図形を塗る (内側にある選択図形は中抜き)。</summary>
+    private void FillSelection()
+    {
+        var selected = Canvas.Selection.ToList();
+        var loops = selected.Select(ClosedLoop).Where(l => l != null).Select(l => l!).ToList();
+        if (loops.Count == 0)
+        {
+            Canvas.ShowMessage("選択中の図形に閉じた図形がありません。結合 (J) で 1 つの閉じた線にしてから塗るか、範囲の内側をクリックしてください。");
+            return;
+        }
+        var fills = GroupLoops(loops).Select(MakeHatch).ToList();
+        Execute(new AddEntitiesCommand(fills, $"塗りつぶし ({fills.Count} 個)"));
+        Canvas.ClearSelection();
+        var skipped = selected.Count - loops.Count;
+        Canvas.ShowMessage($"{fills.Count} 個の範囲を塗りつぶしました。" + (skipped > 0 ? $" (閉じていない図形 {skipped} 個は対象外)" : ""));
+    }
+
+    /// <summary>
+    /// 閉じた点列を「外形 + 中抜き」の組に分ける。他のループの内側に偶数回入っているものが外形、
+    /// 奇数回のものは、それを囲む最も小さい外形の中抜き。
+    /// </summary>
+    public static List<List<List<Vec2>>> GroupLoops(List<List<Vec2>> loops)
+    {
+        int Depth(List<Vec2> l) => loops.Count(o => o != l && HatchEntity.IsInside(o, l[0]));
+        var outers = loops.Where(l => Depth(l) % 2 == 0).ToList();
+        var groups = outers.ToDictionary(o => o, o => new List<List<Vec2>> { o });
+        foreach (var hole in loops.Where(l => Depth(l) % 2 == 1))
+        {
+            var owner = outers.Where(o => HatchEntity.IsInside(o, hole[0])).MinBy(o => Math.Abs(HatchEntity.SignedArea(o)));
+            if (owner != null) groups[owner].Add(hole);
+        }
+        return [.. groups.Values];
+    }
+
+    private HatchEntity MakeHatch(List<List<Vec2>> loops) =>
+        Styled(new HatchEntity(Doc.CurrentLayer, loops, Solid ? [] : HatchSettings.Patterns(Doc), Solid)
+        {
+            TransparencyPercent = HatchSettings.TransparencyPercent,
+        });
 
     public override void OnPoint(Vec2 p)
     {
@@ -104,13 +169,13 @@ public sealed class HatchTool : CadTool, IStyledDrawTool
 
     private void Create(List<List<Vec2>> loops)
     {
-        var hatch = Styled(new HatchEntity(Doc.CurrentLayer, loops, HatchSettings.Patterns(Doc), HatchSettings.Style == HatchStyle.Solid));
+        var hatch = MakeHatch(loops);
         if (!hatch.Solid && hatch.Lines.Count == 0)
         {
             Canvas.ShowMessage("間隔に対して範囲が小さすぎる (または大きすぎる) ため、ハッチ線ができません。間隔を見直してください。");
             return;
         }
-        Execute(new AddEntitiesCommand([hatch], "ハッチング"));
+        Execute(new AddEntitiesCommand([hatch], Name));
     }
 
     public override void DrawPreview(DrawingContext dc)
@@ -127,7 +192,10 @@ public sealed class HatchTool : CadTool, IStyledDrawTool
             foreach (var l in loops) Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewDashPen, l, true);
         }
         if (loops == null) return;
-        var preview = new HatchEntity(Doc.CurrentLayer, loops, HatchSettings.Patterns(Doc), HatchSettings.Style == HatchStyle.Solid);
+        var preview = new HatchEntity(Doc.CurrentLayer, loops, Solid ? [] : HatchSettings.Patterns(Doc), Solid)
+        {
+            TransparencyPercent = Math.Max(HatchSettings.TransparencyPercent, Solid ? 50 : 0), // 塗りの下絵が見えるよう半透明で
+        };
         if (preview.Solid || preview.Lines.Count <= 5000) Canvas.DrawEntity(dc, preview, PreviewColor);
     }
 
@@ -160,7 +228,7 @@ public sealed class HatchTool : CadTool, IStyledDrawTool
     }
 
     /// <summary>閉じた図形なら境界の点列 (閉じたポリライン・始点に戻るポリライン・円)。</summary>
-    private static List<Vec2>? ClosedLoop(Entity e)
+    public static List<Vec2>? ClosedLoop(Entity e)
     {
         switch (e)
         {

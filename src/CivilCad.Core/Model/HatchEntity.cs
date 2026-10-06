@@ -46,6 +46,22 @@ public sealed class HatchEntity : Entity
 
     private bool _solid;
 
+    /// <summary>不透明度 (1 = 不透明、0 = 見えない)。下の図形を透かして見せるのに使う。</summary>
+    public double Opacity
+    {
+        get => _opacity;
+        set => _opacity = Math.Clamp(double.IsNaN(value) ? 1 : value, 0, 1);
+    }
+
+    private double _opacity = 1;
+
+    /// <summary>透明度 (%)。0 = 不透明、100 = 透明。</summary>
+    public double TransparencyPercent
+    {
+        get => Math.Round((1 - Opacity) * 100, 6);
+        set => Opacity = 1 - value / 100;
+    }
+
     /// <summary>元のパターン名 (DXF・SFC から読んだもの)。表示用。</summary>
     public string? PatternName { get; set; }
 
@@ -112,7 +128,7 @@ public sealed class HatchEntity : Entity
     }
 
     public override Entity Clone() =>
-        CopyPropertiesTo(new HatchEntity(Layer, Loops, Patterns, Solid) { PatternName = PatternName });
+        CopyPropertiesTo(new HatchEntity(Layer, Loops, Patterns, Solid) { PatternName = PatternName, Opacity = Opacity });
 
     public override IEnumerable<SnapPoint> SnapPoints => Loops.SelectMany(l => l).Select(p => new SnapPoint(p, SnapKind.Endpoint));
 

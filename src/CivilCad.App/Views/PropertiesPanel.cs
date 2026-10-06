@@ -153,6 +153,7 @@ public sealed class PropertiesPanel : UserControl
         AddColorRow("色", sel.Select(e => e.Color).ToList(), c => Apply(x => x.Color = c, "色変更"));
         AddWeightRow("線幅 (mm)", sel.Select(e => e.LineWeight).ToList(), w => Apply(x => x.LineWeight = w, "線幅変更"));
         AddTextSizeRows(sel.OfType<TextEntity>().ToList());
+        AddTransparencyRow(sel.OfType<HatchEntity>().ToList());
         var lengths = sel.Select(LengthOf).Where(l => l != null).Select(l => l!.Value).ToList();
         if (sel.Count > 1 && lengths.Count > 0) AddReadOnly("長さ合計", $"{lengths.Sum():F3} m  ({lengths.Count} 個)");
 
@@ -365,6 +366,17 @@ public sealed class PropertiesPanel : UserControl
                 t.FitWidth = null; // 幅指定 (SXF/DXF のフィット) は解除して幅係数で決める
             }, "幅係数変更"),
             "文字の横幅の倍率 (1 = 標準、0.8 = 細め)");
+    }
+
+    /// <summary>ハッチング・塗りつぶしの透明度 (複数選択なら、選んだハッチングすべてに)。</summary>
+    private void AddTransparencyRow(List<HatchEntity> hatches)
+    {
+        if (hatches.Count == 0) return;
+        var values = hatches.Select(h => Math.Round(h.TransparencyPercent, 1)).Distinct().ToList();
+        AddEditable("透明度 (%)", values.Count == 1 ? values[0].ToString("0.#", CultureInfo.InvariantCulture) : "", s =>
+            double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var pct) && pct is >= 0 and <= 100 &&
+            Apply(x => { if (x is HatchEntity h) h.TransparencyPercent = pct; }, "透明度変更"),
+            "0 = 不透明、50 = 半透明、100 = 透明。下の線や文字を透かして見せたいときに");
     }
 
     /// <summary>何も選択していないとき: これから描く図形の設定。</summary>
