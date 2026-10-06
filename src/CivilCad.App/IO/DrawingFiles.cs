@@ -78,6 +78,21 @@ public static class DrawingFiles
     /// <summary>拡張子の形式で保存し、ログに出す文を返す。</summary>
     public static string Save(CadDocument doc, string path)
     {
+        // 画面で一定の大きさの文字は、ファイルには用紙上の大きさ (1px = 0.26mm) を縮尺で換算した高さで書く
+        var screenTexts = doc.Entities.OfType<TextEntity>().Where(t => t.ScreenHeightPx != null).Select(t => (Text: t, t.Height)).ToList();
+        foreach (var (t, _) in screenTexts) t.Height = doc.PaperMmToMeters(t.ScreenHeightPx!.Value * TextEntity.MmPerPixel);
+        try
+        {
+            return SaveAs(doc, path);
+        }
+        finally
+        {
+            foreach (var (t, h) in screenTexts) t.Height = h;
+        }
+    }
+
+    private static string SaveAs(CadDocument doc, string path)
+    {
         switch (Path.GetExtension(path).ToLowerInvariant())
         {
             case ".sfc":

@@ -331,7 +331,16 @@ public sealed class ArcTool : CadTool, IStyledDrawTool, IRadiusInput
 
 public sealed class TextTool : CadTool, IStyledDrawTool
 {
-    /// <summary>文字高 (用紙上の mm)。図面の縮尺で m に換算して作図する (1:500 で 3.5mm → 1.75m)。</summary>
+    /// <summary>
+    /// true なら、新しい文字は画面上で一定の大きさ (<see cref="DefaultScreenPx"/>) にする。縮尺・拡大率によらず同じ大きさで見える。
+    /// false なら用紙上の mm (<see cref="DefaultHeightMm"/>) を図面の縮尺で m に換算する (1:500 で 3.5mm → 1.75m)。
+    /// </summary>
+    public static bool ScreenFixed { get; set; } = true;
+
+    /// <summary>画面で一定の文字の高さ (ピクセル)。</summary>
+    public static double DefaultScreenPx { get; set; } = 16;
+
+    /// <summary>文字高 (用紙上の mm)。<see cref="ScreenFixed"/> が false のときに使う。</summary>
     public static double DefaultHeightMm { get; set; } = 3.5;
 
     private Vec2? _position;
@@ -346,7 +355,9 @@ public sealed class TextTool : CadTool, IStyledDrawTool
         OnActivated();
     }
     protected override void OnActivated() =>
-        SetPrompt($"文字の位置 (左下) を指定 [文字高 {DefaultHeightMm:0.##}mm = {Doc.PaperMmToMeters(DefaultHeightMm):0.###}m ({Doc.ScaleText}) / H=数値(mm) で変更]");
+        SetPrompt(ScreenFixed
+            ? $"文字の位置 (左下) を指定 [大きさ: 画面で {DefaultScreenPx:0.#}px (縮尺によらず一定) / H=数値(px) で変更]"
+            : $"文字の位置 (左下) を指定 [文字高 {DefaultHeightMm:0.##}mm = {Doc.PaperMmToMeters(DefaultHeightMm):0.###}m ({Doc.ScaleText}) / H=数値(mm) で変更]");
 
     public override void OnPoint(Vec2 p)
     {
@@ -359,16 +370,21 @@ public sealed class TextTool : CadTool, IStyledDrawTool
         var t = text.Trim();
         if (t.StartsWith("H=", StringComparison.OrdinalIgnoreCase) && TryParseNumber(t[2..], out var h) && h > 0)
         {
-            DefaultHeightMm = h;
+            if (ScreenFixed) DefaultScreenPx = h;
+            else DefaultHeightMm = h;
             if (_position == null) OnActivated();
             return true;
         }
         if (_position is not Vec2 pos) return false;
-        if (text.Length > 0)
-            Execute(new AddEntitiesCommand([Styled(new TextEntity(Doc.CurrentLayer, pos, text, Doc.PaperMmToMeters(DefaultHeightMm)))], "文字"));
+        if (text.Length > 0) Execute(new AddEntitiesCommand([Styled(Create(Doc.CurrentLayer, pos, text, Canvas.Scale))], "文字"));
         // 続けて次の文字を置ける (Esc で終了)
         _position = null;
         OnActivated();
         return true;
     }
+
+    /// <summary>今の設定の大きさの文字を作る (pixelsPerMeter は画面の拡大率)。</summary>
+    public TextEntity Create(Layer layer, Vec2 pos, string text, double pixelsPerMeter) => ScreenFixed
+        ? new TextEntity(layer, pos, text, DefaultScreenPx / pixelsPerMeter) { ScreenHeightPx = DefaultScreenPx }
+        : new TextEntity(layer, pos, text, Doc.PaperMmToMeters(DefaultHeightMm));
 }

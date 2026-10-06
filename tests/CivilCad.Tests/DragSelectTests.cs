@@ -65,10 +65,10 @@ public class DragSelectTests
         tool.OnRelease(new Vec2(19, -5));
         Assert.Same(b, Assert.Single(canvas.Selection));
 
-        // 図形のクリックで追加
+        // 図形のクリックはその図形だけを選ぶ (追加は Shift+クリック)
         tool.OnPress(new Vec2(5, 0.2));
         tool.OnRelease(new Vec2(5, 0.2));
-        Assert.Equal(2, canvas.Selection.Count);
+        Assert.Same(a, Assert.Single(canvas.Selection));
     });
 
     [Fact]

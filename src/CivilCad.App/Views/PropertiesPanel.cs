@@ -352,10 +352,28 @@ public sealed class PropertiesPanel : UserControl
     private void AddTextSizeRows(List<TextEntity> texts)
     {
         if (texts.Count == 0) return;
-        var heights = texts.Select(t => Math.Round(t.Height / Doc.ScaleDenominator * 1000, 3)).Distinct().ToList();
+        // 画面で一定の文字は、保存するときの大きさ (用紙上 1px = 0.26mm) を出す
+        var heights = texts.Select(t => Math.Round(t.ScreenHeightPx is double px ? px * TextEntity.MmPerPixel : t.Height / Doc.ScaleDenominator * 1000, 3)).Distinct().ToList();
         AddEditable("文字高 (mm)", heights.Count == 1 ? heights[0].ToString("0.###") : "", s =>
-            TryPositive(s, out var h) && Apply(x => { if (x is TextEntity t) t.Height = Doc.PaperMmToMeters(h); }, "文字高変更"),
+            TryPositive(s, out var h) && Apply(x =>
+            {
+                if (x is not TextEntity t) return;
+                t.Height = Doc.PaperMmToMeters(h);
+                t.ScreenHeightPx = null; // 用紙の大きさを決めたら、画面で一定ではなくなる
+            }, "文字高変更"),
             $"用紙上の文字の高さ。図面の縮尺 {Doc.ScaleText} で m に換算されます");
+
+        var pxs = texts.Select(t => t.ScreenHeightPx).Distinct().ToList();
+        AddEditable("画面で一定 (px)", pxs.Count == 1 && pxs[0] is double onePx ? onePx.ToString("0.#") : "", s =>
+            string.IsNullOrWhiteSpace(s)
+                ? Apply(x => { if (x is TextEntity t) t.ScreenHeightPx = null; }, "文字の大きさを図面に固定")
+                : TryPositive(s, out var px) && Apply(x =>
+                {
+                    if (x is not TextEntity t) return;
+                    t.ScreenHeightPx = px;
+                    t.FitWidth = null;
+                }, "文字の大きさを画面で一定に"),
+            "数値 (ピクセル) を入れると、縮尺・拡大率によらず画面上でこの大きさに見える。空欄にすると今の大きさで図面に固定");
 
         var factors = texts.Select(t => Math.Round(t.WidthFactor, 3)).Distinct().ToList();
         AddEditable("幅係数", factors.Count == 1 ? factors[0].ToString("0.###") : "", s =>
@@ -399,6 +417,16 @@ public sealed class PropertiesPanel : UserControl
             Doc.CurrentLineWeight = w;
             Committed?.Invoke(this, EventArgs.Empty);
         });
+        if (Tools.TextTool.ScreenFixed)
+            AddEditable("文字の大きさ (画面 px)", Tools.TextTool.DefaultScreenPx.ToString("0.#"), s =>
+            {
+                if (!TryPositive(s, out var px)) return false;
+                Tools.TextTool.DefaultScreenPx = px;
+                Committed?.Invoke(this, EventArgs.Empty);
+                QueueRefresh();
+                return true;
+            }, "文字ツールで書く文字の、画面上の高さ。縮尺・拡大率によらず一定 (文字ツールの入力欄で用紙 mm に切り替えられる)");
+        else
         AddEditable("文字高 (mm)", Tools.TextTool.DefaultHeightMm.ToString("0.###"), s =>
         {
             if (!TryPositive(s, out var h)) return false;

@@ -156,8 +156,14 @@ public sealed class DrawInputBar : Border
                     "0 = 不透明、50 = 半透明、100 = 透明。下の線や文字を透かして見せたいときに", allowEmpty: false, allowNegative: true);
                 break;
             case TextTool:
-                AddNumber($"文字高 (mm, {doc.ScaleText})", () => TextTool.DefaultHeightMm, v => { if (v is double h) TextTool.DefaultHeightMm = h; },
-                    "用紙上の文字の高さ。図面の縮尺で m に換算", allowEmpty: false);
+                AddCheck("画面で一定の大きさ", TextTool.ScreenFixed, v => { TextTool.ScreenFixed = v; _canvas?.Tool.RefreshPrompt(); Rebuild(); },
+                    "オンなら、文字は縮尺・拡大率によらず画面上で同じ大きさに見える (保存するときは用紙上 1px = 0.26mm の大きさにする)\nオフなら用紙上の mm を図面の縮尺で m に換算");
+                if (TextTool.ScreenFixed)
+                    AddNumber("大きさ (画面 px)", () => TextTool.DefaultScreenPx, v => { if (v is double px) { TextTool.DefaultScreenPx = px; _canvas?.Tool.RefreshPrompt(); } },
+                        "画面上の文字の高さ (ピクセル)", allowEmpty: false);
+                else
+                    AddNumber($"文字高 (mm, {doc.ScaleText})", () => TextTool.DefaultHeightMm, v => { if (v is double h) { TextTool.DefaultHeightMm = h; _canvas?.Tool.RefreshPrompt(); } },
+                        "用紙上の文字の高さ。図面の縮尺で m に換算", allowEmpty: false);
                 break;
         }
 

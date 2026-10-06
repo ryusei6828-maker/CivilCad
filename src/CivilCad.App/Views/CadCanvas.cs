@@ -318,6 +318,7 @@ public sealed class CadCanvas : FrameworkElement
     private void OnDocumentChanged(object? sender, EventArgs e)
     {
         _snapIndex = null;
+        SyncScreenTexts(); // 追加・元に戻した文字も、いまの拡大率の大きさに
         // 削除・非表示・ロックされた図形は選択から外す
         var before = Selection.Count;
         Selection.RemoveWhere(x => !Document.Entities.Contains(x) || !Document.IsEditable(x));
@@ -329,8 +330,23 @@ public sealed class CadCanvas : FrameworkElement
 
     public void RedrawAll()
     {
+        SyncScreenTexts();
         RedrawScene();
         RedrawOverlay();
+    }
+
+    /// <summary>画面で一定の大きさの文字 (<see cref="TextEntity.ScreenHeightPx"/>) の高さを、いまの拡大率に合わせる。</summary>
+    public void SyncScreenTexts()
+    {
+        var changed = false;
+        foreach (var t in Document.Entities.OfType<TextEntity>())
+        {
+            if (t.ScreenHeightPx == null) continue;
+            var before = t.Height;
+            t.SyncScreenHeight(Scale);
+            changed |= before != t.Height;
+        }
+        if (changed) _snapIndex = null; // 文字の範囲が変わったので作り直す
     }
 
     public void RedrawScene()

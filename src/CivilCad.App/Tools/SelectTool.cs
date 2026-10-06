@@ -8,8 +8,8 @@ using CivilCad.Core.Model;
 namespace CivilCad.App.Tools;
 
 /// <summary>
-/// 選択。図形クリックで選択、ドラッグで範囲選択 (範囲に完全に入る図形、向きは問わない)、
-/// 空き部分クリックで選択解除。Shift で選択解除。
+/// 選択。図形クリックでその図形だけを選択、Shift+クリックで追加・解除、ドラッグで範囲選択 (向きは問わない。Shift で追加)、
+/// 空き部分クリックで選択解除。
 /// </summary>
 public sealed class SelectTool : CadTool
 {
@@ -22,7 +22,7 @@ public sealed class SelectTool : CadTool
     public override bool IsDragging => _drag.IsMouseDrag;
 
     protected override void OnActivated() =>
-        SetPrompt($"図形をクリックで選択 / ドラッグで範囲選択 ({BoxDrag.ModeText}) / Shift で解除、またはコマンドを入力");
+        SetPrompt($"図形をクリックで選択 (Shift+クリックで追加・解除) / ドラッグで範囲選択 ({BoxDrag.ModeText}、Shift+ドラッグで追加)、またはコマンドを入力");
 
     public override void OnPress(Vec2 p) => _drag.Press(p);
 
@@ -36,10 +36,23 @@ public sealed class SelectTool : CadTool
     public override void OnRelease(Vec2 p)
     {
         if (_drag.Release(Canvas, p) is not var (start, moved)) return;
-        var remove = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-        if (moved) Canvas.AddToSelection(BoxDrag.Hits(Doc, start, p), remove);
-        else if (Canvas.HitTest(start) is { } hit) Canvas.AddToSelection([hit], remove);
-        else if (!remove) Canvas.ClearSelection();
+        // クリックはその図形だけを選ぶ。Shift+クリックで足す (選択済みなら外す)、Shift+ドラッグで範囲の図形を足す
+        var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        if (moved)
+        {
+            var hits = BoxDrag.Hits(Doc, start, p);
+            if (shift) Canvas.AddToSelection(hits);
+            else Canvas.SetSelection(hits);
+        }
+        else if (Canvas.HitTest(start) is { } hit)
+        {
+            if (!shift) Canvas.SetSelection([hit]);
+            else Canvas.AddToSelection([hit], remove: Canvas.Selection.Contains(hit));
+        }
+        else if (!shift)
+        {
+            Canvas.ClearSelection();
+        }
     }
 
     /// <summary>コマンド欄からの座標入力: 2 点で範囲選択。</summary>
@@ -51,7 +64,8 @@ public sealed class SelectTool : CadTool
             SetPrompt("範囲のもう一方の角を指定");
             return;
         }
-        Canvas.AddToSelection(BoxDrag.Hits(Doc, corner, p), Keyboard.Modifiers.HasFlag(ModifierKeys.Shift));
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) Canvas.AddToSelection(BoxDrag.Hits(Doc, corner, p));
+        else Canvas.SetSelection(BoxDrag.Hits(Doc, corner, p));
         _drag.TypedCorner = null;
         OnActivated();
     }

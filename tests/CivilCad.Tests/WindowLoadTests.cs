@@ -44,6 +44,19 @@ public class WindowLoadTests
                 var textEdit = new CivilCad.App.Views.TextEditWindow("No.1");
                 Assert.NotNull(textEdit.Content);
                 textEdit.Close();
+                // 文字を選ぶと、閉じていたプロパティ (右側) が開く
+                var canvas = (CivilCad.App.Views.CadCanvas)main.FindName("Canvas");
+                var propsHost = (System.Windows.FrameworkElement)main.FindName("PropsHost");
+                typeof(CivilCad.App.MainWindow).GetMethod("RunCommand", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                    .Invoke(main, ["PR"]);
+                Assert.Equal(System.Windows.Visibility.Collapsed, propsHost.Visibility);
+                var line = new CivilCad.Core.Model.LineEntity(canvas.Document.CurrentLayer, new(0, 0), new(1, 0));
+                var label = new CivilCad.Core.Model.TextEntity(canvas.Document.CurrentLayer, new(0, 5), "No.1", 1);
+                canvas.Document.Entities.AddRange([line, label]);
+                canvas.SetSelection([line]);
+                Assert.Equal(System.Windows.Visibility.Collapsed, propsHost.Visibility); // 線では開かない
+                canvas.SetSelection([label]);
+                Assert.Equal(System.Windows.Visibility.Visible, propsHost.Visibility);
                 var scale = new CivilCad.App.Drawing.ScaleWindow(500);
                 Assert.NotNull(scale.Content);
                 scale.Close();

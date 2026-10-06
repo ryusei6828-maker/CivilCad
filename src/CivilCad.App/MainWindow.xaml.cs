@@ -45,7 +45,12 @@ public partial class MainWindow : Window
         Canvas.PromptChanged += (_, _) => PromptText.Text = $"[{Canvas.Tool.Name}] {Canvas.Tool.Prompt}:";
         Canvas.Message += (_, msg) => Log(msg);
         Canvas.CursorMoved += (_, _) => UpdateCoordinates();
-        Canvas.SelectionChanged += (_, _) => SelectionText.Text = Canvas.Selection.Count > 0 ? $"{Canvas.Selection.Count} 個選択中" : "";
+        Canvas.SelectionChanged += (_, _) =>
+        {
+            SelectionText.Text = Canvas.Selection.Count > 0 ? $"{Canvas.Selection.Count} 個選択中" : "";
+            // 文字を選んだら、閉じているプロパティ (右側) を開いて文字の内容・大きさを見せる
+            if (_propsDock != null && !_propsDock.IsOpen && Canvas.Selection.Any(x => x is TextEntity)) SetPanelOpen(_propsDock, true);
+        };
         Canvas.PreviewMouseDown += (_, _) => CommandBox.Focus();
         Canvas.ContextRequested += (_, _) => ShowCanvasMenu();
         PreviewKeyDown += Window_PreviewKeyDown;

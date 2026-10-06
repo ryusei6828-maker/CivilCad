@@ -23,6 +23,21 @@ public sealed class TextEntity(Layer layer, Vec2 position, string text, double h
     public double WidthFactor { get; set; } = 1;
     public double? FitWidth { get; set; }
 
+    /// <summary>
+    /// 画面上で一定の大きさで表示する文字の高さ (ピクセル)。null なら普通の文字 (Height が図面上の高さ)。
+    /// 設定されているときの Height は、いまの表示倍率での高さ (表示側が <see cref="SyncScreenHeight"/> で合わせる)。
+    /// </summary>
+    public double? ScreenHeightPx { get; set; }
+
+    /// <summary>1 ピクセル = 25.4 / 96 mm (保存するときは用紙上のこの大きさにする)。</summary>
+    public const double MmPerPixel = 25.4 / 96;
+
+    /// <summary>画面で一定の文字の Height を、表示倍率 (1m = pixelsPerMeter ピクセル) に合わせる。</summary>
+    public void SyncScreenHeight(double pixelsPerMeter)
+    {
+        if (ScreenHeightPx is double px && pixelsPerMeter > 0) Height = px / pixelsPerMeter;
+    }
+
     /// <summary>文字幅の概算 (等幅フォント想定: 全角 1.0H、半角 0.5H)。</summary>
     public double ApproxWidth => FitWidth ?? Text.Sum(c => c < 0x80 || c is >= '｡' and <= 'ﾟ' ? 0.5 : 1.0) * Height * WidthFactor;
 
@@ -76,6 +91,7 @@ public sealed class TextEntity(Layer layer, Vec2 position, string text, double h
         VAlign = VAlign,
         WidthFactor = WidthFactor,
         FitWidth = FitWidth,
+        ScreenHeightPx = ScreenHeightPx,
     });
 
     public override IEnumerable<SnapPoint> SnapPoints => [new(Position, SnapKind.Node)];
