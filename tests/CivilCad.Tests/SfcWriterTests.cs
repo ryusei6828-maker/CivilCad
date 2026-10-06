@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text;
 using CivilCad.App.Drawing;
 using CivilCad.App.IO;
@@ -29,6 +29,43 @@ public class SfcWriterTests
             new LineEntity(hidden, new Vec2(1000, 2000), new Vec2(1001, 2001)),
         ]);
         return doc;
+    }
+
+    /// <summary>
+    /// 他の CAD (SCADEC) と同じ並び: 用紙 (drawing_sheet_feature) の後ろはレイヤ表 (layer_feature) だけ。
+    /// レイヤを編集した図面 (名前の変更・空白・重複・図形の無い "0") でも、名前と図形のレイヤが正しく戻ること。
+    /// </summary>
+    [Fact]
+    public void LayerTableAtEnd_AndEditedLayersRoundTrip()
+    {
+        var doc = MakeDrawing();
+        var road = doc.Layers.First(l => l.Name == "D-STR");
+        road.Name = "  道路 (編集)  ";                       // 前後の空白
+        var dup = new Layer("道路 (編集)", RgbColor.Blue);    // 名前が重複 (空白を除くと同じ)
+        doc.Layers.Add(dup);
+        doc.Entities.Add(new LineEntity(dup, new Vec2(1300, 2300), new Vec2(1310, 2300)));
+        var orphan = new Layer("一覧に無いレイヤ", RgbColor.Green); // レイヤ一覧に無いレイヤの図形
+        doc.Entities.Add(new LineEntity(orphan, new Vec2(1300, 2310), new Vec2(1310, 2310)));
+
+        var (loaded, text) = RoundTrip(doc);
+
+        var order = System.Text.RegularExpressions.Regex.Matches(text, @"#\d+ = (\w+)\(").Select(m => m.Groups[1].Value).ToList();
+        var sheet = order.IndexOf("drawing_sheet_feature");
+        Assert.True(sheet > 0);
+        Assert.All(order.Skip(sheet + 1), n => Assert.Equal("layer_feature", n));
+        Assert.DoesNotContain("layer_feature", order.Take(sheet));
+        Assert.DoesNotContain("layer_feature(\\'0\\'", text);   // 図形の無い "0" は書かない
+
+        var names = loaded.Layers.Select(l => l.Name).ToList();
+        Assert.Contains("道路 (編集)", names);
+        Assert.Contains("道路 (編集)_2", names);
+        Assert.Contains("一覧に無いレイヤ", names);
+        Assert.Equal(names.Count, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+
+        // 図形が元のレイヤ (名前) に戻る
+        Assert.Contains(loaded.Entities, e => e is LineEntity l && l.Layer.Name == "道路 (編集)_2" && Math.Abs(l.Start.DistanceTo(l.End) - 10) < 1e-6);
+        Assert.Contains(loaded.Entities, e => e is LineEntity l && l.Layer.Name == "一覧に無いレイヤ");
+        Assert.Contains(loaded.Entities, e => e is CircleEntity && e.Layer.Name == "道路 (編集)");
     }
 
     private static (CadDocument Loaded, string Text) RoundTrip(CadDocument doc)

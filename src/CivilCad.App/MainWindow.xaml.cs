@@ -1005,6 +1005,10 @@ public partial class MainWindow : Window
             Log(error);
             box.Text = layer.Name;
         }
+        else
+        {
+            box.Text = name; // 前後の空白を除いた名前にする
+        }
     }
 
     // ---- スナップの種類 ----
