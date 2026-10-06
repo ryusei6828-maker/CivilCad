@@ -93,6 +93,9 @@ public sealed class CadCanvas : FrameworkElement
     public event EventHandler? ToolChanged;
     public event EventHandler? PromptChanged;
     public event EventHandler? CursorMoved;
+
+    /// <summary>作図領域で右クリックされた (右クリックメニューを出す)。</summary>
+    public event EventHandler? ContextRequested;
     public event EventHandler<string>? Message;
 
     protected override int VisualChildrenCount => _visuals.Count;
@@ -215,8 +218,8 @@ public sealed class CadCanvas : FrameworkElement
                 RedrawOverlay();
                 break;
             case MouseButton.Right:
-                _tool.OnRightClick();
-                RedrawOverlay();
+                // 右クリックはコマンドの操作メニュー (一つ戻す・やり直しなど) を出す。中身は MainWindow が作る
+                ContextRequested?.Invoke(this, EventArgs.Empty);
                 break;
         }
         e.Handled = true;

@@ -13,7 +13,14 @@ public sealed class DistanceTool : CadTool
 
     public override string Name => "距離";
     public override Vec2? BasePoint => _first;
+    public override bool CanStepBack => _first != null;
     protected override void OnActivated() => SetPrompt("1点目を指定");
+
+    public override void StepBack()
+    {
+        _first = null;
+        OnActivated();
+    }
 
     public override void OnPoint(Vec2 p)
     {
@@ -45,7 +52,14 @@ public sealed class AreaTool : CadTool
 
     public override string Name => "面積";
     public override Vec2? BasePoint => _points.Count > 0 ? _points[^1] : null;
+    public override bool CanStepBack => _points.Count > 0;
+    public override string? ConfirmLabel => _points.Count >= 3 ? "面積を計算 (Enter)" : null;
     protected override void OnActivated() => SetPrompt("頂点を順に指定 (Enter で計算)");
+
+    public override void StepBack()
+    {
+        if (_points.Count > 0) _points.RemoveAt(_points.Count - 1);
+    }
 
     public override void OnPoint(Vec2 p) => _points.Add(p);
     public override void OnMouseMove(Vec2 p) => _cursor = p;

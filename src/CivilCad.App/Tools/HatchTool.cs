@@ -1,4 +1,4 @@
-using System.Windows.Media;
+﻿using System.Windows.Media;
 using CivilCad.App.Views;
 using CivilCad.Core.Commands;
 using CivilCad.Core.Geometry;
@@ -37,7 +37,7 @@ public static class HatchSettings
 /// <summary>
 /// ハッチング。閉じた図形 (閉じたポリライン・円) の内側をクリックするとその範囲にハッチングを作る
 /// (内側にある閉じた図形は中抜き)。閉じた図形が無い所では、クリックした点を頂点とする範囲を作り Enter で確定。
-/// Esc か右クリックで終了するまで続けて作れる。
+/// Esc で終了するまで続けて作れる。
 /// </summary>
 public sealed class HatchTool : CadTool, IStyledDrawTool
 {
@@ -51,7 +51,7 @@ public sealed class HatchTool : CadTool, IStyledDrawTool
 
     protected override void OnActivated() =>
         SetPrompt(_points.Count > 0
-            ? "次の点を指定 (Enter / 右クリックで確定、Esc で取り消し)"
+            ? "次の点を指定 (Enter で確定、Esc で取り消し / 右クリックで一つ戻す・やり直し)"
             : $"閉じた図形の内側をクリック、または範囲の 1 点目を指定 [{HatchSettings.StyleName(HatchSettings.Style)} {HatchSettings.AngleDeg:0.##}° 間隔 {HatchSettings.SpacingMm:0.##}mm]");
 
     public override void OnPoint(Vec2 p)
@@ -80,10 +80,13 @@ public sealed class HatchTool : CadTool, IStyledDrawTool
         OnActivated();
     }
 
-    public override void OnRightClick()
+    public override bool CanStepBack => _points.Count > 0;
+    public override string? ConfirmLabel => _points.Count >= 3 ? "範囲を確定 (Enter)" : null;
+
+    public override void StepBack()
     {
-        if (_points.Count > 0) OnEnter();
-        else Finish();
+        if (_points.Count > 0) _points.RemoveAt(_points.Count - 1);
+        OnActivated();
     }
 
     public override void OnCancel()

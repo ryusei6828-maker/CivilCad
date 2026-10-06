@@ -8,7 +8,7 @@ namespace CivilCad.App.Tools;
 
 /// <summary>
 /// 削除モード (消しゴム)。図形をクリックするとすぐ消える。ドラッグで範囲に完全に入る図形をまとめて消す
-/// (向きは問わない)。Esc か右クリックで終了するまで続く。
+/// (向きは問わない)。Esc で終了するまで続く。
 /// </summary>
 public sealed class EraseTool : CadTool
 {
@@ -23,7 +23,7 @@ public sealed class EraseTool : CadTool
     public override bool IsDragging => _drag.IsMouseDrag;
 
     protected override void OnActivated() =>
-        SetPrompt($"消す図形をクリック / ドラッグで{BoxDrag.ModeText}をまとめて削除 / Esc・右クリックで終了");
+        SetPrompt($"消す図形をクリック / ドラッグで{BoxDrag.ModeText}をまとめて削除 / Esc で終了");
 
     public override void OnPress(Vec2 p) => _drag.Press(p);
 
@@ -63,7 +63,6 @@ public sealed class EraseTool : CadTool
     }
 
     public override void OnEnter() { }
-    public override void OnRightClick() => OnCancel();
 
     public override void OnCancel()
     {
@@ -103,6 +102,14 @@ public sealed class MoveCopyTool(bool copy) : CadTool
     public override string Name => copy ? "複写" : "移動";
     public override Vec2? BasePoint => _base;
     public override bool RequiresSelection => true;
+    public override bool CanStepBack => _base != null;
+    public override string? ConfirmLabel => copy && _base != null ? "複写を終える (Enter)" : null;
+
+    public override void StepBack()
+    {
+        _base = null;
+        SetPrompt("基点を指定");
+    }
 
     protected override void OnActivated()
     {

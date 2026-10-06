@@ -58,9 +58,31 @@ public abstract class CadTool
     /// <summary>true の間は左ドラッグ中 (キャンバスがマウスをキャプチャする)。</summary>
     public virtual bool IsDragging => false;
     public virtual void OnMouseMove(Vec2 p) { }
-    public virtual void OnRightClick() => OnEnter();
     public virtual void OnEnter() => Finish();
+
+    /// <summary>Esc: 入力途中のものを取り消してコマンドを終える (選択では選択解除)。</summary>
     public virtual void OnCancel() => Finish();
+
+    // ---- 右クリックメニュー ----
+
+    /// <summary>「一つ戻す」ができる (指定済みの点などがある)。</summary>
+    public virtual bool CanStepBack => false;
+
+    /// <summary>直前の手順 (最後に指定した点など) を取り消す。</summary>
+    public virtual void StepBack() { }
+
+    /// <summary>Enter に当たる操作の名前 (「確定」「終了」など)。null なら右クリックメニューに出さない。</summary>
+    public virtual string? ConfirmLabel => null;
+
+    /// <summary>右クリックメニューに足す、ツール固有の項目。</summary>
+    public virtual IEnumerable<(string Label, Action Run)> MenuItems => [];
+
+    /// <summary>直前に作った図形を取り消す (元に戻すの一番上ならそれを戻し、違えば削除する)。</summary>
+    protected void Retract(IUndoableCommand created, IReadOnlyList<Entity> entities)
+    {
+        if (Doc.History.Peek == created) Doc.History.Undo();
+        else if (entities.Any(Doc.Entities.Contains)) Execute(new RemoveEntitiesCommand([.. entities.Where(Doc.Entities.Contains)], "取り消し"));
+    }
 
     /// <summary>座標以外の文字入力 (半径・文字列・オプションなど)。処理したら true。</summary>
     public virtual bool OnText(string text) => false;

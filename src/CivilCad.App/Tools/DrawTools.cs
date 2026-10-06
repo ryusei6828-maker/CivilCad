@@ -8,33 +8,56 @@ namespace CivilCad.App.Tools;
 
 public sealed class LineTool : CadTool, ILengthAngleInput, IStyledDrawTool
 {
-    private Vec2? _last;
+    // 指定した点と、その点で作った線 (始点なら null)。「一つ戻す」で後ろから取り消す
+    private readonly List<(Vec2 Point, AddEntitiesCommand? Command, LineEntity? Line)> _steps = [];
     private Vec2 _cursor;
 
     public override string Name => "線";
-    public override Vec2? BasePoint => _last;
+    public override Vec2? BasePoint => _steps.Count > 0 ? _steps[^1].Point : null;
     public double? FixedLength { get => DrawInputMemory.Length; set => DrawInputMemory.Length = value; }
     public double? FixedAngleDeg { get => DrawInputMemory.AngleDeg; set => DrawInputMemory.AngleDeg = value; }
-    public (double Length, double AngleDeg)? Live => _last is Vec2 b ? LengthAngle.Measure(b, _cursor) : null;
+    public (double Length, double AngleDeg)? Live => BasePoint is Vec2 b ? LengthAngle.Measure(b, _cursor) : null;
+    public override bool CanStepBack => _steps.Count > 0;
+    public override string? ConfirmLabel => _steps.Count > 0 ? "線を終える (Enter)" : null;
 
-    protected override void OnActivated() => SetPrompt("始点を指定");
+    protected override void OnActivated() =>
+        SetPrompt(_steps.Count == 0 ? "始点を指定" : "次の点を指定 (Enter で終了 / 右クリックで一つ戻す・やり直し)");
 
     public override Vec2 ConstrainCursor(Vec2 p) =>
-        _last is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg) : p;
+        BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg) : p;
 
     public override void OnPoint(Vec2 p)
     {
-        if (_last is Vec2 last && last != p)
-            Execute(new AddEntitiesCommand([Styled(new LineEntity(Doc.CurrentLayer, last, p))], "線"));
-        _last = p;
-        SetPrompt("次の点を指定 (Enter / 右クリックで終了)");
+        if (BasePoint is Vec2 last)
+        {
+            if (last == p) return;
+            var line = Styled(new LineEntity(Doc.CurrentLayer, last, p));
+            var cmd = new AddEntitiesCommand([line], "線");
+            Execute(cmd);
+            _steps.Add((p, cmd, line));
+        }
+        else
+        {
+            _steps.Add((p, null, null));
+        }
+        OnActivated();
+    }
+
+    /// <summary>最後の点を取り消す (その点で引いた線も消す)。</summary>
+    public override void StepBack()
+    {
+        if (_steps.Count == 0) return;
+        var (_, cmd, line) = _steps[^1];
+        _steps.RemoveAt(_steps.Count - 1);
+        if (cmd != null) Retract(cmd, [line!]);
+        OnActivated();
     }
 
     public override void OnMouseMove(Vec2 p) => _cursor = p;
 
     public override void DrawPreview(DrawingContext dc)
     {
-        if (_last is Vec2 last) Canvas.DrawWorldLine(dc, CadCanvas.PreviewPen, last, _cursor);
+        if (BasePoint is Vec2 last) Canvas.DrawWorldLine(dc, CadCanvas.PreviewPen, last, _cursor);
     }
 }
 
@@ -48,8 +71,14 @@ public sealed class PolylineTool : CadTool, ILengthAngleInput, IStyledDrawTool
     public double? FixedLength { get => DrawInputMemory.Length; set => DrawInputMemory.Length = value; }
     public double? FixedAngleDeg { get => DrawInputMemory.AngleDeg; set => DrawInputMemory.AngleDeg = value; }
     public (double Length, double AngleDeg)? Live => BasePoint is Vec2 b ? LengthAngle.Measure(b, _cursor) : null;
+    public override bool CanStepBack => _points.Count > 0;
+    public override string? ConfirmLabel => _points.Count >= 2 ? "確定 (Enter)" : null;
 
-    protected override void OnActivated() => SetPrompt("始点を指定");
+    public override IEnumerable<(string Label, Action Run)> MenuItems =>
+        _points.Count >= 3 ? [("閉じて確定 (C)", () => Commit(true))] : [];
+
+    protected override void OnActivated() =>
+        SetPrompt(_points.Count == 0 ? "始点を指定" : "次の点を指定 (C = 閉じる / Enter で確定 / 右クリックで一つ戻す・やり直し)");
 
     public override Vec2 ConstrainCursor(Vec2 p) =>
         BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg) : p;
@@ -58,7 +87,13 @@ public sealed class PolylineTool : CadTool, ILengthAngleInput, IStyledDrawTool
     {
         if (_points.Count > 0 && _points[^1] == p) return;
         _points.Add(p);
-        SetPrompt("次の点を指定 (C = 閉じる / Enter で確定)");
+        OnActivated();
+    }
+
+    public override void StepBack()
+    {
+        if (_points.Count > 0) _points.RemoveAt(_points.Count - 1);
+        OnActivated();
     }
 
     public override void OnMouseMove(Vec2 p) => _cursor = p;
@@ -109,6 +144,14 @@ public sealed class CircleTool : CadTool, IRadiusInput, IStyledDrawTool
     protected override void OnActivated() =>
         SetPrompt(_center != null ? "半径を入力、または円周上の点を指定"
             : FixedRadius is double r ? $"中心点を指定 (半径 {r:0.###} m で作図)" : "中心点を指定");
+
+    public override bool CanStepBack => _center != null;
+
+    public override void StepBack()
+    {
+        _center = null;
+        OnActivated();
+    }
 
     public override void OnPoint(Vec2 p)
     {
@@ -183,6 +226,27 @@ public sealed class ArcTool : CadTool, IStyledDrawTool, IRadiusInput
     protected override void OnActivated() =>
         SetPrompt(FixedRadius is double r ? $"円弧の始点を指定 (半径 {r:0.###} m)" : "円弧の始点を指定");
 
+    public override bool CanStepBack => _points.Count > 0;
+
+    /// <summary>最後に指定した点を取り消し、その点を指定する手順からやり直す。</summary>
+    public override void StepBack()
+    {
+        if (_points.Count == 0) return;
+        _points.RemoveAt(_points.Count - 1);
+        if (_points.Count == 0)
+        {
+            OnActivated();
+        }
+        else if (FixedRadius is double radius)
+        {
+            SetPrompt($"終点を指定 (半径 {radius:0.###} m、2 点間は {radius * 2:0.###} m まで)");
+        }
+        else
+        {
+            SetPrompt(_points.Count == 1 ? "通過点を指定" : "終点を指定");
+        }
+    }
+
     public override void OnPoint(Vec2 p)
     {
         if (FixedRadius is double radius)
@@ -251,6 +315,13 @@ public sealed class TextTool : CadTool, IStyledDrawTool
 
     public override string Name => "文字";
     public override bool WantsTextInput => _position != null;
+    public override bool CanStepBack => _position != null;
+
+    public override void StepBack()
+    {
+        _position = null;
+        OnActivated();
+    }
     protected override void OnActivated() =>
         SetPrompt($"文字の位置 (左下) を指定 [文字高 {DefaultHeightMm:0.##}mm = {Doc.PaperMmToMeters(DefaultHeightMm):0.###}m ({Doc.ScaleText}) / H=数値(mm) で変更]");
 
