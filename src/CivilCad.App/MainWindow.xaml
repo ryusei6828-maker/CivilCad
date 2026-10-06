@@ -25,8 +25,10 @@
         <Menu x:Name="MainMenu" DockPanel.Dock="Top">
             <MenuItem Header="ファイル(_F)">
                 <MenuItem Header="新規(_N)" Command="New"><MenuItem.Icon><Image Source="{StaticResource IconNew}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
-                <MenuItem Header="開く DXF / SFC(_O)..." Command="Open"><MenuItem.Icon><Image Source="{StaticResource IconOpen}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
-                <MenuItem Header="名前を付けて保存 DXF / SFC(_S)..." Command="Save"><MenuItem.Icon><Image Source="{StaticResource IconSave}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="開く(_O)... (DXF・DWG・JWW・SFC・P21)" Command="Open"><MenuItem.Icon><Image Source="{StaticResource IconOpen}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="名前を付けて保存(_S)... (DXF・DWG・JWW・SFC・P21)" Command="Save"><MenuItem.Icon><Image Source="{StaticResource IconSave}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <Separator/>
+                <MenuItem Header="PDF に印刷(_P)... (PDF)" Tag="PDF" Click="Tool_Click"/>
                 <Separator/>
                 <MenuItem Header="座標読込 SIMA / CSV (PI)..." Tag="PI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPoints}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>

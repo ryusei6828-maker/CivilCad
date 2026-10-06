@@ -127,6 +127,7 @@ public partial class MainWindow : Window
             case "J": JoinSelection(); break;
             case "H": StartTool(new HatchTool(), c); break;
             case "PI": ImportPoints(); break;
+            case "PDF": PrintPdf(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
             case "RO": StartTool(new RotateTool(), c); break;
@@ -478,6 +479,29 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "保存エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>PDF に印刷: 用紙・縮尺などを選び、保存先を決めて書き出す。</summary>
+    private void PrintPdf()
+    {
+        if (PdfWindow.Ask(this, _doc) is not var (options, openAfter)) return;
+        var dlg = new SaveFileDialog
+        {
+            Filter = "PDF ファイル (*.pdf)|*.pdf",
+            FileName = (_filePath != null ? System.IO.Path.GetFileNameWithoutExtension(_filePath) : _active.FileName) + ".pdf",
+        };
+        if (dlg.ShowDialog(this) != true) return;
+        try
+        {
+            var l = PdfExport.Export(_doc, dlg.FileName, options);
+            Log($"PDF に印刷しました: {dlg.FileName}  (用紙 {l.PaperName} {(l.Width >= l.Height ? "横" : "縦")} {l.Width:0}×{l.Height:0}mm, 縮尺 1:{l.MetersPerMm * 1000:0.##}" +
+                (options.Monochrome ? ", 白黒" : "") + ")");
+            if (openAfter) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dlg.FileName) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            MessageBox.Show(this, ex.Message, "印刷エラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

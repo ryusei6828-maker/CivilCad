@@ -20,6 +20,7 @@ public static class CommandRegistry
         new("SC", "縮尺設定", "IconScale", "文字高・図枠・路線注記の換算に使う"),
         new("CS", "座標設定", "IconCoord", "基準点を測量座標に合わせて図面を移動・回転"),
         new("PI", "座標読込 (SIMA / CSV)", "IconPoints", "座標ファイルの点を、点の印と点名で図面に配置"),
+        new("PDF", "PDF に印刷", null, "用紙・縮尺・白黒を選んで PDF に書き出す"),
         new("ZN","平面直角座標系の系番号", "IconCoord", "I〜XIX系。緯度経度の表示に使う"),
         new("M", "移動", "IconMove", "先に図形を選択"),
         new("CO", "複写", "IconCopy", "先に図形を選択"),
@@ -49,6 +50,7 @@ public static class CommandRegistry
     {
         ["SNAP"] = "F3",
         ["ORTHO"] = "F8",
+        ["PDF"] = "Ctrl+P",
     };
 
     public static CommandInfo? Find(string code) => All.FirstOrDefault(c => c.Code == code);

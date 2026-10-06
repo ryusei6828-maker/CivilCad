@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="ACadSharp" Version="3.8.0" />
     <PackageReference Include="netDxf.netstandard" Version="3.0.1" />
+    <PackageReference Include="SkiaSharp" Version="4.153.1" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -25,5 +26,10 @@
   <ItemGroup>
     <Resource Include="civilcad.ico" />
   </ItemGroup>
+
+  <!-- SkiaSharp のネイティブライブラリのデバッグ情報 (約 90MB) は配布物に要らない -->
+  <Target Name="RemoveNativePdb" AfterTargets="Publish">
+    <Delete Files="$(PublishDir)libSkiaSharp.pdb" />
+  </Target>
 
 </Project>

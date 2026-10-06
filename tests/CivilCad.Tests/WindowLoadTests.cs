@@ -41,6 +41,9 @@ public class WindowLoadTests
                 var zoneWin = new CivilCad.App.Drawing.ZoneWindow(2, false, new CivilCad.Core.Geometry.Vec2(-60760, -95537));
                 Assert.NotNull(zoneWin.Content);
                 zoneWin.Close();
+                var pdfWin = new CivilCad.App.Views.PdfWindow(new CivilCad.Core.Model.CadDocument());
+                Assert.NotNull(pdfWin.Content);
+                pdfWin.Close();
                 var textEdit = new CivilCad.App.Views.TextEditWindow("No.1");
                 Assert.NotNull(textEdit.Content);
                 textEdit.Close();
