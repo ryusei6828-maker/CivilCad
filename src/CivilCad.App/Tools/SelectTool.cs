@@ -26,6 +26,13 @@ public sealed class SelectTool : CadTool
 
     public override void OnPress(Vec2 p) => _drag.Press(p);
 
+    /// <summary>文字をダブルクリックすると中身を変えられる。</summary>
+    public override void OnDoubleClick(Vec2 p)
+    {
+        if (Canvas.HitTest(p) is TextEntity text) TextEditing.Edit(Canvas, text);
+        else OnPress(p);
+    }
+
     public override void OnRelease(Vec2 p)
     {
         if (_drag.Release(Canvas, p) is not var (start, moved)) return;

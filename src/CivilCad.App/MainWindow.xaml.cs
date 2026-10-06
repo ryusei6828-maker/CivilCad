@@ -128,6 +128,7 @@ public partial class MainWindow : Window
             case "O": StartTool(new OffsetTool(), c); break;
             case "TR": StartTool(new TrimTool(), c); break;
             case "EX": StartTool(new ExtendTool(), c); break;
+            case "ED": StartTool(new TextEditTool(), c); break;
             case "DI": StartTool(new DistanceTool(), c); break;
             case "AA": StartTool(new AreaTool(), c); break;
             case "E" or "DEL":

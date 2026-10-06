@@ -55,6 +55,9 @@ public abstract class CadTool
     /// <summary>マウスの左ボタンを離した (ドラッグの終わり)。</summary>
     public virtual void OnRelease(Vec2 p) { }
 
+    /// <summary>ダブルクリックの 2 回目。既定は普通のクリック (選択ではダブルクリックした文字を変える)。</summary>
+    public virtual void OnDoubleClick(Vec2 p) => OnPress(p);
+
     /// <summary>true の間は左ドラッグ中 (キャンバスがマウスをキャプチャする)。</summary>
     public virtual bool IsDragging => false;
     public virtual void OnMouseMove(Vec2 p) { }

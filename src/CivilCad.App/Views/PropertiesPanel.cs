@@ -407,7 +407,7 @@ public sealed class PropertiesPanel : UserControl
             QueueRefresh();
             return true;
         }, $"文字ツールで書く文字の高さ (用紙 mm)。{Doc.ScaleText} で {Doc.PaperMmToMeters(Tools.TextTool.DefaultHeightMm):0.###} m");
-        AddNote("図形を選択すると、その図形の長さ・線幅・文字の大きさなどを表示・変更できます (Enter で確定、Ctrl+Z で戻す)。");
+        AddNote("図形を選択すると、その図形の長さ・線幅・文字の大きさなどを表示・変更できます (Enter で確定、Ctrl+Z で戻す)。文字はダブルクリックか文字変更 (ED) で中身を変えられます。");
     }
 
     // ---- 編集の適用 ----

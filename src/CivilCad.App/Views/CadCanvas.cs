@@ -213,7 +213,8 @@ public sealed class CadCanvas : FrameworkElement
                 break;
             case MouseButton.Left:
                 UpdateCursor(p);
-                _tool.OnPress(CursorWorld);
+                if (e.ClickCount == 2) _tool.OnDoubleClick(CursorWorld);
+                else _tool.OnPress(CursorWorld);
                 if (_tool.IsDragging) CaptureMouse();
                 RedrawOverlay();
                 break;
