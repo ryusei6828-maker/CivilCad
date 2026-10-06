@@ -136,7 +136,9 @@ public sealed class MoveCopyTool(bool copy) : CadTool
         else
         {
             Execute(new TranslateEntitiesCommand(_targets, delta));
-            Finish();
+            // 続けて同じ図形を移動できる (Esc で終了)
+            _base = null;
+            SetPrompt("続けて移動: 基点を指定 (Esc で終了)");
         }
     }
 

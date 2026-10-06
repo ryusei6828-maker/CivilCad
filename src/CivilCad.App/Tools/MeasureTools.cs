@@ -256,9 +256,14 @@ public sealed class AreaTool : MeasureToolBase
 
     protected override void OnMeasureEnter()
     {
-        if (_points.Count < 3)
+        if (_points.Count == 0)
         {
             Finish();
+            return;
+        }
+        if (_points.Count < 3)
+        {
+            Canvas.ShowMessage("面積は 3 点以上で指定してください。");
             return;
         }
         double sum = 0, perimeter = 0;

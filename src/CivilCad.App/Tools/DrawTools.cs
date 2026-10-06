@@ -18,10 +18,10 @@ public sealed class LineTool : CadTool, ILengthAngleInput, IStyledDrawTool
     public double? FixedAngleDeg { get => DrawInputMemory.AngleDeg; set => DrawInputMemory.AngleDeg = value; }
     public (double Length, double AngleDeg)? Live => BasePoint is Vec2 b ? LengthAngle.Measure(b, _cursor) : null;
     public override bool CanStepBack => _steps.Count > 0;
-    public override string? ConfirmLabel => _steps.Count > 0 ? "線を終える (Enter)" : null;
+    public override string? ConfirmLabel => _steps.Count > 0 ? "この線を終えて次の線へ (Enter)" : null;
 
     protected override void OnActivated() =>
-        SetPrompt(_steps.Count == 0 ? "始点を指定" : "次の点を指定 (Enter で終了 / 右クリックで一つ戻す・やり直し)");
+        SetPrompt(_steps.Count == 0 ? "始点を指定 (Esc で終了)" : "次の点を指定 (Enter でこの線を終えて次の線へ / Esc で終了)");
 
     public override Vec2 ConstrainCursor(Vec2 p) =>
         BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg) : p;
@@ -40,6 +40,18 @@ public sealed class LineTool : CadTool, ILengthAngleInput, IStyledDrawTool
         {
             _steps.Add((p, null, null));
         }
+        OnActivated();
+    }
+
+    /// <summary>Enter: 引いている線を終えて、次の線の始点の指定へ (続けて描ける)。何も引いていなければコマンドを終える。</summary>
+    public override void OnEnter()
+    {
+        if (_steps.Count == 0)
+        {
+            Finish();
+            return;
+        }
+        _steps.Clear();
         OnActivated();
     }
 
@@ -105,13 +117,20 @@ public sealed class PolylineTool : CadTool, ILengthAngleInput, IStyledDrawTool
         return true;
     }
 
-    public override void OnEnter() => Commit(false);
+    /// <summary>Enter: 描いている途中ならそのポリラインを確定して次へ。何も描いていなければコマンドを終える。</summary>
+    public override void OnEnter()
+    {
+        if (_points.Count == 0) Finish();
+        else Commit(false);
+    }
 
     private void Commit(bool closed)
     {
         if (_points.Count >= 2)
             Execute(new AddEntitiesCommand([Styled(new PolylineEntity(Doc.CurrentLayer, _points, closed && _points.Count > 2))], "ポリライン"));
-        Finish();
+        // 続けて次のポリラインを描ける (Esc で終了)
+        _points.Clear();
+        OnActivated();
     }
 
     public override void DrawPreview(DrawingContext dc)
@@ -174,7 +193,9 @@ public sealed class CircleTool : CadTool, IRadiusInput, IStyledDrawTool
     private void Create(Vec2 c, double r)
     {
         if (r > 0) Execute(new AddEntitiesCommand([Styled(new CircleEntity(Doc.CurrentLayer, c, r))], "円"));
-        Finish();
+        // 続けて次の円を描ける (Esc で終了)
+        _center = null;
+        OnActivated();
     }
 
     public override void OnMouseMove(Vec2 p) => _cursor = p;
@@ -263,7 +284,8 @@ public sealed class ArcTool : CadTool, IStyledDrawTool, IRadiusInput
                 Execute(new AddEntitiesCommand([Styled(arc)], "円弧"));
             else
                 Canvas.ShowMessage("3点が一直線上にあるため円弧を作れません。");
-            Finish();
+            _points.Clear(); // 続けて次の円弧を描ける (Esc で終了)
+            OnActivated();
         }
     }
 
@@ -288,7 +310,8 @@ public sealed class ArcTool : CadTool, IStyledDrawTool, IRadiusInput
             default:
                 if (ArcEntity.FromChordAndRadius(Doc.CurrentLayer, _points[0], _points[1], radius, p) is { } arc)
                     Execute(new AddEntitiesCommand([Styled(arc)], "円弧"));
-                Finish();
+                _points.Clear(); // 続けて次の円弧を描ける (Esc で終了)
+                OnActivated();
                 break;
         }
     }
@@ -343,7 +366,9 @@ public sealed class TextTool : CadTool, IStyledDrawTool
         if (_position is not Vec2 pos) return false;
         if (text.Length > 0)
             Execute(new AddEntitiesCommand([Styled(new TextEntity(Doc.CurrentLayer, pos, text, Doc.PaperMmToMeters(DefaultHeightMm)))], "文字"));
-        Finish();
+        // 続けて次の文字を置ける (Esc で終了)
+        _position = null;
+        OnActivated();
         return true;
     }
 }
