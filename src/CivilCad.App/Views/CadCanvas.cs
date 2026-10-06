@@ -19,7 +19,7 @@ public sealed class CadCanvas : FrameworkElement
     private const double PickTolerancePx = 6;
     private const double SnapTolerancePx = 12;
 
-    private static readonly Brush Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
+    private static readonly Brush Background = Frozen(new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E)));
     private static readonly RgbColor DimColor = new(90, 90, 90);
     private static readonly Pen SnapPen = Freeze(new Pen(Brushes.Lime, 2));
     public static readonly Pen PreviewPen = Freeze(new Pen(new SolidColorBrush(Color.FromRgb(0x66, 0xCC, 0xFF)), 1));
@@ -463,6 +463,9 @@ public sealed class CadCanvas : FrameworkElement
         return g;
     }
 
+    /// <summary>文字を作るときの大きさの上限 (px)。これより大きい文字は拡大して描く。</summary>
+    private const double MaxTextEm = 2000;
+
     private void DrawText(DrawingContext dc, TextEntity t, RgbColor color, bool selected)
     {
         var em = t.Height * Scale;
@@ -475,16 +478,20 @@ public sealed class CadCanvas : FrameworkElement
             return;
         }
 
-        var ft = new FormattedText(t.Text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, _typeface, em,
+        // WPF の文字は 35791px までしか作れないので、大きく拡大したとき (縮尺 1:1000 の図面など) は
+        // 上限の大きさで作って拡大して描く (見た目は同じ)
+        var drawEm = Math.Min(em, MaxTextEm);
+        var k = em / drawEm;
+        var ft = new FormattedText(t.Text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, _typeface, drawEm,
             GetBrush(color), VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        var naturalWidth = Math.Max(ft.WidthIncludingTrailingWhitespace, 1e-6);
+        var naturalWidth = Math.Max(ft.WidthIncludingTrailingWhitespace * k, 1e-6);
         var xScale = t.FitWidth is double fit ? fit * Scale / naturalWidth : t.WidthFactor;
         var widthPx = naturalWidth * xScale;
 
         // 配置基準 (中央・右寄せ・上端など) から文字列の左下を求めて描く
         var p = WorldToScreen(t.BaselineStart(widthPx / Scale));
         dc.PushTransform(new RotateTransform(-t.Rotation * 180 / Math.PI, p.X, p.Y));
-        dc.PushTransform(new ScaleTransform(xScale, 1, p.X, p.Y));
+        dc.PushTransform(new ScaleTransform(xScale * k, k, p.X, p.Y));
         // 全角文字の枠 (高さ = 文字高) の下端を基準点に合わせる (Jw_cad 等と同じ見え方)
         dc.DrawText(ft, new Point(p.X, p.Y - ft.Height));
         dc.Pop();
