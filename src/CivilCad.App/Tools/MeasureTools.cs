@@ -29,17 +29,34 @@ public static class MeasureSettings
     /// <summary>距離なら方向角、面積なら周長も書く。</summary>
     public static bool Detail { get; set; }
 
+    /// <summary>計測結果の単位 (mm / cm / m)。</summary>
+    public static LengthUnit Unit { get; set; } = LengthUnit.M;
+
     public static string Num(double v) => v.ToString("F" + Decimals, CultureInfo.InvariantCulture);
 
-    public static string DistanceText(Vec2 a, Vec2 b)
+    /// <summary>
+    /// CAD 上の長さ (図面の座標の単位 = m) に縮尺を掛けて、選んだ単位で表した値。
+    /// 例: 1:100 で CAD 上 0.01 (1cm) → 1m → 100cm。
+    /// </summary>
+    public static double Length(double cadLength, double scale) => cadLength * scale / Unit.Meters();
+
+    /// <summary>面積は縮尺の 2 乗を掛ける。</summary>
+    public static double Area(double cadArea, double scale) => cadArea * scale * scale / (Unit.Meters() * Unit.Meters());
+
+    public static string UnitLabel => Unit.Label();
+
+    public static string DistanceText(Vec2 a, Vec2 b, double scale)
     {
         var d = b - a;
-        var text = $"L={Num(d.Length)}m";
+        var text = $"L={Num(Length(d.Length, scale))}{UnitLabel}";
         return Detail ? $"{text}  θ={Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}" : text;
     }
 
-    public static string AreaText(double area, double perimeter) =>
-        Detail ? $"A={Num(area)}m²  (周長 {Num(perimeter)}m)" : $"A={Num(area)}m²";
+    public static string AreaText(double cadArea, double cadPerimeter, double scale)
+    {
+        var text = $"A={Num(Area(cadArea, scale))}{UnitLabel}²";
+        return Detail ? $"{text}  (周長 {Num(Length(cadPerimeter, scale))}{UnitLabel})" : text;
+    }
 
     /// <summary>線の向きに沿った文字の角度 (逆さまにならないよう -90°〜90° に収める)。</summary>
     public static double ReadableAngle(Vec2 a, Vec2 b)
@@ -191,8 +208,12 @@ public sealed class DistanceTool : MeasureToolBase
         if (p.DistanceTo(a) < 1e-12) return;
         _second = p;
         var d = p - a;
-        Canvas.ShowMessage($"距離 = {d.Length:F3} m   ΔX(北) = {d.Y:F3}  ΔY(東) = {d.X:F3}   方向角 = {Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}");
-        Measured(MeasureSettings.DistanceText(a, p), MeasureSettings.ReadableAngle(a, p), TextHAlign.Center, TextVAlign.Bottom);
+        var s = Doc.ScaleDenominator;
+        var u = MeasureSettings.UnitLabel;
+        string L(double v) => $"{MeasureSettings.Num(MeasureSettings.Length(v, s))} {u}";
+        Canvas.ShowMessage($"距離 = {L(d.Length)}   ΔX(北) = {L(d.Y)}  ΔY(東) = {L(d.X)}   方向角 = {Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}" +
+                           $"   (CAD上 {d.Length:F3} × 縮尺 {Doc.ScaleText})");
+        Measured(MeasureSettings.DistanceText(a, p, s), MeasureSettings.ReadableAngle(a, p), TextHAlign.Center, TextVAlign.Bottom);
     }
 
     protected override void DrawMeasurePreview(DrawingContext dc)
@@ -249,9 +270,12 @@ public sealed class AreaTool : MeasureToolBase
             perimeter += a.DistanceTo(b);
         }
         var area = Math.Abs(sum) / 2;
-        Canvas.ShowMessage($"面積 = {area:F3} m²   周長 = {perimeter:F3} m   ({_points.Count} 点)");
+        var s = Doc.ScaleDenominator;
+        var u = MeasureSettings.UnitLabel;
+        Canvas.ShowMessage($"面積 = {MeasureSettings.Num(MeasureSettings.Area(area, s))} {u}²   周長 = {MeasureSettings.Num(MeasureSettings.Length(perimeter, s))} {u}" +
+                           $"   ({_points.Count} 点、CAD上 {area:F3} / {perimeter:F3} × 縮尺 {Doc.ScaleText})");
         _closed = true;
-        Measured(MeasureSettings.AreaText(area, perimeter), 0, TextHAlign.Center, TextVAlign.Middle);
+        Measured(MeasureSettings.AreaText(area, perimeter, s), 0, TextHAlign.Center, TextVAlign.Middle);
     }
 
     protected override void DrawMeasurePreview(DrawingContext dc)

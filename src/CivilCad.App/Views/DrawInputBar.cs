@@ -128,6 +128,7 @@ public sealed class DrawInputBar : Border
                 AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
                 break;
             case MeasureToolBase:
+                AddMeasureUnit(doc);
                 AddCheck("結果を文字で記入", MeasureSettings.PlaceText, v => MeasureSettings.PlaceText = v,
                     "オンなら、計測のあと結果の文字がカーソルに付いて動き、クリックした位置に置ける (Enter で置かずに次へ)");
                 AddNumber($"文字高 (mm, {doc.ScaleText})", () => MeasureSettings.TextHeightMm, v => { if (v is double h) MeasureSettings.TextHeightMm = h; },
@@ -368,6 +369,35 @@ public sealed class DrawInputBar : Border
             if (focused) Box.SelectAll();
             return true;
         }
+    }
+
+    /// <summary>計測結果の単位 (mm / cm / m)。結果は CAD 上の長さに縮尺を掛けた値。</summary>
+    private void AddMeasureUnit(CadDocument doc)
+    {
+        AddLabel("単位");
+        var units = new[] { LengthUnit.Mm, LengthUnit.Cm, LengthUnit.M };
+        var box = new ComboBox
+        {
+            Width = 56,
+            Margin = new Thickness(0, 0, 6, 0),
+            ItemsSource = units.Select(u => u.Label()).ToList(),
+            SelectedIndex = Array.IndexOf(units, MeasureSettings.Unit),
+            ToolTip = $"計測結果の単位。結果は CAD 上の長さに縮尺 ({doc.ScaleText}) を掛けた値 (面積は縮尺の 2 乗)",
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0) return;
+            MeasureSettings.Unit = units[box.SelectedIndex];
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
+        _panel.Children.Add(new TextBlock
+        {
+            Text = $"(×縮尺 {doc.ScaleText})",
+            Foreground = LabelBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 14, 0),
+        });
     }
 
     private void AddCheck(string label, bool value, Action<bool> set, string tip)

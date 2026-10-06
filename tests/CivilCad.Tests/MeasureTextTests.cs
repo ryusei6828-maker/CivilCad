@@ -1,4 +1,4 @@
-using System.Runtime.ExceptionServices;
+﻿using System.Runtime.ExceptionServices;
 using CivilCad.App.Tools;
 using CivilCad.App.Views;
 using CivilCad.Core.Geometry;
@@ -15,7 +15,7 @@ public class MeasureTextTests
         {
             try
             {
-                var doc = new CadDocument { ScaleDenominator = 500 };
+                var doc = new CadDocument { ScaleDenominator = 1 };
                 action(doc, new CadCanvas { Document = doc });
             }
             catch (Exception ex) { error = ex; }
@@ -25,6 +25,7 @@ public class MeasureTextTests
                 MeasureSettings.Detail = false;
                 MeasureSettings.Decimals = 3;
                 MeasureSettings.TextHeightMm = 2.5;
+                MeasureSettings.Unit = LengthUnit.M;
             }
         });
         t.SetApartmentState(ApartmentState.STA);
@@ -64,6 +65,35 @@ public class MeasureTextTests
         tool.OnPoint(new Vec2(0, 5));          // 北へ 5m
         tool.OnPoint(new Vec2(1, 1));
         Assert.Equal("L=5.0m  θ=0°00'00.0\"",doc.Entities.OfType<TextEntity>().Last().Text);
+    });
+
+    [Fact]
+    public void Scale_IsApplied_InChosenUnit() => RunSta((doc, canvas) =>
+    {
+        // 1:100 で CAD 上 1cm (0.01) → 100cm
+        doc.ScaleDenominator = 100;
+        MeasureSettings.Unit = LengthUnit.Cm;
+        MeasureSettings.Decimals = 1;
+        var tool = new DistanceTool();
+        canvas.SetTool(tool);
+        tool.OnPoint(new Vec2(0, 0));
+        tool.OnPoint(new Vec2(0.01, 0));
+        tool.OnPoint(new Vec2(1, 1));
+        Assert.Equal("L=100.0cm", doc.Entities.OfType<TextEntity>().Last().Text);
+
+        // 面積は縮尺の 2 乗: CAD 上 0.02 × 0.03 = 0.0006 → 実寸 2m × 3m = 6m² = 60000cm²
+        MeasureSettings.Unit = LengthUnit.M;
+        MeasureSettings.Detail = true;
+        var area = new AreaTool();
+        canvas.SetTool(area);
+        foreach (var p in new Vec2[] { new(0, 0), new(0.02, 0), new(0.02, 0.03), new(0, 0.03) }) area.OnPoint(p);
+        area.OnEnter();
+        area.OnPoint(new Vec2(0.01, 0.01));
+        Assert.Equal("A=6.0m²  (周長 10.0m)", doc.Entities.OfType<TextEntity>().Last().Text);
+
+        Assert.Equal(60000, MeasureSettings.Area(0.0006, 100) * 10000, 6); // m² → cm² の確認 (×10⁴)
+        MeasureSettings.Unit = LengthUnit.Mm;
+        Assert.Equal(1000, MeasureSettings.Length(0.01, 100), 9);           // 1:100 で 1cm → 1000mm
     });
 
     [Fact]
