@@ -26,6 +26,29 @@ public sealed class CoordinateSetTool : CadTool
 
     protected override void OnActivated() => SetPrompt("基準点1 を図面上で指定 (スナップ可)");
 
+    public override bool CanStepBack => _step != Step.Point1;
+    public override string? ConfirmLabel => _step == Step.Point2 ? "移動だけ行う (Enter)" : null;
+
+    /// <summary>一つ前の手順へ (測量座標の入力 → 図面上の点の指定 → 一つ前の測量座標の入力)。</summary>
+    public override void StepBack()
+    {
+        switch (_step)
+        {
+            case Step.Survey1:
+                _step = Step.Point1;
+                OnActivated();
+                break;
+            case Step.Point2:
+                _step = Step.Survey1;
+                SetPrompt("基準点1 の測量座標を「X,Y」で入力 (X=北, Y=東。例: -95537.12,-60760.90)");
+                break;
+            case Step.Survey2:
+                _step = Step.Point2;
+                SetPrompt("基準点2 を指定 (方向も合わせる) / Enter で移動だけ行う");
+                break;
+        }
+    }
+
     public override void OnPoint(Vec2 p)
     {
         switch (_step)

@@ -127,12 +127,33 @@ public sealed class DrawInputBar : Border
             case IRadiusInput ri:
                 AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
                 break;
-            case HatchTool:
-                AddHatchStyle();
-                AddNumber("角度 (°)", () => HatchSettings.AngleDeg, v => { if (v is double a) { HatchSettings.AngleDeg = a; _canvas?.Tool.RefreshPrompt(); } },
-                    "ハッチ線の向き。東 = 0°、反時計回り (45° = 右上がり)", allowEmpty: false, allowNegative: true);
-                AddNumber($"間隔 (mm, {doc.ScaleText})", () => HatchSettings.SpacingMm, v => { if (v is double s) { HatchSettings.SpacingMm = s; _canvas?.Tool.RefreshPrompt(); } },
-                    "用紙上の線の間隔。図面の縮尺で m に換算", allowEmpty: false);
+            case MeasureToolBase:
+                AddMeasureUnit(doc);
+                AddCheck("結果を文字で記入", MeasureSettings.PlaceText, v => MeasureSettings.PlaceText = v,
+                    "オンなら、計測のあと結果の文字がカーソルに付いて動き、クリックした位置に置ける (Enter で置かずに次へ)");
+                AddNumber($"文字高 (mm, {doc.ScaleText})", () => MeasureSettings.TextHeightMm, v => { if (v is double h) MeasureSettings.TextHeightMm = h; },
+                    "記入する文字の高さ (用紙上の mm)", allowEmpty: false);
+                AddNumber("小数桁", () => MeasureSettings.Decimals, v => { if (v is double d) MeasureSettings.Decimals = (int)Math.Round(d); },
+                    "小数点以下の桁数 (0〜6)", allowEmpty: false, allowNegative: true);
+                AddCheck(tool is DistanceTool ? "方向角も記入" : "周長も記入", MeasureSettings.Detail, v => MeasureSettings.Detail = v,
+                    tool is DistanceTool ? "例: L=12.345m  θ=45°00'00\"" : "例: A=123.456m²  (周長 45.678m)");
+                break;
+            case PerpendicularTool:
+                AddNumber("長さ", () => PerpendicularTool.FixedLength, v => { PerpendicularTool.FixedLength = v; _canvas?.Tool.RefreshPrompt(); },
+                    "垂線の長さ。入れておくと、終点はクリックした側にこの長さで決まる", isLength: true);
+                break;
+            case HatchTool hatchTool:
+                if (!hatchTool.IsFill)
+                {
+                    AddHatchStyle();
+                    AddNumber("角度 (°)", () => HatchSettings.AngleDeg, v => { if (v is double a) { HatchSettings.AngleDeg = a; _canvas?.Tool.RefreshPrompt(); } },
+                        "ハッチ線の向き。東 = 0°、反時計回り (45° = 右上がり)", allowEmpty: false, allowNegative: true);
+                    AddNumber($"間隔 (mm, {doc.ScaleText})", () => HatchSettings.SpacingMm, v => { if (v is double s) { HatchSettings.SpacingMm = s; _canvas?.Tool.RefreshPrompt(); } },
+                        "用紙上の線の間隔。図面の縮尺で m に換算", allowEmpty: false);
+                }
+                AddNumber("透明度 (%)", () => HatchSettings.TransparencyPercent,
+                    v => { if (v is double t) { HatchSettings.TransparencyPercent = t; _canvas?.Tool.RefreshPrompt(); } },
+                    "0 = 不透明、50 = 半透明、100 = 透明。下の線や文字を透かして見せたいときに", allowEmpty: false, allowNegative: true);
                 break;
             case TextTool:
                 AddNumber($"文字高 (mm, {doc.ScaleText})", () => TextTool.DefaultHeightMm, v => { if (v is double h) TextTool.DefaultHeightMm = h; },
@@ -348,6 +369,56 @@ public sealed class DrawInputBar : Border
             if (focused) Box.SelectAll();
             return true;
         }
+    }
+
+    /// <summary>計測結果の単位 (mm / cm / m)。結果は CAD 上の長さに縮尺を掛けた値。</summary>
+    private void AddMeasureUnit(CadDocument doc)
+    {
+        AddLabel("単位");
+        var units = new[] { LengthUnit.Mm, LengthUnit.Cm, LengthUnit.M };
+        var box = new ComboBox
+        {
+            Width = 56,
+            Margin = new Thickness(0, 0, 6, 0),
+            ItemsSource = units.Select(u => u.Label()).ToList(),
+            SelectedIndex = Array.IndexOf(units, MeasureSettings.Unit),
+            ToolTip = $"計測結果の単位。結果は CAD 上の長さに縮尺 ({doc.ScaleText}) を掛けた値 (面積は縮尺の 2 乗)",
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0) return;
+            MeasureSettings.Unit = units[box.SelectedIndex];
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
+        _panel.Children.Add(new TextBlock
+        {
+            Text = $"(×縮尺 {doc.ScaleText})",
+            Foreground = LabelBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 14, 0),
+        });
+    }
+
+    private void AddCheck(string label, bool value, Action<bool> set, string tip)
+    {
+        var box = new CheckBox
+        {
+            Content = label,
+            IsChecked = value,
+            Foreground = LabelBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 14, 0),
+            Focusable = false,
+            ToolTip = tip,
+        };
+        box.Click += (_, _) =>
+        {
+            set(box.IsChecked == true);
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
     }
 
     private void AddHatchStyle()

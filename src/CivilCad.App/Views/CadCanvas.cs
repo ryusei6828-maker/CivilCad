@@ -19,7 +19,7 @@ public sealed class CadCanvas : FrameworkElement
     private const double PickTolerancePx = 6;
     private const double SnapTolerancePx = 12;
 
-    private static readonly Brush Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
+    private static readonly Brush Background = Frozen(new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E)));
     private static readonly RgbColor DimColor = new(90, 90, 90);
     private static readonly Pen SnapPen = Freeze(new Pen(Brushes.Lime, 2));
     public static readonly Pen PreviewPen = Freeze(new Pen(new SolidColorBrush(Color.FromRgb(0x66, 0xCC, 0xFF)), 1));
@@ -93,6 +93,9 @@ public sealed class CadCanvas : FrameworkElement
     public event EventHandler? ToolChanged;
     public event EventHandler? PromptChanged;
     public event EventHandler? CursorMoved;
+
+    /// <summary>作図領域で右クリックされた (右クリックメニューを出す)。</summary>
+    public event EventHandler? ContextRequested;
     public event EventHandler<string>? Message;
 
     protected override int VisualChildrenCount => _visuals.Count;
@@ -215,8 +218,8 @@ public sealed class CadCanvas : FrameworkElement
                 RedrawOverlay();
                 break;
             case MouseButton.Right:
-                _tool.OnRightClick();
-                RedrawOverlay();
+                // 右クリックはコマンドの操作メニュー (一つ戻す・やり直しなど) を出す。中身は MainWindow が作る
+                ContextRequested?.Invoke(this, EventArgs.Empty);
                 break;
         }
         e.Handled = true;
@@ -334,14 +337,20 @@ public sealed class CadCanvas : FrameworkElement
         using var dc = _scene.RenderOpen();
         if (ActualWidth <= 0) return;
         var view = VisibleWorldBox;
-        foreach (var e in Document.Entities)
+        // 塗りつぶしは先 (下) に描き、線や文字が塗りに隠れないようにする
+        foreach (var fillPass in new[] { true, false })
         {
-            if (!Document.IsVisible(e) || !e.Bounds.Intersects(view)) continue;
-            var dim = Document.OnlyCurrentLayerEditable && e.Layer != Document.CurrentLayer;
-            var color = dim ? DimColor : e.EffectiveColor;
-            DrawEntity(dc, e, color, Selection.Contains(e));
+            foreach (var e in Document.Entities)
+            {
+                if (IsFill(e) != fillPass || !Document.IsVisible(e) || !e.Bounds.Intersects(view)) continue;
+                var dim = Document.OnlyCurrentLayerEditable && e.Layer != Document.CurrentLayer;
+                var color = dim ? DimColor : e.EffectiveColor;
+                DrawEntity(dc, e, color, Selection.Contains(e));
+            }
         }
     }
+
+    private static bool IsFill(Entity e) => e is HatchEntity { Solid: true } or PolylineEntity { Filled: true };
 
     public void RedrawOverlay()
     {
@@ -377,12 +386,16 @@ public sealed class CadCanvas : FrameworkElement
         }
     }
 
-    /// <summary>ハッチング: 線 (または塗り) を 1 つの図形として描く。選択中は境界も描く。</summary>
+    /// <summary>
+    /// ハッチング: 線 (または塗り) を 1 つの図形として描く。透明度があれば透かして描く。
+    /// 選択中は境界も (透かさずに) 描く。
+    /// </summary>
     private void DrawHatch(DrawingContext dc, HatchEntity h, RgbColor color, bool selected, Pen pen)
     {
+        StreamGeometry? outline = null;
         if (h.Solid || selected)
         {
-            var outline = new StreamGeometry { FillRule = FillRule.EvenOdd };
+            outline = new StreamGeometry { FillRule = FillRule.EvenOdd };
             using (var ctx = outline.Open())
             {
                 foreach (var loop in h.Loops)
@@ -392,21 +405,30 @@ public sealed class CadCanvas : FrameworkElement
                 }
             }
             outline.Freeze();
-            dc.DrawGeometry(h.Solid ? GetBrush(color) : null, selected ? pen : null, outline);
         }
-        if (h.Solid || h.Lines.Count == 0) return;
 
-        var g = new StreamGeometry();
-        using (var ctx = g.Open())
+        var translucent = h.Opacity < 1;
+        if (translucent) dc.PushOpacity(h.Opacity);
+        if (h.Solid)
         {
-            foreach (var (a, b) in h.Lines)
-            {
-                ctx.BeginFigure(WorldToScreen(a), false, false);
-                ctx.LineTo(WorldToScreen(b), true, false);
-            }
+            dc.DrawGeometry(GetBrush(color), null, outline);
         }
-        g.Freeze();
-        dc.DrawGeometry(null, pen, g);
+        else if (h.Lines.Count > 0)
+        {
+            var g = new StreamGeometry();
+            using (var ctx = g.Open())
+            {
+                foreach (var (a, b) in h.Lines)
+                {
+                    ctx.BeginFigure(WorldToScreen(a), false, false);
+                    ctx.LineTo(WorldToScreen(b), true, false);
+                }
+            }
+            g.Freeze();
+            dc.DrawGeometry(null, pen, g);
+        }
+        if (translucent) dc.Pop();
+        if (selected) dc.DrawGeometry(null, pen, outline);
     }
 
     public void DrawWorldLine(DrawingContext dc, Pen pen, Vec2 a, Vec2 b) => dc.DrawLine(pen, WorldToScreen(a), WorldToScreen(b));
@@ -441,6 +463,9 @@ public sealed class CadCanvas : FrameworkElement
         return g;
     }
 
+    /// <summary>文字を作るときの大きさの上限 (px)。これより大きい文字は拡大して描く。</summary>
+    private const double MaxTextEm = 2000;
+
     private void DrawText(DrawingContext dc, TextEntity t, RgbColor color, bool selected)
     {
         var em = t.Height * Scale;
@@ -453,16 +478,20 @@ public sealed class CadCanvas : FrameworkElement
             return;
         }
 
-        var ft = new FormattedText(t.Text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, _typeface, em,
+        // WPF の文字は 35791px までしか作れないので、大きく拡大したとき (縮尺 1:1000 の図面など) は
+        // 上限の大きさで作って拡大して描く (見た目は同じ)
+        var drawEm = Math.Min(em, MaxTextEm);
+        var k = em / drawEm;
+        var ft = new FormattedText(t.Text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, _typeface, drawEm,
             GetBrush(color), VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        var naturalWidth = Math.Max(ft.WidthIncludingTrailingWhitespace, 1e-6);
+        var naturalWidth = Math.Max(ft.WidthIncludingTrailingWhitespace * k, 1e-6);
         var xScale = t.FitWidth is double fit ? fit * Scale / naturalWidth : t.WidthFactor;
         var widthPx = naturalWidth * xScale;
 
         // 配置基準 (中央・右寄せ・上端など) から文字列の左下を求めて描く
         var p = WorldToScreen(t.BaselineStart(widthPx / Scale));
         dc.PushTransform(new RotateTransform(-t.Rotation * 180 / Math.PI, p.X, p.Y));
-        dc.PushTransform(new ScaleTransform(xScale, 1, p.X, p.Y));
+        dc.PushTransform(new ScaleTransform(xScale * k, k, p.X, p.Y));
         // 全角文字の枠 (高さ = 文字高) の下端を基準点に合わせる (Jw_cad 等と同じ見え方)
         dc.DrawText(ft, new Point(p.X, p.Y - ft.Height));
         dc.Pop();

@@ -54,11 +54,11 @@ public class ModifyToolTests
             canvas.Tool.OnEnter();
             Assert.IsType<SelectTool>(canvas.Tool);
 
-            // 連結: 切り分けた 2 本を選択 → 元の 1 本に戻る。元に戻すとトリム直後に戻る
+            // 結合: 切り分けた 2 本を選択 → 元の 1 本に戻る。元に戻すとトリム直後に戻る
             var pieces = doc.Entities.OfType<LineEntity>().Where(l => l.Start.Y == 0 && l.End.Y == 0).ToList();
             Assert.Equal(2, pieces.Count);
             canvas.SetSelection(pieces);
-            Assert.StartsWith("連結: 2 個", JoinCommand.Run(canvas));
+            Assert.StartsWith("結合: 2 個", JoinCommand.Run(canvas));
             Assert.Equal(100.0, Assert.Single(doc.Entities.OfType<LineEntity>(), l => l.Start.Y == 0 && l.End.Y == 0).Length, 9);
             doc.History.Undo();
             Assert.Equal(2, doc.Entities.OfType<LineEntity>().Count(l => l.Start.Y == 0 && l.End.Y == 0));
@@ -112,7 +112,7 @@ public class ModifyToolTests
         OnSta(() =>
         {
             var canvas = new CadCanvas();
-            Assert.StartsWith("連結: つなぎたい図形を 2 つ以上", JoinCommand.Run(canvas));
+            Assert.StartsWith("結合: つなげたい線を 2 本以上", JoinCommand.Run(canvas));
         });
     }
 

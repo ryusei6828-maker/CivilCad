@@ -34,6 +34,7 @@ public abstract class EdgeEditTool : CadTool
     protected abstract bool ExtendsByDefault { get; }
 
     private bool Extending => ExtendsByDefault != ((Keyboard.Modifiers & ModifierKeys.Shift) != 0);
+    public override string? ConfirmLabel => _choosingEdges ? "境界を確定 (Enter)" : "終了 (Enter)";
     private IEnumerable<Entity> Edges => _allEdges ? Doc.Entities.Where(Doc.IsVisible) : _edges.Where(Doc.Entities.Contains);
 
     protected override void OnActivated()
@@ -167,6 +168,12 @@ public sealed class OffsetTool : CadTool
 
     public override string Name => "オフセット";
     public override bool WantsSnap => false;
+    public override bool CanStepBack => _target != null;
+    public override string? ConfirmLabel => _distance.HasValue ? "終了 (Enter)" : null;
+
+    /// <summary>選んだ図形を選び直す。</summary>
+    public override void StepBack() => PromptPick();
+
     public override bool WantsTextInput => true;
 
     protected override void OnActivated()
@@ -273,6 +280,18 @@ public sealed class RotateTool : CadTool
     private bool _copy;
 
     public override string Name => "回転";
+    public override bool CanStepBack => _base.HasValue;
+
+    public override IEnumerable<(string Label, Action Run)> MenuItems =>
+        _base.HasValue ? [(_copy ? "元を残さない (C)" : "元を残す (C)", () => OnText("C"))] : [];
+
+    /// <summary>基点を指定し直す。</summary>
+    public override void StepBack()
+    {
+        _base = null;
+        SetPrompt("回転の基点を指定");
+    }
+
     public override Vec2? BasePoint => _base;
     public override bool RequiresSelection => true;
     public override bool WantsTextInput => _base.HasValue;
@@ -353,22 +372,34 @@ public sealed class RotateTool : CadTool
     }
 }
 
-/// <summary>連結 (J): 選択中の図形をつなぎ直す。ツールではなくすぐに実行する。</summary>
+/// <summary>
+/// 結合 (J): 選択中の図形をつなぎ直す。ツールではなくすぐに実行する。
+/// 1. 同じ直線上の線は 1 本に (間が空いていても埋める)、同じ円上の円弧は 1 つに (<see cref="Join"/>)
+/// 2. 端点がつながる線・開いたポリライン・円弧を 1 本のポリラインに (<see cref="Joiner"/>。一周すれば閉じる)
+/// </summary>
 public static class JoinCommand
 {
     /// <summary>実行して、結果のメッセージを返す。</summary>
     public static string Run(CadCanvas canvas)
     {
         var doc = canvas.Document;
-        if (canvas.Selection.Count < 2) return "連結: つなぎたい図形を 2 つ以上選択してから実行してください (範囲選択も可)。";
-        // 描画順で渡す (連結後の図形は先頭の図形のレイヤ・色・線幅を引き継ぐ)
+        if (canvas.Selection.Count < 2) return "結合: つなげたい線を 2 本以上選択してから実行してください (範囲選択も可)。";
+        // 描画順で渡す (結合後の図形は先頭の図形のレイヤ・色・線幅を引き継ぐ)
         var selected = doc.Entities.Where(e => canvas.Selection.Contains(e) && doc.IsEditable(e)).ToList();
-        var result = Join.Run(selected);
-        if (result.Added.Count == 0)
-            return "連結: つなげられる図形がありません (同じ直線上の線・同じ円上の円弧・端点が重なる線/ポリラインが対象)。";
-        doc.History.Execute(new CompositeCommand($"連結 ({result.Removed.Count} → {result.Added.Count})",
-            new RemoveEntitiesCommand(result.Removed), new AddEntitiesCommand(result.Added)));
-        canvas.SetSelection(result.Added);
-        return $"連結: {result.Removed.Count} 個の図形を {result.Added.Count} 個にまとめました。";
+        var tolerance = Math.Max(doc.PaperMmToMeters(0.05), 1e-6); // 用紙上 0.05mm までの隙間はつながっているとみなす
+
+        var merged = Join.Run(selected, tolerance, chain: false);
+        var pieces = selected.Except(merged.Removed).Concat(merged.Added).ToList();
+        var chained = Joiner.Join(pieces, tolerance);
+
+        var removed = merged.Removed.Concat(chained.Consumed.Except(merged.Added)).ToList();
+        var added = merged.Added.Except(chained.Consumed).Concat(chained.Joined).ToList();
+        if (added.Count == 0)
+            return "結合: つなげられる図形がありません (端点がつながる線・開いたポリライン・円弧、同じ直線上の線、同じ円上の円弧が対象です)。";
+        doc.History.Execute(new CompositeCommand($"結合 ({removed.Count} → {added.Count})",
+            new RemoveEntitiesCommand(removed), new AddEntitiesCommand(added)));
+        canvas.SetSelection(added);
+        return $"結合: {removed.Count} 個の図形を {added.Count} 個にまとめました" +
+               (chained.ClosedCount > 0 ? $" (閉じた図形 {chained.ClosedCount} 個。塗りつぶし (FI) で中を塗れます)" : "") + "。";
     }
 }

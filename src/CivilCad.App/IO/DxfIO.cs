@@ -44,6 +44,8 @@ public static class DxfIO
             de.Layer = layers[e.Layer];
             de.Color = e.Color is RgbColor c2 ? ToAci(c2) : AciColor.ByLayer;
             de.Lineweight = e.LineWeight is double w ? ToDxfWeight(w) : Lineweight.ByLayer;
+            // 透明度 (DXF は 0〜90%)
+            if (e is HatchEntity { TransparencyPercent: > 0 } th) de.Transparency = new Transparency((short)Math.Clamp(Math.Round(th.TransparencyPercent), 0, 90));
             dxf.Entities.Add(de);
         }
         // 図面の縮尺は AutoCAD 等と同じく DIMSCALE (寸法スタイルの全体尺度, ヘッダの $DIMSCALE) に入れる
@@ -104,7 +106,11 @@ public static class DxfIO
         foreach (var o in dxf.Entities.MTexts)
             Add(o, [.. FromDxfMText(o, LayerOf(o))]);
         foreach (var o in dxf.Entities.Hatches)
-            if (FromDxfHatch(o, LayerOf(o)) is { } hatch) Add(o, hatch);
+            if (FromDxfHatch(o, LayerOf(o)) is { } hatch)
+            {
+                if (!o.Transparency.IsByLayer && !o.Transparency.IsByBlock && o.Transparency.Value > 0) hatch.TransparencyPercent = o.Transparency.Value;
+                Add(o, hatch);
+            }
 
         doc.Entities.AddRange(list);
         doc.NotifyChanged();

@@ -116,12 +116,14 @@ public static class SfcWriter
             foreach (var width in _userWidths) Feature($"width_feature({Q(width)})");
             Feature($"text_font_feature({Str("ＭＳ ゴシック")})");
 
-            var code = 1;
-            foreach (var l in doc.Layers)
-            {
-                _layerCodes[l] = code++;
-                Feature($"layer_feature({Str(l.Name)},{Q(l.IsVisible ? 1 : 0)})");
-            }
+            // レイヤの番号 (1 始まり) は先に決めておき、レイヤの定義 (layer_feature) は最後に書く
+            var layers = UsableLayers();
+            for (var i = 0; i < layers.Count; i++) _layerCodes[layers[i]] = i + 1;
+
+            // 並びは SCADEC (他の CAD が出力する SFC) と同じにする:
+            //   定義 (色・線種・線幅・文字フォント) → 部分図の中身 + sfig_org → 用紙上の図形 + sfig_locate
+            //   → drawing_sheet_feature (用紙。ここまでが用紙の中身) → layer_feature (レイヤ表)
+            // 用紙の後に図形を書いたり、レイヤ表を先頭に書いたりすると、SXF ブラウザ等で開けない・レイヤ名がずれる
 
             // 部分図: 実寸 mm (図面 m × 1000)
             var sheetLevel = doc.Entities.Where(IsSheetLevel).ToList();
@@ -132,19 +134,74 @@ public static class SfcWriter
                 Feature($"sfig_org_feature({Str(partName)},{Q(1)})");
             }
 
-            Feature($"drawing_sheet_feature({Str(sheetName)},{Q(PaperTypeCode(paper))},{Q(1)},{Q(pw)},{Q(ph)})");
-
             // 用紙 (mm)
             foreach (var e in sheetLevel) WriteEntity(e, p => (p - origin) / k, 1 / k);
             if (partLevel.Count > 0)
             {
                 var pos = -origin / k; // 部分図の原点 (図面座標 0,0) の用紙上の位置
                 var ratio = 1 / doc.ScaleDenominator;
-                Feature($"sfig_locate_feature({Q(0)},{Str(partName)},{Q(pos.X)},{Q(pos.Y)},{Q(0.0)},{Q(ratio, 14)},{Q(ratio, 14)})");
+                Feature($"sfig_locate_feature({Q(1)},{Str(partName)},{Q(pos.X)},{Q(pos.Y)},{Q(0.0)},{Q(ratio, 14)},{Q(ratio, 14)})");
             }
+
+            Feature($"drawing_sheet_feature({Str(sheetName)},{Q(PaperTypeCode(paper))},{Q(1)},{Q(pw)},{Q(ph)})");
+
+            foreach (var l in layers)
+                Feature($"layer_feature({Str(LayerName(l))},{Q(l.IsVisible ? 1 : 0)})");
 
             _sb.Append("ENDSEC;\nEND-ISO-10303-21;\n");
             return _sb.ToString();
+        }
+
+        /// <summary>
+        /// 書き出すレイヤ。図形のあるレイヤは必ず入れる (レイヤ一覧に無いものも)。図形の無い "0" は入れない
+        /// (CivilCad の既定レイヤで、他 CAD の SFC には無い)。SXF のレイヤは 256 個までなので、超える分は図形の無いものから省く。
+        /// </summary>
+        private List<Layer> UsableLayers()
+        {
+            var used = doc.Entities.Select(e => e.Layer).ToHashSet();
+            var list = doc.Layers.Where(l => used.Contains(l) || l.Name != "0").ToList();
+            list.AddRange(used.Where(l => !list.Contains(l)));
+            if (list.Count > MaxLayers) list = [.. list.Where(used.Contains).Concat(list.Where(l => !used.Contains(l))).Take(MaxLayers)];
+            if (list.Count == 0) list.Add(doc.Layers.FirstOrDefault() ?? new Layer("0", RgbColor.White));
+            _uniqueNames = UniqueNames(list);
+            return list;
+        }
+
+        private const int MaxLayers = 256;
+        private Dictionary<Layer, string> _uniqueNames = [];
+
+        private string LayerName(Layer l) => _uniqueNames.TryGetValue(l, out var n) ? n : l.Name;
+
+        /// <summary>
+        /// レイヤ名を SXF で使える形にする: 前後の空白・改行を除き、空なら「レイヤn」、長すぎれば切り詰め (Shift_JIS 256 バイトまで)、
+        /// 重複していれば「_2」などを付けて区別する (同じ名前があると他のソフトでレイヤがまとまったり読めなかったりする)。
+        /// </summary>
+        private Dictionary<Layer, string> UniqueNames(List<Layer> layers)
+        {
+            var result = new Dictionary<Layer, string>();
+            var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < layers.Count; i++)
+            {
+                var name = new string(layers[i].Name.Where(c => !char.IsControl(c)).ToArray()).Trim();
+                if (name.Length == 0) name = $"レイヤ{i + 1}";
+                while (SjisLength(name) > 250) name = name[..^1];
+                var unique = name;
+                for (var n = 2; !taken.Add(unique); n++) unique = $"{name}_{n}";
+                result[layers[i]] = unique;
+            }
+            return result;
+        }
+
+        private int SjisLength(string s)
+        {
+            try
+            {
+                return sjis.GetByteCount(s);
+            }
+            catch (EncoderFallbackException)
+            {
+                return s.Length * 8; // \X2\ 表記になる文字があるときは長めに見積もる
+            }
         }
 
         private static bool IsSheetLevel(Entity e) => e.Layer.Name.StartsWith("D-TTL", StringComparison.OrdinalIgnoreCase);

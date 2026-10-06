@@ -82,6 +82,32 @@
         </GeometryDrawing>
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
+    <DrawingImage x:Key="IconPerpendicular" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Pen="{StaticResource IcoInkPen}" Geometry="M1,22 L14,22"/>
+        <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M7,22 L7,10 M7,19 L10,19 L10,22"/>
+        <GeometryDrawing Brush="{StaticResource IcoPencil}" Pen="{StaticResource IcoInkPen}" Geometry="{StaticResource PencilBody}"/>
+        <GeometryDrawing Brush="{StaticResource IcoInk}" Geometry="{StaticResource PencilTip}"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
+    <DrawingImage x:Key="IconFill" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Brush="#FF7FB2E5" Pen="{StaticResource IcoBluePen}" Geometry="M2,22 L4,12 L12,13 L13,22 Z"/>
+        <GeometryDrawing Brush="{StaticResource IcoPencil}" Pen="{StaticResource IcoInkPen}" Geometry="{StaticResource PencilBody}"/>
+        <GeometryDrawing Brush="{StaticResource IcoInk}" Geometry="{StaticResource PencilTip}"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
+    <DrawingImage x:Key="IconJoin" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M2,18 L8,8 L14,14 L21,5"/>
+        <GeometryDrawing Brush="{StaticResource IcoInk}">
+            <GeometryDrawing.Geometry><GeometryGroup>
+                <EllipseGeometry Center="8,8" RadiusX="2" RadiusY="2"/>
+                <EllipseGeometry Center="14,14" RadiusX="2" RadiusY="2"/>
+            </GeometryGroup></GeometryDrawing.Geometry>
+        </GeometryDrawing>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <DrawingImage x:Key="IconCircle" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
         <GeometryDrawing Pen="{StaticResource IcoBluePen}">
@@ -185,13 +211,6 @@
         <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M20,2 L20,22"/>
         <GeometryDrawing Pen="{StaticResource IcoInkThick}" Geometry="M2,12 L10,12"/>
         <GeometryDrawing Pen="{StaticResource IcoInkPen}" Geometry="M10,12 L19,12 M15,8.5 L19,12 L15,15.5"/>
-    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
-
-    <DrawingImage x:Key="IconJoin" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
-        <GeometryDrawing Pen="{StaticResource IcoInkThick}" Geometry="M2,18 L9,18 M15,18 L22,18 M22,18 L22,6"/>
-        <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M9,18 L15,18"/>
-        <GeometryDrawing Pen="{StaticResource IcoInkPen}" Geometry="M9,10 L12,13 L15,10 M12,5 L12,13"/>
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
 

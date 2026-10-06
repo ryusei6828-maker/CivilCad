@@ -47,6 +47,7 @@ public partial class MainWindow : Window
         Canvas.CursorMoved += (_, _) => UpdateCoordinates();
         Canvas.SelectionChanged += (_, _) => SelectionText.Text = Canvas.Selection.Count > 0 ? $"{Canvas.Selection.Count} 個選択中" : "";
         Canvas.PreviewMouseDown += (_, _) => CommandBox.Focus();
+        Canvas.ContextRequested += (_, _) => ShowCanvasMenu();
         PreviewKeyDown += Window_PreviewKeyDown;
         Loaded += (_, _) =>
         {
@@ -116,6 +117,9 @@ public partial class MainWindow : Window
             case "C": StartTool(new CircleTool(), c); break;
             case "A": StartTool(new ArcTool(), c); break;
             case "T": StartTool(new TextTool(), c); break;
+            case "PE": StartTool(new PerpendicularTool(), c); break;
+            case "FI": StartTool(new HatchTool(fill: true), c); break;
+            case "J": JoinSelection(); break;
             case "H": StartTool(new HatchTool(), c); break;
             case "PI": ImportPoints(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
@@ -124,7 +128,6 @@ public partial class MainWindow : Window
             case "O": StartTool(new OffsetTool(), c); break;
             case "TR": StartTool(new TrimTool(), c); break;
             case "EX": StartTool(new ExtendTool(), c); break;
-            case "J": Log(JoinCommand.Run(Canvas)); break;
             case "DI": StartTool(new DistanceTool(), c); break;
             case "AA": StartTool(new AreaTool(), c); break;
             case "E" or "DEL":
@@ -185,7 +188,71 @@ public partial class MainWindow : Window
         CommandBox.Focus();
     }
 
-    private static readonly Brush ActiveToolBrush = new SolidColorBrush(Color.FromRgb(0xCC, 0xE4, 0xFF));
+    /// <summary>結合: 選択中の線をつなぎ直す (同じ直線上・同じ円上のものはまとめ、端点がつながるものは 1 本のポリラインに)。</summary>
+    private void JoinSelection() => Log(JoinCommand.Run(Canvas));
+
+    // ---- 右クリックメニュー ----
+
+    /// <summary>
+    /// 作図領域の右クリックメニュー。コマンド中は 一つ戻す・最初からやり直す・確定・終了、
+    /// 選択中は 移動・複写・削除 などを出す。
+    /// </summary>
+    private void ShowCanvasMenu()
+    {
+        var tool = Canvas.Tool;
+        var menu = new ContextMenu();
+        MenuItem Item(string header, Action run, bool enabled = true, string? gesture = null)
+        {
+            var item = new MenuItem { Header = header, IsEnabled = enabled, InputGestureText = gesture ?? "" };
+            item.Click += (_, _) =>
+            {
+                run();
+                Canvas.RedrawOverlay();
+                FocusCommandBox();
+            };
+            menu.Items.Add(item);
+            return item;
+        }
+
+        if (tool is SelectTool)
+        {
+            var hasSel = Canvas.Selection.Count > 0;
+            Item("移動", () => RunCommand("M"), hasSel, "M");
+            Item("複写", () => RunCommand("CO"), hasSel, "CO");
+            Item("削除", DeleteSelection, hasSel, "Delete");
+            Item("選択を解除", Canvas.ClearSelection, hasSel, "Esc");
+            menu.Items.Add(new Separator());
+            Item("元に戻す", () => Undo_Executed(this, null!), _doc.History.CanUndo, "Ctrl+Z");
+            Item("やり直し", () => Redo_Executed(this, null!), _doc.History.CanRedo, "Ctrl+Y");
+            menu.Items.Add(new Separator());
+            Item("全体表示", ZoomExtentsWithReport, true, "ZE");
+        }
+        else
+        {
+            menu.Items.Add(new MenuItem { Header = $"[{tool.Name}]", IsEnabled = false });
+            Item("一つ戻す", tool.StepBack, tool.CanStepBack, "Backspace");
+            Item("最初からやり直す", RestartTool);
+            if (tool.ConfirmLabel is { } confirm) Item(confirm, tool.OnEnter);
+            foreach (var (label, run) in tool.MenuItems) Item(label, run);
+            menu.Items.Add(new Separator());
+            Item("コマンドを終了", () => Canvas.SetTool(new SelectTool()), true, "Esc");
+        }
+        menu.PlacementTarget = Canvas;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+        menu.IsOpen = true;
+    }
+
+    /// <summary>実行中のコマンドを最初からやり直す (入力途中の点などを捨てる。作った図形はそのまま)。</summary>
+    private void RestartTool()
+    {
+        var tool = Canvas.Tool;
+        if (tool.CommandCode is not { } code) return;
+        if (code == "E") StartTool(new EraseTool(), "E"); // 削除モードは選択図形を消さずにやり直す
+        else RunCommand(code);
+        Log($"{tool.Name}: 最初からやり直します。");
+    }
+
+    private static readonly Brush ActiveToolBrush =new SolidColorBrush(Color.FromRgb(0xCC, 0xE4, 0xFF));
 
     /// <summary>実行中のコマンドのボタンを色付けして、今どのモードかを分かるようにする。</summary>
     private void UpdateToolbarHighlight()
@@ -264,8 +331,29 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Esc でコマンドをキャンセル: コマンド欄以外 (作図領域・ツールバー等) にフォーカスがあっても効くようにする。
+        // ただし入力欄・一覧 (レイヤ名の編集、入力バーの数値など) の中の Esc はそちらに任せる
+        if (e.Key == Key.Escape && !CommandBox.IsKeyboardFocused &&
+            Keyboard.FocusedElement is not (System.Windows.Controls.Primitives.TextBoxBase or ComboBox or DataGridCell or ComboBoxItem))
+        {
+            Canvas.Tool.OnCancel();
+            Canvas.RedrawOverlay();
+            FocusCommandBox();
+            e.Handled = true;
+            return;
+        }
+
         // 以下はコマンド欄にフォーカスがあるときだけ (レイヤ名の編集などを邪魔しない)
         if (!CommandBox.IsKeyboardFocused) return;
+
+        // コマンド欄が空なら Backspace で「一つ戻す」(右クリックメニューと同じ)
+        if (e.Key == Key.Back && Keyboard.Modifiers == ModifierKeys.None && CommandBox.Text.Length == 0 && Canvas.Tool.CanStepBack)
+        {
+            Canvas.Tool.StepBack();
+            Canvas.RedrawOverlay();
+            e.Handled = true;
+            return;
+        }
 
         // コマンド欄が空なら Ctrl+Z / Y / A は図面に対する操作にする (TextBox 自身の処理より優先)
         if (Keyboard.Modifiers == ModifierKeys.Control && CommandBox.Text.Length == 0)
@@ -876,6 +964,10 @@ public partial class MainWindow : Window
         {
             Log(error);
             box.Text = layer.Name;
+        }
+        else
+        {
+            box.Text = name; // 前後の空白を除いた名前にする
         }
     }
 

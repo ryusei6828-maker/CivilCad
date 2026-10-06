@@ -44,8 +44,10 @@
                 <MenuItem Header="ポリライン (PL)" Tag="PL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPolyline}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="円 (C)" Tag="C" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCircle}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="円弧 3点 (A)" Tag="A" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconArc}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="垂線 (PE)" Tag="PE" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPerpendicular}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="文字 (T)" Tag="T" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconText}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="ハッチング (H)" Tag="H" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconHatch}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="塗りつぶし (FI)" Tag="FI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFill}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
             <MenuItem Header="図面(_Z)">
                 <MenuItem Header="図枠 (外枠・表題欄) (FR)..." Tag="FR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFrame}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
@@ -61,7 +63,7 @@
                 <MenuItem Header="オフセット (O)" Tag="O" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconOffset}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="トリム (TR)" Tag="TR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconTrim}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="延長 (EX)" Tag="EX" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconExtend}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
-                <MenuItem Header="連結 (J)" Tag="J" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconJoin}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="結合 (J)" Tag="J" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconJoin}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
                 <MenuItem Header="削除モード (E)" Tag="E" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconErase}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
@@ -113,8 +115,10 @@
                         <Button Style="{StaticResource ToolButton}" Tag="PL" Click="Tool_Click" ToolTip="ポリライン (PL)"><StackPanel><Image Source="{StaticResource IconPolyline}" Width="24" Height="24"/><TextBlock Text="ポリライン" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="C" Click="Tool_Click" ToolTip="円 (C)"><StackPanel><Image Source="{StaticResource IconCircle}" Width="24" Height="24"/><TextBlock Text="円" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="A" Click="Tool_Click" ToolTip="円弧 (A)"><StackPanel><Image Source="{StaticResource IconArc}" Width="24" Height="24"/><TextBlock Text="円弧" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="PE" Click="Tool_Click" ToolTip="垂線 (PE)"><StackPanel><Image Source="{StaticResource IconPerpendicular}" Width="24" Height="24"/><TextBlock Text="垂線" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="T" Click="Tool_Click" ToolTip="文字 (T)"><StackPanel><Image Source="{StaticResource IconText}" Width="24" Height="24"/><TextBlock Text="文字" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="H" Click="Tool_Click" ToolTip="ハッチング (H)"><StackPanel><Image Source="{StaticResource IconHatch}" Width="24" Height="24"/><TextBlock Text="ハッチング" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="FI" Click="Tool_Click" ToolTip="塗りつぶし (FI)"><StackPanel><Image Source="{StaticResource IconFill}" Width="24" Height="24"/><TextBlock Text="塗りつぶし" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="修正">
@@ -125,7 +129,7 @@
                         <Button Style="{StaticResource ToolButton}" Tag="O" Click="Tool_Click" ToolTip="オフセット (O): 距離を入力 → 図形 → ずらす側をクリック"><StackPanel><Image Source="{StaticResource IconOffset}" Width="24" Height="24"/><TextBlock Text="オフセット" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="TR" Click="Tool_Click" ToolTip="トリム (TR): 境界を選んで Enter → 切り取る部分をクリック (Shift+クリックで延長)"><StackPanel><Image Source="{StaticResource IconTrim}" Width="24" Height="24"/><TextBlock Text="トリム" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="EX" Click="Tool_Click" ToolTip="延長 (EX): 境界を選んで Enter → 伸ばす端をクリック (Shift+クリックでトリム)"><StackPanel><Image Source="{StaticResource IconExtend}" Width="24" Height="24"/><TextBlock Text="延長" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
-                        <Button Style="{StaticResource ToolButton}" Tag="J" Click="Tool_Click" ToolTip="連結 (J) ※先に図形を選択。分かれた線を 1 本の線・ポリラインにつなぎ直す"><StackPanel><Image Source="{StaticResource IconJoin}" Width="24" Height="24"/><TextBlock Text="連結" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="J" Click="Tool_Click" ToolTip="結合 (J) ※先に図形を選択。分かれた線を 1 本の線・ポリラインにつなぎ直す"><StackPanel><Image Source="{StaticResource IconJoin}" Width="24" Height="24"/><TextBlock Text="結合" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="E" Click="Tool_Click" ToolTip="削除モード (E): クリックした図形を消す。Esc で終了"><StackPanel><Image Source="{StaticResource IconErase}" Width="24" Height="24"/><TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>

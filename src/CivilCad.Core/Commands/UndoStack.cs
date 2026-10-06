@@ -17,6 +17,9 @@ public sealed class UndoStack(CadDocument doc)
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
 
+    /// <summary>次に元に戻されるコマンド。</summary>
+    public IUndoableCommand? Peek => _undo.Count > 0 ? _undo.Peek() : null;
+
     /// <summary>変更のたびに増える番号 (保存時の値と比べて「未保存の変更があるか」を判定する)。</summary>
     public long Version { get; private set; }
 

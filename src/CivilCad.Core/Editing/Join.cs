@@ -17,7 +17,8 @@ public static class Join
     /// 円・閉じたポリライン・文字などはそのまま。円弧と線はつながない (ポリラインが円弧を持てないため)。
     /// できた図形は、元の図形のうち先頭のもの (entities の順) のレイヤ・色・線幅を引き継ぐ。
     /// </summary>
-    public static JoinResult Run(IReadOnlyList<Entity> entities, double tolerance = EditUtil.PointTolerance)
+    /// <param name="chain">false なら手順 3 (ポリラインにつなぐ) をしない (つなぐのは画面側の結合に任せるとき)。</param>
+    public static JoinResult Run(IReadOnlyList<Entity> entities, double tolerance = EditUtil.PointTolerance, bool chain = true)
     {
         var removed = new List<Entity>();
         var added = new List<Entity>();
@@ -45,13 +46,14 @@ public static class Join
             added.Add(MergeArcs(group));
         }
 
+        if (!chain) return new JoinResult(removed, added);
         chainable.AddRange(entities.OfType<PolylineEntity>().Where(p => !p.IsClosed && p.Points.Count >= 2));
-        foreach (var chain in Chains(chainable, tolerance))
+        foreach (var members in Chains(chainable, tolerance))
         {
-            if (chain.Count == 1) continue;
-            foreach (var e in chain)
+            if (members.Count == 1) continue;
+            foreach (var e in members)
                 if (!added.Remove(e)) removed.Add(e); // 手順 1 で作ったばかりの線は、追加をやめれば済む
-            added.Add(BuildPolyline(chain, tolerance));
+            added.Add(BuildPolyline(members, tolerance));
         }
         return new JoinResult(removed, added);
     }
