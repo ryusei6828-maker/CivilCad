@@ -34,8 +34,12 @@ public sealed record SymbolText(Vec2 Position, string Text, double Height, doubl
 public sealed record SymbolHatch(IReadOnlyList<IReadOnlyList<Vec2>> Loops, IReadOnlyList<HatchPattern> Patterns, bool Solid,
     double TransparencyPercent = 0) : SymbolShape;
 
-/// <summary>プリセット (記号) の定義。IsUser = 図形を選んで登録したもの。</summary>
-public sealed record SymbolDefinition(string Kind, string Name, IReadOnlyList<SymbolShape> Shapes, double DefaultSizeMm, bool IsUser = false);
+/// <summary>
+/// プリセット (記号) の定義。IsUser = 図形を選んで登録したもの。
+/// PointsNorth = 方位記号: 向きは常に北に合わせる (CadDocument.AlignNorthArrows)。
+/// </summary>
+public sealed record SymbolDefinition(string Kind, string Name, IReadOnlyList<SymbolShape> Shapes, double DefaultSizeMm,
+    bool IsUser = false, bool PointsNorth = false);
 
 /// <summary>プリセットの一覧 (最初から入っているもの + 登録したもの)。</summary>
 public static class SymbolLibrary
@@ -53,7 +57,7 @@ public static class SymbolLibrary
             new SymbolPoly([new(0, 0.42), new(-0.13, -0.32), new(0, -0.18)], true, Filled: true),
             new SymbolPoly([new(0, 0.42), new(0.13, -0.32), new(0, -0.18)], true),
             new SymbolText(new Vec2(0, 0.6), "N", 0.2),
-        ], 20),
+        ], 20, PointsNorth: true),
 
         // 線 + 塗りの矢じり + N
         new(NorthArrowSimple, "方位記号 (シンプル)",
@@ -61,7 +65,7 @@ public static class SymbolLibrary
             new SymbolPoly([new(0, -0.45), new(0, 0.3)], false),
             new SymbolPoly([new(0, 0.45), new(-0.09, 0.22), new(0.09, 0.22)], true, Filled: true),
             new SymbolText(new Vec2(0, 0.62), "N", 0.2),
-        ], 15),
+        ], 15, PointsNorth: true),
 
         // 十字 + 北側を塗った菱形 + N
         new(NorthArrowCross, "方位記号 (十字)",
@@ -71,7 +75,7 @@ public static class SymbolLibrary
             new SymbolPoly([new(0, 0.42), new(-0.08, 0), new(0.08, 0)], true, Filled: true),
             new SymbolPoly([new(0, -0.42), new(-0.08, 0), new(0.08, 0)], true),
             new SymbolText(new Vec2(0, 0.6), "N", 0.2),
-        ], 20),
+        ], 20, PointsNorth: true),
     ];
 
     private static readonly List<SymbolDefinition> _user = [];

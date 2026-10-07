@@ -214,10 +214,20 @@ public sealed class PropertiesPanel : UserControl
                         sx.SizeMm = mm;
                         sx.Size = Doc.PaperMmToMeters(mm);
                     }, "プリセットの大きさ変更"), "用紙上の大きさ。縮尺を変えても用紙上の大きさは変わらない");
-                AddEditable("向き (°)", Deg(sym.Rotation).ToString("0.###", CultureInfo.InvariantCulture), s =>
-                    double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var deg) &&
-                    Apply(x => ((SymbolEntity)x).Rotation = deg * Math.PI / 180, "プリセットの向き変更"),
-                    "記号の上 (北) の向き。0 = 図面の上、反時計回りが正");
+                if (sym.Definition.PointsNorth)
+                {
+                    // 方位記号の向きは常に北 (変更できない)
+                    AddReadOnly("向き", Tools.PresetTool.NorthText(Doc));
+                    if (Math.Abs(sym.Rotation) > 1e-12)
+                        AddReadOnly("座標北との差", $"{Angles.ToDms(Math.Abs(sym.Rotation))} {(sym.Rotation > 0 ? "西" : "東")}へ");
+                }
+                else
+                {
+                    AddEditable("向き (°)", Deg(sym.Rotation).ToString("0.###", CultureInfo.InvariantCulture), s =>
+                        double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var deg) &&
+                        Apply(x => ((SymbolEntity)x).Rotation = deg * Math.PI / 180, "プリセットの向き変更"),
+                        "記号の上の向き。0 = 図面の上、反時計回りが正");
+                }
                 AddReadOnly("図面上の大きさ", $"{sym.Size:F3} m");
                 break;
 

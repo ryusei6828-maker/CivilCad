@@ -146,6 +146,20 @@ public static class PlaneRectangular
         return (phi * 180 / Math.PI, lambda * 180 / Math.PI);
     }
 
+    /// <summary>
+    /// 真北の向き: 座標北 (X 軸 = 図面の上) から反時計回りの角 (ラジアン)。系の原点より東では正 (真北は座標北より西へ傾く)。
+    /// 子午線収差角 γ と大きさは同じ。緯度を少しずらした 2 点の座標から求める。
+    /// </summary>
+    public static double TrueNorthRotation(PlaneZone zone, double x, double y)
+    {
+        var (lat, lon) = ToLatLon(zone, x, y);
+        const double d = 1e-4;
+        var (x1, y1) = FromLatLon(zone, lat + d, lon);
+        var (x0, y0) = FromLatLon(zone, lat - d, lon);
+        // 北へ進む向き (X = 北, Y = 東) と X 軸との角。東へずれていれば時計回り (負) なので符号を反転する
+        return -Math.Atan2(y1 - y0, x1 - x0);
+    }
+
     /// <summary>度 → "35°39'29.16""" 形式。</summary>
     public static string ToDms(double deg, int secDecimals = 2)
     {

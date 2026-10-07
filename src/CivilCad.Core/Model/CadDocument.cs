@@ -124,7 +124,48 @@ public sealed class CadDocument : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public void NotifyChanged() => Changed?.Invoke(this, EventArgs.Empty);
+    public void NotifyChanged()
+    {
+        AlignNorthArrows();
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    // ---- 北の向き ----
+
+    /// <summary>
+    /// 真北の向きを求める関数: (系番号, 図面上の位置) → 真北の向き (座標北 = 図面の上 から反時計回り、ラジアン)。
+    /// 緯度経度の計算は CivilCad.Alignment にあるので、アプリの起動時に設定する。
+    /// </summary>
+    public static Func<int, Vec2, double?>? TrueNorthProvider { get; set; }
+
+    /// <summary>true = 方位記号は真北 (系が設定されていれば子午線収差を補正)、false = 座標北 (図面の上)。</summary>
+    public bool UseTrueNorth
+    {
+        get => _useTrueNorth;
+        set
+        {
+            if (_useTrueNorth == value) return;
+            _useTrueNorth = value;
+            OnPropertyChanged();
+            NotifyChanged();
+        }
+    }
+
+    private bool _useTrueNorth = true;
+
+    /// <summary>真北で求められるか (系が設定されている)。</summary>
+    public bool CanUseTrueNorth => PlaneZone != null && TrueNorthProvider != null;
+
+    /// <summary>位置 p での北の向き (図面の上から反時計回り、ラジアン)。</summary>
+    public double NorthRotation(Vec2 p) =>
+        UseTrueNorth && PlaneZone is int zone && TrueNorthProvider?.Invoke(zone, p) is double r && double.IsFinite(r) ? r : 0;
+
+    /// <summary>方位記号の向きを、置いてある位置の北に合わせる (移動・回転・系の変更のたびに呼ばれる)。</summary>
+    public void AlignNorthArrows()
+    {
+        foreach (var e in Entities)
+            if (e is SymbolEntity s && s.Definition.PointsNorth) s.Rotation = NorthRotation(s.Position);
+    }
 
     public bool IsVisible(Entity e) => e.Layer.IsVisible;
 

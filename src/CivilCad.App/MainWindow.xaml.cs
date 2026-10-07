@@ -34,8 +34,14 @@ public partial class MainWindow : Window
     private AlignmentInput _alignmentInput { get => _active.AlignmentInput; set => _active.AlignmentInput = value; }
     private HorizontalAlignment? _alignment { get => _active.Alignment; set => _active.Alignment = value; }
 
+    /// <summary>方位記号の真北: 平面直角座標 (図面の x = 東, y = 北) から子午線収差を求める。</summary>
+    public static void RegisterTrueNorth() =>
+        CadDocument.TrueNorthProvider ??= (zone, p) =>
+            PlaneRectangular.Find(zone) is { } z ? PlaneRectangular.TrueNorthRotation(z, p.Y, p.X) : null;
+
     public MainWindow()
     {
+        RegisterTrueNorth();
         InitializeComponent();
         SheetTabs.ItemsSource = _sheets;
         ActivateSheet(AddSheet());

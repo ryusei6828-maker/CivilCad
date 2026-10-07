@@ -30,11 +30,22 @@ public sealed class PresetTool : CadTool, IStyledDrawTool
 
     public override string Name => "プリセット";
 
-    protected override void OnActivated() =>
-        SetPrompt($"{SymbolLibrary.Get(PresetSettings.Kind).Name} を置く位置を指定 [大きさ {PresetSettings.SizeMm:0.##}mm、向き {PresetSettings.AngleDeg:0.##}°] (Esc で終了)");
+    protected override void OnActivated()
+    {
+        var def = SymbolLibrary.Get(PresetSettings.Kind);
+        SetPrompt($"{def.Name} を置く位置を指定 [大きさ {PresetSettings.SizeMm:0.##}mm、向き {(def.PointsNorth ? NorthText(Doc) : $"{PresetSettings.AngleDeg:0.##}°")}] (Esc で終了)");
+    }
 
+    /// <summary>方位記号の向きの説明 (真北 / 座標北)。</summary>
+    public static string NorthText(CadDocument doc) =>
+        !doc.UseTrueNorth ? "座標北 (図面の上)"
+        : doc.CanUseTrueNorth ? $"真北 ({doc.PlaneZone}系、子午線収差を補正)"
+        : "座標北 (系が未設定のため図面の上)";
+
+    /// <summary>方位記号は置く位置の北に向ける。それ以外は入力バーの向き。</summary>
     private SymbolEntity Make(Vec2 p) =>
-        new(Doc.CurrentLayer, PresetSettings.Kind, p, PresetSettings.SizeMm, Doc.PaperMmToMeters(PresetSettings.SizeMm), PresetSettings.AngleDeg * Math.PI / 180);
+        new(Doc.CurrentLayer, PresetSettings.Kind, p, PresetSettings.SizeMm, Doc.PaperMmToMeters(PresetSettings.SizeMm),
+            SymbolLibrary.Get(PresetSettings.Kind).PointsNorth ? Doc.NorthRotation(p) : PresetSettings.AngleDeg * Math.PI / 180);
 
     public override void OnPoint(Vec2 p)
     {
