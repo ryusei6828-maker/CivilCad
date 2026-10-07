@@ -127,6 +127,15 @@ public sealed class DrawInputBar : Border
             case IRadiusInput ri:
                 AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
                 break;
+            case PresetTool:
+                AddPresetKind();
+                AddNumber($"大きさ (mm, {doc.ScaleText})", () => PresetSettings.SizeMm,
+                    v => { if (v is double s) { PresetSettings.SizeMm = s; _canvas?.Tool.RefreshPrompt(); } },
+                    "用紙上の大きさ。図面の縮尺によらず、用紙上 (図面全体を見たとき) この大きさになる", allowEmpty: false);
+                AddNumber("向き (°)", () => PresetSettings.AngleDeg,
+                    v => { if (v is double a) { PresetSettings.AngleDeg = a; _canvas?.Tool.RefreshPrompt(); } },
+                    "記号の上 (北) の向き。0 = 図面の上、反時計回りが正 (図面の北が傾いているときに)", allowEmpty: false, allowNegative: true);
+                break;
             case MeasureToolBase:
                 AddMeasureUnit(doc);
                 AddCheck("結果を文字で記入", MeasureSettings.PlaceText, v => MeasureSettings.PlaceText = v,
@@ -416,6 +425,30 @@ public sealed class DrawInputBar : Border
         {
             set(box.IsChecked == true);
             _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
+    }
+
+    private void AddPresetKind()
+    {
+        AddLabel("種類");
+        var defs = SymbolLibrary.All;
+        var box = new ComboBox
+        {
+            Width = 150,
+            Margin = new Thickness(0, 0, 12, 0),
+            ItemsSource = defs.Select(d => d.Name).ToList(),
+            SelectedIndex = Math.Max(0, defs.ToList().FindIndex(d => d.Kind == PresetSettings.Kind)),
+            ToolTip = "置くプリセット",
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0 || defs[box.SelectedIndex].Kind == PresetSettings.Kind) return;
+            PresetSettings.Kind = defs[box.SelectedIndex].Kind;
+            PresetSettings.SizeMm = defs[box.SelectedIndex].DefaultSizeMm;
+            _canvas?.Tool.RefreshPrompt();
+            Dispatcher.BeginInvoke(Rebuild); // 大きさの欄を標準の大きさにする
             Committed?.Invoke(this, EventArgs.Empty);
         };
         _panel.Children.Add(box);

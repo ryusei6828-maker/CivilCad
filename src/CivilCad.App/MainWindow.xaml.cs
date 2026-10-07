@@ -119,6 +119,7 @@ public partial class MainWindow : Window
             case "T": StartTool(new TextTool(), c); break;
             case "PE": StartTool(new PerpendicularTool(), c); break;
             case "FI": StartTool(new HatchTool(fill: true), c); break;
+            case "PS": StartTool(new PresetTool(), c); break;
             case "J": JoinSelection(); break;
             case "H": StartTool(new HatchTool(), c); break;
             case "PI": ImportPoints(); break;

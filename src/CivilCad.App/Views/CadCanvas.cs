@@ -383,6 +383,40 @@ public sealed class CadCanvas : FrameworkElement
             case HatchEntity h:
                 DrawHatch(dc, h, color, selected, pen);
                 break;
+            case SymbolEntity s:
+                DrawSymbol(dc, s, color, selected);
+                break;
+        }
+    }
+
+    /// <summary>プリセット (記号): 定義の図形を位置・大きさ・向きに合わせて描く。選択中は範囲を破線で囲む。</summary>
+    private void DrawSymbol(DrawingContext dc, SymbolEntity s, RgbColor color, bool selected)
+    {
+        var pen = GetPen(color, false, s.LineWeight);
+        foreach (var shape in s.Definition.Shapes)
+        {
+            switch (shape)
+            {
+                case SymbolPoly p when p.Points.Count > 1:
+                    dc.DrawGeometry(p.Filled ? GetBrush(color) : null, pen, PolylineGeometry(p.Points.Select(s.Map).ToList(), p.Closed));
+                    break;
+                case SymbolCircle c:
+                    var r = c.Radius * s.Size * Scale;
+                    dc.DrawEllipse(c.Filled ? GetBrush(color) : null, pen, WorldToScreen(s.Map(c.Center)), r, r);
+                    break;
+                case SymbolText t:
+                    DrawText(dc, new TextEntity(s.Layer, s.Map(t.Position), t.Text, t.Height * s.Size, s.Rotation)
+                    {
+                        HAlign = TextHAlign.Center,
+                        VAlign = TextVAlign.Middle,
+                    }, color, false);
+                    break;
+            }
+        }
+        if (selected)
+        {
+            var b = s.Bounds;
+            dc.DrawRectangle(null, GetPen(color, true), new Rect(WorldToScreen(b.Min), WorldToScreen(b.Max)));
         }
     }
 

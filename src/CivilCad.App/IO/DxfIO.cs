@@ -28,7 +28,8 @@ public static class DxfIO
             layers[l] = dl;
         }
 
-        foreach (var e in doc.Entities)
+        // プリセット (記号) は線・塗り・円・文字に展開して書く (他の CAD でも表示できるように)
+        foreach (var e in doc.Entities.SelectMany(x => x is SymbolEntity s ? s.Explode() : [x]))
         {
             EntityObject? de = e switch
             {

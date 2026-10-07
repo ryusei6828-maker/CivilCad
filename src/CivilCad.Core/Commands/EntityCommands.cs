@@ -104,9 +104,20 @@ public sealed class SetScaleCommand(double scaleDenominator) : IUndoableCommand
     {
         _old = doc.ScaleDenominator;
         doc.ScaleDenominator = scaleDenominator;
+        ResizeSymbols(doc);
     }
 
-    public void Undo(CadDocument doc) => doc.ScaleDenominator = _old;
+    public void Undo(CadDocument doc)
+    {
+        doc.ScaleDenominator = _old;
+        ResizeSymbols(doc);
+    }
+
+    /// <summary>プリセット (記号) は用紙上の大きさを保つので、図面上の大きさを新しい縮尺で合わせ直す。</summary>
+    private static void ResizeSymbols(CadDocument doc)
+    {
+        foreach (var s in doc.Entities.OfType<SymbolEntity>()) s.Size = doc.PaperMmToMeters(s.SizeMm);
+    }
 }
 
 public sealed class SetPlaneZoneCommand(int? zone) : IUndoableCommand

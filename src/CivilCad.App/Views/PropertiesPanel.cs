@@ -205,6 +205,22 @@ public sealed class PropertiesPanel : UserControl
                 AddReadOnly("弦長", $"{a.StartPoint.DistanceTo(a.EndPoint):F3} m");
                 break;
 
+            case SymbolEntity sym:
+                AddReadOnly("位置", Xy(sym.Position));
+                AddEditable($"大きさ (mm, {Doc.ScaleText})", sym.SizeMm.ToString("0.###", CultureInfo.InvariantCulture), s =>
+                    TryPositive(s, out var mm) && Apply(x =>
+                    {
+                        var sx = (SymbolEntity)x;
+                        sx.SizeMm = mm;
+                        sx.Size = Doc.PaperMmToMeters(mm);
+                    }, "プリセットの大きさ変更"), "用紙上の大きさ。縮尺を変えても用紙上の大きさは変わらない");
+                AddEditable("向き (°)", Deg(sym.Rotation).ToString("0.###", CultureInfo.InvariantCulture), s =>
+                    double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var deg) &&
+                    Apply(x => ((SymbolEntity)x).Rotation = deg * Math.PI / 180, "プリセットの向き変更"),
+                    "記号の上 (北) の向き。0 = 図面の上、反時計回りが正");
+                AddReadOnly("図面上の大きさ", $"{sym.Size:F3} m");
+                break;
+
             case HatchEntity h:
                 AddReadOnly("種類", (h.Solid ? "塗りつぶし" : h.Patterns.Count >= 2 ? $"線 {h.Patterns.Count} 方向" : "斜線")
                                    + (string.IsNullOrEmpty(h.PatternName) ? "" : $" ({h.PatternName})"));
@@ -502,6 +518,7 @@ public sealed class PropertiesPanel : UserControl
         ArcEntity => "円弧",
         TextEntity => "文字",
         HatchEntity => "ハッチング",
+        SymbolEntity s => s.Definition.Name,
         _ => e.GetType().Name,
     };
 

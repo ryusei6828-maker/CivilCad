@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO;
 using System.Text;
 using CivilCad.App.Drawing;
@@ -84,6 +84,10 @@ public static class SfcWriter
         private int _nextId = 10;
         private int _compositeCount;
 
+        /// <summary>書き出す図形。プリセット (記号) は線・塗り・円・文字に展開する (他の CAD でも表示できるように)。</summary>
+        private List<Entity> Entities => _entities ??= [.. doc.Entities.SelectMany(e => e is SymbolEntity s ? s.Explode() : [e])];
+        private List<Entity>? _entities;
+
         public string Build(string fileName)
         {
             var (paper, pw, ph, origin) = Layout(doc);
@@ -91,7 +95,7 @@ public static class SfcWriter
             var partName = $"図面:{doc.ScaleText.Replace(':', '/')}";
 
             // 色・線幅の表を先に作る (定義は使用より前に書く)
-            foreach (var e in doc.Entities)
+            foreach (var e in Entities)
             {
                 ColorCode(e.EffectiveColor, register: true);
                 WidthCode(e.LineWeight, register: true);
@@ -118,8 +122,8 @@ public static class SfcWriter
             // 用紙の後に図形を書いたり、レイヤ表を先頭に書いたりすると、SXF ブラウザ等で開けない・レイヤ名がずれる
 
             // 部分図: 実寸 mm (図面 m × 1000)
-            var sheetLevel = doc.Entities.Where(IsSheetLevel).ToList();
-            var partLevel = doc.Entities.Where(e => !IsSheetLevel(e)).ToList();
+            var sheetLevel = Entities.Where(IsSheetLevel).ToList();
+            var partLevel = Entities.Where(e => !IsSheetLevel(e)).ToList();
             if (partLevel.Count > 0)
             {
                 foreach (var e in partLevel) WriteEntity(e, p => p * 1000, 1000);
