@@ -29,6 +29,34 @@ public sealed class PdfOptions
     /// false なら文字は形 (アウトライン) で描く (見た目は同じ)。
     /// </summary>
     public bool EmbedFonts { get; set; }
+
+    /// <summary>印刷範囲の選び方 (窓で覚えておく用。実際の範囲は <see cref="Region"/> と <see cref="Only"/>)。</summary>
+    public PdfRange Range { get; set; } = PdfRange.Drawing;
+
+    /// <summary>範囲が用紙 (余白を除く) にちょうど収まる縮尺にする。用紙を指定しなければ A3。</summary>
+    public bool FitToPaper { get; set; }
+
+    /// <summary>印刷する範囲 (図面座標 m)。範囲の外は印刷しない。null なら図面全体。</summary>
+    public Box2? Region { get; set; }
+
+    /// <summary>この図形だけ印刷する (選択した図形)。null ならすべて。</summary>
+    public IReadOnlyCollection<Entity>? Only { get; set; }
+}
+
+/// <summary>印刷範囲。</summary>
+public enum PdfRange
+{
+    /// <summary>図面全体 (図枠があれば図枠)。</summary>
+    Drawing,
+
+    /// <summary>今の画面に見えている範囲。</summary>
+    Screen,
+
+    /// <summary>選択した図形だけ。</summary>
+    Selection,
+
+    /// <summary>2 点で指定した四角の範囲。</summary>
+    Window,
 }
 
 /// <summary>
@@ -44,17 +72,35 @@ public static class PdfExport
     /// <summary>用紙 (幅・高さ mm) と、用紙の左下に当たる図面座標 (m)、用紙 1mm が図面で何 m か。</summary>
     public sealed record Layout(string PaperName, double Width, double Height, Vec2 Origin, double MetersPerMm);
 
+    /// <summary>「用紙に合わせる」ときの用紙の余白 (mm)。</summary>
+    public const double FitMargin = 10;
+
+    /// <summary>「用紙に合わせる」で用紙を指定しないときの用紙。</summary>
+    public const string FitDefaultPaper = "A3";
+
     public static Layout ComputeLayout(CadDocument doc, PdfOptions o)
     {
+        var target = TargetBox(doc, o);
+        if (o.FitToPaper)
+        {
+            // 範囲 (無ければ図枠・図形全体) が、余白を除いた用紙にちょうど収まる縮尺
+            var fitPaper = PaperSize.All.FirstOrDefault(x => x.Name == (o.Paper ?? FitDefaultPaper)) ?? PaperSize.All.First(x => x.Name == FitDefaultPaper);
+            var (fw, fh) = o.Portrait ? (fitPaper.Height, fitPaper.Width) : (fitPaper.Width, fitPaper.Height);
+            var fitBox = target ?? FrameBox(doc) ?? Extents(doc);
+            var fitK = Math.Max(fitBox.Width / (fw - 2 * FitMargin), fitBox.Height / (fh - 2 * FitMargin));
+            if (!(fitK > 1e-12)) fitK = doc.ScaleDenominator / 1000;
+            return new Layout(fitPaper.Name, fw, fh, fitBox.Center - new Vec2(fw, fh) / 2 * fitK, fitK);
+        }
+
         var scale = o.ScaleDenominator is double s && s > 0 ? s : doc.ScaleDenominator;
         var k = scale / 1000;
-        // 用紙を指定しない & 図面の縮尺のままなら、SFC と同じ選び方
-        if (o.Paper == null && !o.Portrait && Math.Abs(scale - doc.ScaleDenominator) < 1e-9)
+        // 範囲・用紙を指定しない & 図面の縮尺のままなら、SFC と同じ選び方
+        if (target == null && o.Paper == null && !o.Portrait && Math.Abs(scale - doc.ScaleDenominator) < 1e-9)
         {
             var (p, w, h, origin) = SfcWriter.Layout(doc);
             return new Layout(p?.Name ?? "自由", w, h, origin, k);
         }
-        var ext = Extents(doc);
+        var ext = target ?? Extents(doc);
         PaperSize? paper = o.Paper != null ? PaperSize.All.FirstOrDefault(x => x.Name == o.Paper) : null;
         double pw, ph;
         if (paper != null)
@@ -71,10 +117,19 @@ public static class PdfExport
             paper = fit;
             (pw, ph) = fit != null ? (fit.Width, fit.Height) : (Math.Ceiling(needW), Math.Ceiling(needH));
         }
-        // 図形 (図枠があれば図枠) を用紙の中央に置く
-        var box = FrameBox(doc) ?? ext;
+        // 範囲 (指定が無ければ図枠、それも無ければ図形全体) を用紙の中央に置く
+        var box = target ?? FrameBox(doc) ?? ext;
         var center = box.IsEmpty ? Vec2.Zero : box.Center;
         return new Layout(paper?.Name ?? "自由", pw, ph, center - new Vec2(pw, ph) / 2 * k, k);
+    }
+
+    /// <summary>印刷する範囲 (範囲の指定、無ければ選択した図形の範囲)。指定が無ければ null。</summary>
+    public static Box2? TargetBox(CadDocument doc, PdfOptions o)
+    {
+        if (o.Region is { IsEmpty: false } r) return r;
+        if (o.Only == null) return null;
+        var box = o.Only.Where(doc.IsVisible).Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
+        return box.IsEmpty ? null : box;
     }
 
     private static Box2 Extents(CadDocument doc)
@@ -131,8 +186,14 @@ public static class PdfExport
         public void Draw()
         {
             canvas.Clear(SKColors.White);
+            // 範囲を指定したときは、範囲の外を印刷しない
+            if (o.Region is { IsEmpty: false } r)
+            {
+                var (a, b) = (P(r.Min), P(r.Max));
+                canvas.ClipRect(new SKRect(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y), Math.Max(a.X, b.X), Math.Max(a.Y, b.Y)));
+            }
             // プリセット (記号) は線・塗り・円・文字に展開する
-            var visible = doc.Entities.Where(doc.IsVisible).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e]).ToList();
+            var visible = (o.Only ?? doc.Entities).Where(doc.IsVisible).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e]).ToList();
             // 画像は一番下
             foreach (var img in visible.OfType<ImageEntity>()) DrawImage(img);
             // 塗りは線の下に描く (画面と同じ)

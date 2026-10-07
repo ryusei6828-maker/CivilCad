@@ -504,9 +504,17 @@ public partial class MainWindow : Window
     }
 
     /// <summary>PDF に印刷: 用紙・縮尺などを選び、保存先を決めて書き出す。</summary>
-    private void PrintPdf()
+    /// <summary>PDF に印刷する。window は図面上で指定した印刷範囲 (範囲を指定したあとに呼び直すとき)。</summary>
+    private void PrintPdf(Box2? window = null)
     {
-        if (PdfWindow.Ask(this, _doc) is not var (options, openAfter)) return;
+        var targets = new PdfTargets(Canvas.VisibleWorldBox, [.. Canvas.Selection], window);
+        if (PdfWindow.Ask(this, _doc, targets) is not var (options, openAfter, pickWindow)) return;
+        if (pickWindow)
+        {
+            // 図面上で範囲を指定してもらい、指定したら設定の窓をもう一度出す
+            StartTool(new PdfRangeTool(box => Dispatcher.BeginInvoke(() => PrintPdf(box))), "PDF");
+            return;
+        }
         var dlg = new SaveFileDialog
         {
             Filter = "PDF ファイル (*.pdf)|*.pdf",
@@ -517,7 +525,8 @@ public partial class MainWindow : Window
         {
             var l = PdfExport.Export(_doc, dlg.FileName, options);
             Log($"PDF に印刷しました: {dlg.FileName}  (用紙 {l.PaperName} {(l.Width >= l.Height ? "横" : "縦")} {l.Width:0}×{l.Height:0}mm, 縮尺 1:{l.MetersPerMm * 1000:0.##}" +
-                (options.Monochrome ? ", 白黒" : "") + ")");
+                (options.Monochrome ? ", 白黒" : "") + (options.FitToPaper ? ", 用紙に合わせる" : "") +
+                options.Range switch { PdfRange.Screen => ", 今の画面", PdfRange.Selection => $", 選択した図形 {options.Only?.Count} 個", PdfRange.Window => ", 指定した範囲", _ => "" } + ")");
             if (openAfter) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dlg.FileName) { UseShellExecute = true });
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)

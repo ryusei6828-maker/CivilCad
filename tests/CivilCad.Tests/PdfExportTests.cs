@@ -149,4 +149,56 @@ public class PdfExportTests
         var (a, e) = (Dark(outlined), Dark(embedded));
         Assert.True(Math.Abs(a - e) <= Math.Max(20, e / 20), $"outlined {a}, embedded {e}");
     }
+
+    [Fact]
+    public void Layout_FitToPaper()
+    {
+        var (doc, o) = Sample();
+        o.FitToPaper = true;
+        o.ScaleDenominator = 12345; // 用紙に合わせるときは縮尺を使わない
+        var ext = doc.Entities.Where(doc.IsVisible).Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
+        var l = PdfExport.ComputeLayout(doc, o);
+        Assert.Equal(("A4", 297.0, 210.0), (l.PaperName, l.Width, l.Height));
+        // 範囲が余白 10mm を除いた用紙 (277 × 190mm) にちょうど収まり、中央に来る
+        Assert.Equal(Math.Max(ext.Width / 277, ext.Height / 190), l.MetersPerMm, 12);
+        Assert.True((l.Origin + new Vec2(297, 210) / 2 * l.MetersPerMm).DistanceTo(ext.Center) < 1e-9);
+        // 用紙を指定しなければ A3
+        o.Paper = null;
+        o.Portrait = true;
+        var a3 = PdfExport.ComputeLayout(doc, o);
+        Assert.Equal(("A3", 297.0, 420.0), (a3.PaperName, a3.Width, a3.Height));
+        Assert.Equal(Math.Max(ext.Width / 277, ext.Height / 400), a3.MetersPerMm, 12);
+    }
+
+    [Fact]
+    public void Range_SelectionOnly()
+    {
+        var (doc, o) = Sample();
+        var red = doc.Entities[0];
+        o.Only = [red];
+        o.Range = PdfRange.Selection;
+        o.FitToPaper = true;
+        using var bmp = Raster(doc, o, out var l);
+        // 選択した赤い線 (20m) だけが用紙に合わせて印刷される
+        Assert.Equal(20.0 / 277, l.MetersPerMm, 9);
+        Assert.Contains(Near(bmp, l, new Vec2(0, -5)), c => c.Red > 200 && c.Green < 60);
+        Assert.All(Near(bmp, l, new Vec2(0, -3)), c => Assert.True(IsWhite(c)));
+        for (var x = 0; x < bmp.Width; x += 3)
+            for (var y = 0; y < bmp.Height; y += 3)
+                Assert.False(bmp.GetPixel(x, y) is { Red: < 60, Green: < 60, Blue: < 60 }, "選択していない図形が印刷されている");
+    }
+
+    [Fact]
+    public void Range_Window_ClipsOutside()
+    {
+        var (doc, o) = Sample();
+        o.Region = new Box2(new Vec2(-12, -8), new Vec2(0, 8)); // 左半分
+        o.Range = PdfRange.Window;
+        using var bmp = Raster(doc, o, out var l);
+        // 範囲の中心が用紙の中心
+        Assert.True((l.Origin + new Vec2(l.Width, l.Height) / 2 * l.MetersPerMm).DistanceTo(new Vec2(-6, 0)) < 1e-9);
+        Assert.Contains(Near(bmp, l, new Vec2(-5, -5)), c => c.Red > 200 && c.Green < 60); // 範囲の中の赤い線
+        Assert.All(Near(bmp, l, new Vec2(5, -5)), c => Assert.True(IsWhite(c)));           // 範囲の外は印刷しない
+        Assert.All(Near(bmp, l, new Vec2(6, 0)), c => Assert.True(IsWhite(c)));            // 塗りつぶしも
+    }
 }

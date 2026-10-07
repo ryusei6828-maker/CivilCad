@@ -44,6 +44,20 @@ public class WindowLoadTests
                 var pdfWin = new CivilCad.App.Views.PdfWindow(new CivilCad.Core.Model.CadDocument());
                 Assert.NotNull(pdfWin.Content);
                 pdfWin.Close();
+                // 選択していれば、印刷範囲は「選択した図形だけ」が最初に選ばれる
+                var pdfDoc = new CivilCad.Core.Model.CadDocument();
+                var sel = new CivilCad.Core.Model.LineEntity(pdfDoc.CurrentLayer, new(0, 0), new(10, 0));
+                pdfDoc.Entities.Add(sel);
+                var pdfSel = new CivilCad.App.Views.PdfWindow(pdfDoc, new(new(new(-5, -5), new(5, 5)), [sel], null));
+                var rangeBox = (System.Windows.Controls.ComboBox)typeof(CivilCad.App.Views.PdfWindow)
+                    .GetField("_range", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(pdfSel)!;
+                Assert.Equal((int)CivilCad.App.IO.PdfRange.Selection, rangeBox.SelectedIndex);
+                // 「範囲を指定」でまだ範囲が無ければ、ボタンは範囲の指定になる
+                rangeBox.SelectedIndex = (int)CivilCad.App.IO.PdfRange.Window;
+                var okButton = (System.Windows.Controls.Button)typeof(CivilCad.App.Views.PdfWindow)
+                    .GetField("_ok", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(pdfSel)!;
+                Assert.Equal("範囲を指定する", okButton.Content);
+                pdfSel.Close();
                 var textEdit = new CivilCad.App.Views.TextEditWindow("No.1");
                 Assert.NotNull(textEdit.Content);
                 textEdit.Close();

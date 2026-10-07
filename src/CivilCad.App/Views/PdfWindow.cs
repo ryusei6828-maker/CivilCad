@@ -3,17 +3,25 @@ using System.Windows;
 using System.Windows.Controls;
 using CivilCad.App.Drawing;
 using CivilCad.App.IO;
+using CivilCad.Core.Geometry;
 using CivilCad.Core.Model;
 
 namespace CivilCad.App.Views;
 
-/// <summary>PDF に印刷する設定 (用紙・向き・縮尺・白黒・既定の線幅)。前回の設定はアプリを閉じるまで覚える。</summary>
+/// <summary>PDF に印刷するときに分かっている範囲: 今の画面・選択した図形・前に指定した範囲。</summary>
+public sealed record PdfTargets(Box2 Screen, IReadOnlyCollection<Entity> Selection, Box2? Window);
+
+/// <summary>PDF に印刷する設定 (範囲・用紙・向き・縮尺・白黒・既定の線幅)。前回の設定はアプリを閉じるまで覚える。</summary>
 public sealed class PdfWindow : Window
 {
     private static readonly PdfOptions Last = new();
     private static bool s_openAfter = true;
 
     private readonly CadDocument _doc;
+    private readonly PdfTargets _targets;
+    private readonly ComboBox _range = new() { Width = 220 };
+    private readonly Button _pick = new() { Content = "範囲を指定し直す", Padding = new Thickness(8, 0, 8, 0), Margin = new Thickness(8, 0, 0, 0) };
+    private readonly CheckBox _fit = new() { Content = "用紙に合わせて拡大・縮小する (縮尺は自動)" };
     private readonly ComboBox _paper = new() { Width = 160 };
     private readonly RadioButton _landscape = new() { Content = "横", Margin = new Thickness(0, 0, 12, 0), GroupName = "orient" };
     private readonly RadioButton _portrait = new() { Content = "縦", GroupName = "orient" };
@@ -28,11 +36,15 @@ public sealed class PdfWindow : Window
     public PdfOptions Options { get; private set; } = new();
     public bool OpenAfter { get; private set; }
 
-    public PdfWindow(CadDocument doc)
+    /// <summary>true なら、図面上で印刷範囲を指定してから、もう一度この窓を出す。</summary>
+    public bool PickWindow { get; private set; }
+
+    public PdfWindow(CadDocument doc, PdfTargets? targets = null)
     {
         _doc = doc;
+        _targets = targets ?? new PdfTargets(Box2.Empty, [], null);
         Title = "PDF に印刷";
-        Width = 440;
+        Width = 480;
         SizeToContent = SizeToContent.Height;
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -47,6 +59,18 @@ public sealed class PdfWindow : Window
         _weight.Text = Last.DefaultLineWeightMm.ToString("0.##", CultureInfo.InvariantCulture);
         _embed.IsChecked = Last.EmbedFonts;
         _open.IsChecked = s_openAfter;
+        _fit.IsChecked = Last.FitToPaper;
+
+        _range.Items.Add(new ComboBoxItem { Content = "図面全体 (図枠があれば図枠)" });
+        _range.Items.Add(new ComboBoxItem { Content = "今の画面", IsEnabled = !_targets.Screen.IsEmpty });
+        _range.Items.Add(new ComboBoxItem { Content = $"選択した図形だけ ({_targets.Selection.Count} 個)", IsEnabled = _targets.Selection.Count > 0 });
+        _range.Items.Add(new ComboBoxItem { Content = "範囲を指定 (2 点)" });
+        // 選択していれば選択した図形、範囲を指定してきたならその範囲を最初に選ぶ
+        var range = _targets.Window != null ? PdfRange.Window
+            : _targets.Selection.Count > 0 ? PdfRange.Selection
+            : Last.Range == PdfRange.Selection || (Last.Range == PdfRange.Screen && _targets.Screen.IsEmpty) ? PdfRange.Drawing
+            : Last.Range;
+        _range.SelectedIndex = (int)range;
 
         var grid = new Grid { Margin = new Thickness(12) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -78,8 +102,13 @@ public sealed class PdfWindow : Window
         var weight = new StackPanel { Orientation = Orientation.Horizontal };
         weight.Children.Add(_weight);
         weight.Children.Add(new TextBlock { Text = " mm", VerticalAlignment = VerticalAlignment.Center });
-        Row("用紙", _paper, "自動なら、図枠があればそれに合う A 判、無ければ図形全体が余白付きで収まる A 判");
+        var rangePanel = new StackPanel { Orientation = Orientation.Horizontal };
+        rangePanel.Children.Add(_range);
+        rangePanel.Children.Add(_pick);
+        Row("印刷範囲", rangePanel, "範囲の外は印刷しない。選択した図形だけのときは、ほかの図形は印刷しない");
+        Row("用紙", _paper, "自動なら、図枠があればそれに合う A 判、無ければ図形全体が余白付きで収まる A 判 (用紙に合わせるときは A3)");
         Row("向き", orient);
+        Row("", _fit, $"範囲が用紙 (余白 {PdfExport.FitMargin:0}mm) にちょうど収まるように拡大・縮小する");
         Row("縮尺", scale, $"印刷の縮尺。図面の縮尺は {doc.ScaleText}");
         Row("既定の線幅", weight, "線幅を指定していない図形の線の太さ");
         Row("", _mono);
@@ -93,6 +122,17 @@ public sealed class PdfWindow : Window
             Options = o;
             OpenAfter = _open.IsChecked == true;
             Remember(o, OpenAfter);
+            // 範囲を指定するのに、まだ指定していなければ、図面上で指定してもらう
+            PickWindow = o.Range == PdfRange.Window && _targets.Window == null;
+            DialogResult = true;
+        };
+        _pick.Click += (_, _) =>
+        {
+            if (Read() is not { } o) return;
+            Options = o;
+            OpenAfter = _open.IsChecked == true;
+            Remember(o, OpenAfter);
+            PickWindow = true;
             DialogResult = true;
         };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
@@ -105,6 +145,9 @@ public sealed class PdfWindow : Window
         panel.Children.Add(new Border { Margin = new Thickness(12, 0, 12, 12), Child = buttons });
         Content = panel;
 
+        _range.SelectionChanged += (_, _) => UpdateSummary();
+        _fit.Checked += (_, _) => UpdateSummary();
+        _fit.Unchecked += (_, _) => UpdateSummary();
         _paper.SelectionChanged += (_, _) => UpdateSummary();
         _landscape.Checked += (_, _) => UpdateSummary();
         _portrait.Checked += (_, _) => UpdateSummary();
@@ -121,14 +164,19 @@ public sealed class PdfWindow : Window
         Last.Monochrome = o.Monochrome;
         Last.DefaultLineWeightMm = o.DefaultLineWeightMm;
         Last.EmbedFonts = o.EmbedFonts;
+        Last.Range = o.Range;
+        Last.FitToPaper = o.FitToPaper;
         s_openAfter = openAfter;
     }
 
-    /// <summary>入力を読む。数字が正しくなければ null。</summary>
+    /// <summary>入力を読む。数字が正しくなければ null (用紙に合わせるときは縮尺は見ない)。</summary>
     private PdfOptions? Read()
     {
-        if (!double.TryParse(_scale.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var scale) || !(scale > 0)) return null;
+        var fit = _fit.IsChecked == true;
+        double scale = _doc.ScaleDenominator;
+        if (!fit && (!double.TryParse(_scale.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out scale) || !(scale > 0))) return null;
         if (!double.TryParse(_weight.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var weight) || !(weight > 0)) return null;
+        var range = (PdfRange)Math.Max(0, _range.SelectedIndex);
         return new PdfOptions
         {
             Paper = _paper.SelectedIndex > 0 ? PaperSize.All[_paper.SelectedIndex - 1].Name : null,
@@ -137,11 +185,22 @@ public sealed class PdfWindow : Window
             Monochrome = _mono.IsChecked == true,
             DefaultLineWeightMm = weight,
             EmbedFonts = _embed.IsChecked == true,
+            Range = range,
+            FitToPaper = fit,
+            Region = range switch
+            {
+                PdfRange.Screen => _targets.Screen,
+                PdfRange.Window => _targets.Window,
+                _ => null,
+            },
+            Only = range == PdfRange.Selection ? _targets.Selection : null,
         };
     }
 
     private void UpdateSummary()
     {
+        _scale.IsEnabled = _fit.IsChecked != true;
+        _pick.Visibility = _range.SelectedIndex == (int)PdfRange.Window && _targets.Window != null ? Visibility.Visible : Visibility.Collapsed;
         if (Read() is not { } o)
         {
             _summary.Text = "縮尺と線幅には 0 より大きい数を入れてください。";
@@ -149,15 +208,23 @@ public sealed class PdfWindow : Window
             return;
         }
         _ok.IsEnabled = true;
+        if (o.Range == PdfRange.Window && _targets.Window == null)
+        {
+            _ok.Content = "範囲を指定する";
+            _summary.Text = "「範囲を指定する」を押してから、図面上で印刷する範囲の対角の 2 点をクリックしてください。指定したら、この窓がもう一度出ます。";
+            return;
+        }
+        _ok.Content = "保存先を選んで印刷";
         var l = PdfExport.ComputeLayout(_doc, o);
         var orient = l.Width >= l.Height ? "横" : "縦";
-        _summary.Text = $"用紙 {l.PaperName} {orient} ({l.Width:0}×{l.Height:0} mm)、縮尺 1:{l.MetersPerMm * 1000:0.##} で印刷します。";
+        _summary.Text = $"用紙 {l.PaperName} {orient} ({l.Width:0}×{l.Height:0} mm)、縮尺 1:{l.MetersPerMm * 1000:0.##} で印刷します。" +
+            (o.FitToPaper ? " (用紙に合わせた縮尺)" : "");
     }
 
-    /// <summary>窓を出して設定を返す (やめたら null)。</summary>
-    public static (PdfOptions Options, bool OpenAfter)? Ask(Window owner, CadDocument doc)
+    /// <summary>窓を出して設定を返す (やめたら null)。PickWindow なら、範囲を指定してからもう一度呼ぶ。</summary>
+    public static (PdfOptions Options, bool OpenAfter, bool PickWindow)? Ask(Window owner, CadDocument doc, PdfTargets? targets = null)
     {
-        var w = new PdfWindow(doc) { Owner = owner };
-        return w.ShowDialog() == true ? (w.Options, w.OpenAfter) : null;
+        var w = new PdfWindow(doc, targets) { Owner = owner };
+        return w.ShowDialog() == true ? (w.Options, w.OpenAfter, w.PickWindow) : null;
     }
 }
