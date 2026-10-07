@@ -68,6 +68,64 @@ public static class DrawingFrame
     public static (double Width, double Height) FrameSize(DrawingFrameOptions o) =>
         ((o.PaperSize.Width - 2 * o.Margin) * o.MetersPerPaperMm, (o.PaperSize.Height - 2 * o.Margin) * o.MetersPerPaperMm);
 
+    /// <summary>「図形が収まる縮尺」で選ぶ縮尺 (分母)。</summary>
+    public static readonly double[] StandardScales =
+        [1, 2, 5, 10, 20, 25, 50, 100, 150, 200, 250, 300, 400, 500, 600, 1000, 1500, 2000, 2500, 3000, 5000, 10000, 20000, 25000, 50000];
+
+    /// <summary>図形と外枠・表題欄の間にあける用紙上の余裕 (mm)。</summary>
+    public const double FitPadding = 10;
+
+    /// <summary>図枠の図形を除いた、表示中のレイヤの図形の範囲。図形が無ければ null。</summary>
+    public static Box2? DrawingExtents(CadDocument doc)
+    {
+        var box = doc.Entities.Where(e => e.Tag != Tag && doc.IsVisible(e)).Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
+        return box.IsEmpty ? null : box;
+    }
+
+    /// <summary>
+    /// 外枠の中で図形を置ける場所 (外枠の左下からの用紙 mm)。表題欄があれば、表題欄の上 (横いっぱい) と左 (縦いっぱい) の 2 つ。
+    /// </summary>
+    private static IEnumerable<(Vec2 Min, Vec2 Max)> FreeAreas(DrawingFrameOptions o)
+    {
+        var fw = o.PaperSize.Width - 2 * o.Margin;
+        var fh = o.PaperSize.Height - 2 * o.Margin;
+        var pad = new Vec2(FitPadding, FitPadding);
+        if (!o.IncludeTitleBlock)
+        {
+            yield return (pad, new Vec2(fw, fh) - pad);
+            yield break;
+        }
+        yield return (new Vec2(0, TitleHeight) + pad, new Vec2(fw, fh) - pad);
+        yield return (pad, new Vec2(fw - TitleWidth, fh) - pad);
+    }
+
+    /// <summary>縮尺 (分母) をこれ以上にすれば、図形が外枠の中 (表題欄を除く) に収まる。</summary>
+    private static double RequiredScale(DrawingFrameOptions o, Box2 ext) => FreeAreas(o)
+        .Where(a => a.Max.X > a.Min.X && a.Max.Y > a.Min.Y)
+        .Select(a => Math.Max(ext.Width * 1000 / (a.Max.X - a.Min.X), ext.Height * 1000 / (a.Max.Y - a.Min.Y)))
+        .DefaultIfEmpty(double.PositiveInfinity).Min();
+
+    /// <summary>図形が外枠の中 (表題欄を除く) に収まる、いちばん大きく描ける標準の縮尺 (分母)。</summary>
+    public static double FitScale(DrawingFrameOptions o, Box2 ext)
+    {
+        var need = RequiredScale(o, ext);
+        return StandardScales.FirstOrDefault(s => s >= need * (1 - 1e-9), Math.Ceiling(need / 10000) * 10000);
+    }
+
+    /// <summary>今の縮尺で図形が外枠の中 (表題欄を除く) に収まるか。</summary>
+    public static bool Fits(DrawingFrameOptions o, Box2 ext) => RequiredScale(o, ext) <= o.ScaleDenominator * (1 + 1e-9);
+
+    /// <summary>図形が外枠の中 (表題欄を除いた場所) の中央に来るような、外枠の左下の位置。</summary>
+    public static Vec2 CenteredOrigin(DrawingFrameOptions o, Box2 ext)
+    {
+        var k = o.MetersPerPaperMm;
+        // 図形を置ける場所のうち、余裕の大きい方
+        var area = FreeAreas(o)
+            .OrderByDescending(a => Math.Min((a.Max.X - a.Min.X) * k - ext.Width, (a.Max.Y - a.Min.Y) * k - ext.Height))
+            .First();
+        return ext.Center - (area.Min + area.Max) / 2 * k;
+    }
+
     /// <summary>外枠の左下を origin に置いたときの図形 (図面座標, m)。</summary>
     public static List<Entity> Build(CadDocument doc, DrawingFrameOptions o, Vec2 origin)
     {

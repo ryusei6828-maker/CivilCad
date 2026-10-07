@@ -1,16 +1,21 @@
 using System.Globalization;
 using System.Windows;
+using CivilCad.Core.Geometry;
 
 namespace CivilCad.App.Drawing;
 
 public partial class FrameWindow : Window
 {
-    private static readonly double[] CommonScales = [100, 200, 250, 300, 500, 1000, 2500, 5000];
+    private static readonly double[] CommonScales = [10, 20, 50, 100, 200, 250, 300, 500, 1000, 2500, 5000];
+    private readonly Box2? _extents;
     private bool _loaded;
 
-    public FrameWindow(DrawingFrameOptions options)
+    /// <param name="extents">描いてある図形 (図枠を除く) の範囲。「図形が収まる縮尺」と大きさの比較に使う。</param>
+    public FrameWindow(DrawingFrameOptions options, Box2? extents = null)
     {
         InitializeComponent();
+        _extents = extents;
+        FitButton.IsEnabled = extents != null;
         PaperBox.ItemsSource = PaperSize.All;
         PaperBox.SelectedItem = options.PaperSize;
         ScaleBox.ItemsSource = CommonScales;
@@ -76,10 +81,28 @@ public partial class FrameWindow : Window
         if (!TryRead(out var o))
         {
             SizeText.Text = "";
+            SizeHint.Text = "";
             return;
         }
         var (w, h) = DrawingFrame.FrameSize(o);
-        SizeText.Text = $"外枠の大きさ (図面上): {w:0.###} m × {h:0.###} m  (用紙 1mm = {o.MetersPerPaperMm:0.###} m)";
+        var text = $"外枠の大きさ (図面上): {w:0.###} m × {h:0.###} m  (用紙 1mm = {o.MetersPerPaperMm:0.###} m)";
+        SizeHint.Text = "";
+        if (_extents is Box2 ext)
+        {
+            text += $"\n描いてある図形: {ext.Width:0.###} m × {ext.Height:0.###} m";
+            var fit = DrawingFrame.FitScale(o, ext);
+            if (!DrawingFrame.Fits(o, ext))
+                SizeHint.Text = $"図形が外枠に収まりません。縮尺 1:{fit:0.##} 以上にしてください (「図形が収まる縮尺にする」で選べます)。";
+            else if (fit < o.ScaleDenominator * (1 - 1e-9))
+                SizeHint.Text = $"外枠に対して図形が小さめです。1:{fit:0.##} にすると図形を大きく描けます (「図形が収まる縮尺にする」)。";
+        }
+        SizeText.Text = text;
+    }
+
+    private void FitButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_extents is not Box2 ext || !TryRead(out var o)) return;
+        ScaleBox.Text = DrawingFrame.FitScale(o, ext).ToString(CultureInfo.InvariantCulture);
     }
 
     private void Input_Changed(object sender, RoutedEventArgs e) => UpdateSizeText();

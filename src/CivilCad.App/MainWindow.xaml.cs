@@ -854,7 +854,7 @@ public partial class MainWindow : Window
         // 縮尺は図面の縮尺を初期値にする
         var defaults = _settings.FrameDefaults.Clone();
         defaults.ScaleDenominator = _doc.ScaleDenominator;
-        var dlg = new FrameWindow(defaults) { Owner = this };
+        var dlg = new FrameWindow(defaults, DrawingFrame.DrawingExtents(_doc)) { Owner = this };
         if (dlg.ShowDialog() != true || dlg.Result is not { } options) return;
         if (options.ScaleDenominator != _doc.ScaleDenominator)
         {

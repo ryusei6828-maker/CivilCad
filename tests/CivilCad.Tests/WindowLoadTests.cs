@@ -18,7 +18,7 @@ public class WindowLoadTests
                 app.InitializeComponent(); // アイコン等のリソースを読み込む
                 var main = new CivilCad.App.MainWindow();
                 var settings = new SettingsWindow(new AppSettings());
-                var frame = new CivilCad.App.Drawing.FrameWindow(new CivilCad.App.Drawing.DrawingFrameOptions());
+                var frame = new CivilCad.App.Drawing.FrameWindow(new CivilCad.App.Drawing.DrawingFrameOptions(), new CivilCad.Core.Geometry.Box2(new(0, 0), new(8, 4)));
                 Assert.NotNull(main.Content);
                 // レイヤパネルは既定で閉じ、プロパティは開いている
                 Assert.Equal(System.Windows.Visibility.Collapsed, ((System.Windows.FrameworkElement)main.FindName("LayerHost")).Visibility);

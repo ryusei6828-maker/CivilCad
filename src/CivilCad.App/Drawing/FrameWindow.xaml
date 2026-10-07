@@ -15,16 +15,21 @@
                     <RowDefinition/>
                     <RowDefinition/>
                     <RowDefinition/>
+                    <RowDefinition/>
                 </Grid.RowDefinitions>
                 <TextBlock Text="用紙" VerticalAlignment="Center"/>
                 <ComboBox x:Name="PaperBox" Grid.Column="1" Margin="0,2" SelectionChanged="Input_Changed"/>
                 <TextBlock Grid.Row="1" Text="縮尺  1 :" VerticalAlignment="Center"/>
-                <ComboBox x:Name="ScaleBox" Grid.Row="1" Grid.Column="1" Margin="0,2" IsEditable="True" Width="120"
-                          HorizontalAlignment="Left" TextBoxBase.TextChanged="Input_Changed"/>
+                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
+                    <ComboBox x:Name="ScaleBox" Margin="0,2" IsEditable="True" Width="120" TextBoxBase.TextChanged="Input_Changed"/>
+                    <Button x:Name="FitButton" Content="図形が収まる縮尺にする" Margin="8,2,0,2" Padding="8,0" Click="FitButton_Click"
+                            ToolTip="描いてある図形 (図枠を除く) が外枠の中 (表題欄を除く) に収まる、いちばん大きく描ける縮尺を選ぶ"/>
+                </StackPanel>
                 <TextBlock Grid.Row="2" Text="余白 (mm)" VerticalAlignment="Center"/>
                 <TextBox x:Name="MarginBox" Grid.Row="2" Grid.Column="1" Margin="0,2" Width="120" HorizontalAlignment="Left"
                          TextChanged="Input_Changed"/>
-                <TextBlock x:Name="SizeText" Grid.Row="3" Grid.ColumnSpan="2" Foreground="Gray" Margin="0,4,0,0"/>
+                <TextBlock x:Name="SizeText" Grid.Row="3" Grid.ColumnSpan="2" Foreground="Gray" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                <TextBlock x:Name="SizeHint" Grid.Row="4" Grid.ColumnSpan="2" Foreground="DarkOrange" Margin="0,2,0,0" TextWrapping="Wrap"/>
             </Grid>
         </GroupBox>
 
