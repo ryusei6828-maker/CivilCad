@@ -206,6 +206,18 @@
         <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M12,12 L18,6 M14,6 L18,6 L18,10"/>
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
+    <DrawingImage x:Key="IconAlign" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Brush="#FFE8F1FB" Pen="{StaticResource IcoInkPen}" Geometry="M2,10 L10,4 L15,11 L7,17 Z"/>
+        <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M9,21 L21,21 M10,4 L21,13 M7,17 L9,21"/>
+        <GeometryDrawing Brush="#FFD9363E">
+            <GeometryDrawing.Geometry><GeometryGroup>
+                <EllipseGeometry Center="9,21" RadiusX="1.6" RadiusY="1.6"/>
+                <EllipseGeometry Center="21,21" RadiusX="1.6" RadiusY="1.6"/>
+            </GeometryGroup></GeometryDrawing.Geometry>
+        </GeometryDrawing>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <DrawingImage x:Key="IconMove" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
         <GeometryDrawing Pen="{StaticResource IcoInkThick}"

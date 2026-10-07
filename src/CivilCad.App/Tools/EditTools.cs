@@ -294,3 +294,140 @@ public sealed class ScaleTool : CadTool
         }
     }
 }
+
+/// <summary>
+/// 2 点指示 (位置合わせ): 選択した図形 (画像など) の上の 2 点を、図面上の 2 点に合わせる。
+/// 元の 1 点目 → 合わせ先の 1 点目 → 元の 2 点目 → 合わせ先の 2 点目 の順に指定すると、
+/// 1 点目どうしが重なるよう移動し、2 点目の方向へ回転する。ScaleToFit なら 2 点間の長さも合わせる (拡大縮小)。
+/// </summary>
+public sealed class AlignTool : CadTool
+{
+    private const int MaxPreviewEntities = 300;
+    private static readonly RgbColor GhostColor = new(0x66, 0xCC, 0xFF);
+
+    /// <summary>2 点間の長さも合わせる (拡大縮小する)。次の 2 点指示でも同じ設定を使う。</summary>
+    public static bool ScaleToFit { get; set; } = true;
+
+    private List<Entity> _targets = [];
+    private readonly List<Vec2> _points = [];
+    private Vec2 _cursor;
+
+    public override string Name => "2 点指示";
+    public override bool RequiresSelection => true;
+    public override bool CanStepBack => _points.Count > 0;
+    public override Vec2? BasePoint => _points.Count is 1 or 3 ? _points[^1] : null;
+
+    public override IEnumerable<(string Label, Action Run)> MenuItems =>
+    [
+        (ScaleToFit ? "大きさも合わせる: オン → オフにする (回転と移動だけ)" : "大きさも合わせる: オフ → オンにする (拡大縮小もする)", () =>
+        {
+            ScaleToFit = !ScaleToFit;
+            UpdatePrompt();
+            Canvas.RedrawOverlay();
+        }),
+    ];
+
+    protected override void OnActivated()
+    {
+        _targets = [.. Doc.Entities.Where(Canvas.Selection.Contains)];
+        UpdatePrompt();
+    }
+
+    private string Mode => ScaleToFit ? "回転・移動・大きさ" : "回転・移動のみ";
+
+    private void UpdatePrompt() => SetPrompt(_points.Count switch
+    {
+        0 => $"2 点指示 ({_targets.Count} 個, {Mode}): 合わせる元の 1 点目 (画像の上の点) を指定",
+        1 => "1 点目の合わせ先 (図面上の点) を指定",
+        2 => "合わせる元の 2 点目 (画像の上の点) を指定",
+        _ => $"2 点目の合わせ先 (図面上の点) を指定 [{Mode}、右クリックで切替]",
+    });
+
+    public override void StepBack()
+    {
+        if (_points.Count > 0) _points.RemoveAt(_points.Count - 1);
+        UpdatePrompt();
+    }
+
+    public override void OnPoint(Vec2 p)
+    {
+        if (_points.Count == 2 && (p - _points[0]).Length < 1e-9)
+        {
+            Canvas.ShowMessage("2 点指示: 2 点目は 1 点目と別の点を指定してください。");
+            return;
+        }
+        _points.Add(p);
+        if (_points.Count < 4)
+        {
+            UpdatePrompt();
+            return;
+        }
+        if ((_points[3] - _points[1]).Length < 1e-9)
+        {
+            _points.RemoveAt(3);
+            Canvas.ShowMessage("2 点指示: 合わせ先の 2 点目は 1 点目と別の点を指定してください。");
+            return;
+        }
+        var (rad, k) = Transform(_points[0], _points[1], _points[2], _points[3]);
+        var pairs = _targets.Where(Doc.Entities.Contains).Select(e => (Old: e, New: Apply(e, _points[0], _points[1], rad, k))).ToList();
+        Execute(new ReplaceEntitiesCommand(pairs, "2 点指示"));
+        _targets = [.. pairs.Select(x => x.New)];
+        Canvas.SetSelection(_targets);
+        Canvas.ShowMessage($"2 点指示: {pairs.Count} 個を 回転 {rad * 180 / Math.PI:0.####}°" +
+                           (ScaleToFit ? $"、{k:0.######} 倍" : "") + " で合わせました。");
+        // 続けて合わせ直せる (Esc で終了)
+        _points.Clear();
+        UpdatePrompt();
+    }
+
+    /// <summary>元の 2 点 (s1, s2) を合わせ先 (d1, d2) に合わせる回転角と倍率。</summary>
+    public static (double Rad, double K) Transform(Vec2 s1, Vec2 d1, Vec2 s2, Vec2 d2)
+    {
+        var vs = s2 - s1;
+        var vd = d2 - d1;
+        var rad = vd.Angle - vs.Angle;
+        var k = ScaleToFit && vs.Length > 0 ? vd.Length / vs.Length : 1;
+        return (rad, k);
+    }
+
+    private static Entity Apply(Entity e, Vec2 s1, Vec2 d1, double rad, double k)
+    {
+        var c = e.Clone();
+        c.Translate(d1 - s1);
+        c.Rotate(d1, rad);
+        if (Math.Abs(k - 1) > 1e-15) c.Scale(d1, k);
+        return c;
+    }
+
+    public override void OnMouseMove(Vec2 p) => _cursor = p;
+
+    public override void DrawPreview(DrawingContext dc)
+    {
+        // 指定済みの組を矢印代わりの線で示す (元 → 合わせ先)
+        for (var i = 0; i + 1 < _points.Count; i += 2)
+            Canvas.DrawWorldLine(dc, CadCanvas.PreviewPen, _points[i], _points[i + 1]);
+        if (BasePoint is Vec2 b) Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, b, _cursor);
+        if (_points.Count != 3 || (_cursor - _points[1]).Length < 1e-9) return;
+
+        var (rad, k) = Transform(_points[0], _points[1], _points[2], _cursor);
+        if (_targets.Count > MaxPreviewEntities)
+        {
+            var box = _targets.Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
+            Vec2 T(Vec2 p) => _points[1] + (p - _points[0]).Rotate(rad) * k;
+            Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen,
+                [T(box.Min), T(new Vec2(box.Max.X, box.Min.Y)), T(box.Max), T(new Vec2(box.Min.X, box.Max.Y))], true);
+            return;
+        }
+        foreach (var e in _targets)
+        {
+            // 画像は枠だけ (中身まで描くと重い)
+            if (e is ImageEntity img)
+            {
+                var c = img.Corners.Select(p => _points[1] + (p - _points[0]).Rotate(rad) * k).ToList();
+                Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen, c, true);
+                continue;
+            }
+            Canvas.DrawEntity(dc, Apply(e, _points[0], _points[1], rad, k), GhostColor);
+        }
+    }
+}

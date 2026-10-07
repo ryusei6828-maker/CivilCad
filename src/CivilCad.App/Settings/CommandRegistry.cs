@@ -28,6 +28,7 @@ public static class CommandRegistry
         new("ZN","平面直角座標系の系番号", "IconCoord", "I〜XIX系。緯度経度の表示に使う"),
         new("M", "移動", "IconMove", "先に図形を選択"),
         new("SCL", "拡大縮小", "IconResize", "先に図形を選択。基点 → 倍率 (または 参照する長さ → 新しい長さ)"),
+        new("AL", "2 点指示 (位置合わせ)", "IconAlign", "先に図形 (画像など) を選択。元の点 → 合わせ先 を 2 組指定して、移動・回転 (・拡大縮小) で合わせる"),
         new("CO", "複写", "IconCopy", "先に図形を選択"),
         new("E", "削除モード", "IconErase", "クリックした図形を消す。Esc で終了"),
         new("DI", "距離・方向角", "IconDistance"),

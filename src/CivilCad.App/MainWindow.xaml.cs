@@ -140,6 +140,7 @@ public partial class MainWindow : Window
             case "IM": ImportImage(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
             case "SCL": StartTool(new ScaleTool(), c); break;
+            case "AL": StartTool(new AlignTool(), c); break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
             case "DI": StartTool(new DistanceTool(), c); break;
             case "AA": StartTool(new AreaTool(), c); break;
@@ -252,6 +253,7 @@ public partial class MainWindow : Window
             Item("移動", () => RunCommand("M"), hasSel, "M");
             Item("複写", () => RunCommand("CO"), hasSel, "CO");
             Item("拡大縮小", () => RunCommand("SCL"), hasSel, "SCL");
+            Item("2 点指示 (位置合わせ)", () => RunCommand("AL"), hasSel, "AL");
             Item("削除", DeleteSelection, hasSel, "Delete");
             Item("選択を解除", Canvas.ClearSelection, hasSel, "Esc");
             menu.Items.Add(new Separator());
@@ -963,7 +965,8 @@ public partial class MainWindow : Window
 
         if (info.Placement is not { } pl)
         {
-            Log($"画像「{Path.GetFileName(path)}」({info.PixelWidth}×{info.PixelHeight}) には位置情報 (ワールドファイル) がありません。配置する位置を指定してください。");
+            Log($"画像「{Path.GetFileName(path)}」({info.PixelWidth}×{info.PixelHeight}) には位置情報 (ワールドファイル) がありません。配置する位置を指定してください。" +
+                "置いた後に 2 点指示 (AL) で、画像の上の 2 点を図面の 2 点に合わせられます。");
             StartTool(new ImagePlaceTool(path, info.PixelWidth, info.PixelHeight), "IM");
             return;
         }
@@ -1003,7 +1006,8 @@ public partial class MainWindow : Window
         }
         ImageCache.Forget(path);
         var (w, h) = PdfRenderer.PixelSize(page);
-        Log($"PDF「{Path.GetFileName(path)}」{page.Label} を読み込みます。左下の位置と幅を指定してください (Enter で原寸 = {_doc.ScaleText} で用紙の大きさ)。");
+        Log($"PDF「{Path.GetFileName(path)}」{page.Label} を読み込みます。左下の位置と幅を指定してください (Enter で原寸 = {_doc.ScaleText} で用紙の大きさ)。" +
+            "置いた後に 2 点指示 (AL) で、PDF の上の 2 点を図面の 2 点に合わせられます。");
         StartTool(new ImagePlaceTool(path, w, h, page.Index, page.WidthMm), "IM");
     }
 
