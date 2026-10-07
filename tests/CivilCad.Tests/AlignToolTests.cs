@@ -15,7 +15,7 @@ public class AlignToolTests
         {
             try { action(); }
             catch (Exception ex) { error = ex; }
-            finally { AlignTool.ScaleToFit = true; }
+            finally { AlignTool.ScaleToFit = true; AlignTool.RotateToFit = false; }
         });
         t.SetApartmentState(ApartmentState.STA);
         t.Start();
@@ -32,6 +32,7 @@ public class AlignToolTests
     [Fact]
     public void ImageTwoPoints_MatchDrawingTwoPoints() => RunSta(() =>
     {
+        AlignTool.RotateToFit = true; // 回転も合わせる
         var doc = new CadDocument();
         var img = new ImageEntity(doc.CurrentLayer, "photo.jpg", 100, 50, Vec2.Zero, new Vec2(100, 0), new Vec2(0, 50));
         var line = new LineEntity(doc.CurrentLayer, new Vec2(10, 10), new Vec2(30, 10)); // 画像の上に描いた線もいっしょに
@@ -76,6 +77,7 @@ public class AlignToolTests
     public void WithoutScale_RotatesAndMovesOnly_AndStepBack() => RunSta(() =>
     {
         AlignTool.ScaleToFit = false;
+        AlignTool.RotateToFit = true;
         var doc = new CadDocument();
         var img = new ImageEntity(doc.CurrentLayer, "photo.jpg", 100, 50, Vec2.Zero, new Vec2(100, 0), new Vec2(0, 50));
         doc.Entities.Add(img);
@@ -97,5 +99,29 @@ public class AlignToolTests
         Near(new Vec2(100, 100), moved.Origin);
         Assert.Equal(100, moved.Width, 9);   // 大きさはそのまま
         Assert.Equal(Math.PI / 2, moved.U.Angle, 9);
+    });
+
+    [Fact]
+    public void Default_DoesNotRotate_MovesAndScales() => RunSta(() =>
+    {
+        // 既定は回転しない: 1 点目を合わせ、2 点間の長さで大きさを合わせる。向きはそのまま
+        Assert.False(AlignTool.RotateToFit);
+        var doc = new CadDocument();
+        var img = new ImageEntity(doc.CurrentLayer, "photo.jpg", 100, 50, Vec2.Zero, new Vec2(100, 0), new Vec2(0, 50));
+        doc.Entities.Add(img);
+        var canvas = new CadCanvas { Document = doc };
+        canvas.SetSelection([img]);
+        var tool = new AlignTool();
+        canvas.SetTool(tool);
+        tool.OnPoint(new Vec2(10, 10));
+        tool.OnPoint(new Vec2(1000, 2000));
+        tool.OnPoint(new Vec2(30, 10));   // 元の 2 点は 20 離れている
+        tool.OnPoint(new Vec2(1001, 2040)); // 合わせ先はほぼ真上に 40 (向きが違っても回転しない)
+
+        var moved = doc.Entities.OfType<ImageEntity>().Single();
+        Assert.Equal(0, moved.U.Angle, 9);                    // 向きはそのまま
+        var k = new Vec2(1, 40).Length / 20;
+        Assert.Equal(100 * k, moved.Width, 6);                // 2 点間の長さの比で大きさを合わせる
+        Near(new Vec2(1000, 2000), moved.Map(0.1, 0.8));      // 1 点目は重なる
     });
 }
