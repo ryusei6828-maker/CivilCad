@@ -55,8 +55,24 @@ public static class DrawingFiles
     /// <param name="PaperFormat">SFC / P21 / JWW: 用紙上の mm とファイルの縮尺から実寸 (m) に換算して読んだ。</param>
     public sealed record OpenResult(string Note, Box2? Sheet, double? FileScale = null, ImportUnit? FileUnit = null, bool PaperFormat = false);
 
-    /// <summary>ファイルを読み込んで doc を置き換える。</summary>
+    /// <summary>
+    /// ファイルを読み込んで doc を置き換える。全部のレイヤが非表示で何も見えないときは、全レイヤを表示にする
+    /// (レイヤをすべて非表示にして保存したファイルを開くと画面が真っ黒になるため)。
+    /// </summary>
     public static OpenResult Open(CadDocument doc, string path)
+    {
+        var r = OpenFile(doc, path);
+        if (doc.Entities.Count > 0 && !doc.Entities.Any(doc.IsVisible))
+        {
+            var hidden = doc.Layers.Count(l => !l.IsVisible);
+            foreach (var l in doc.Layers) l.IsVisible = true;
+            doc.NotifyChanged();
+            r = r with { Note = r.Note + $"  ※ファイルではレイヤがすべて非表示 ({hidden} 個) になっていて何も見えないため、全レイヤを表示にしました。" };
+        }
+        return r;
+    }
+
+    private static OpenResult OpenFile(CadDocument doc, string path)
     {
         switch (Path.GetExtension(path).ToLowerInvariant())
         {
@@ -149,7 +165,11 @@ public static class DrawingFiles
         foreach (var (t, _) in screenTexts) t.Height = doc.PaperMmToMeters(t.ScreenHeightPx!.Value * TextEntity.MmPerPixel);
         try
         {
-            return SaveAs(doc, path);
+            var message = SaveAs(doc, path);
+            var hiddenCount = doc.Entities.Count(e => !doc.IsVisible(e));
+            if (hiddenCount > 0)
+                message += $"  ※非表示のレイヤの図形が {hiddenCount} 個あります (非表示のまま保存しました。開いたときも非表示です)。";
+            return message;
         }
         finally
         {

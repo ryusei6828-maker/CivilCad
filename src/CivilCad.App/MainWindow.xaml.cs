@@ -1103,7 +1103,7 @@ public partial class MainWindow : Window
 
     private void LayerIsolate_Click(object sender, RoutedEventArgs e)
     {
-        if (SelectedLayer is not { } target) return;
+        if (SelectedLayer is not { } target || !_doc.Layers.Contains(target)) return;
         SetCurrentLayer(target);
         foreach (var l in _doc.Layers) l.IsVisible = l == target;
     }

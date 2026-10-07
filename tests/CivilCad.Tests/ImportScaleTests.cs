@@ -81,3 +81,60 @@ public class ImportScaleTests
         }
     }
 }
+
+public class HiddenLayerOpenTests
+{
+    [Theory]
+    [InlineData(".sfc")]
+    [InlineData(".dxf")]
+    [InlineData(".jww")]
+    public void Open_AllLayersHidden_ShowsThemAll(string ext)
+    {
+        // レイヤをすべて非表示にして保存したファイルを開いても、真っ黒 (何も見えない) にしない
+        var doc = new CadDocument { ScaleDenominator = 100 };
+        var road = doc.GetOrCreateLayer("歩道", RgbColor.White);
+        var lot = doc.GetOrCreateLayer("宅地", RgbColor.White);
+        doc.Entities.Add(new LineEntity(road, new Vec2(0, 0), new Vec2(10, 0)));
+        doc.Entities.Add(new LineEntity(lot, new Vec2(0, 5), new Vec2(10, 5)));
+        road.IsVisible = false;
+        lot.IsVisible = false;
+        var path = Path.Combine(Path.GetTempPath(), "civilcad-test-" + Guid.NewGuid().ToString("N") + ext);
+        try
+        {
+            Assert.Contains("非表示のレイヤの図形が 2 個", DrawingFiles.Save(doc, path));
+            var back = new CadDocument();
+            var r = DrawingFiles.Open(back, path);
+            Assert.Equal(2, back.Entities.Count(back.IsVisible));
+            Assert.Contains("全レイヤを表示にしました", r.Note);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Open_SomeLayersHidden_KeepsThemHidden()
+    {
+        var doc = new CadDocument { ScaleDenominator = 100 };
+        var road = doc.GetOrCreateLayer("歩道", RgbColor.White);
+        var lot = doc.GetOrCreateLayer("宅地", RgbColor.White);
+        doc.Entities.Add(new LineEntity(road, new Vec2(0, 0), new Vec2(10, 0)));
+        doc.Entities.Add(new LineEntity(lot, new Vec2(0, 5), new Vec2(10, 5)));
+        lot.IsVisible = false;
+        var path = Path.Combine(Path.GetTempPath(), "civilcad-test-" + Guid.NewGuid().ToString("N") + ".sfc");
+        try
+        {
+            DrawingFiles.Save(doc, path);
+            var back = new CadDocument();
+            var r = DrawingFiles.Open(back, path);
+            Assert.False(back.FindLayer("宅地")!.IsVisible);
+            Assert.True(back.FindLayer("歩道")!.IsVisible);
+            Assert.DoesNotContain("全レイヤを表示", r.Note);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+}
