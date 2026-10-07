@@ -5,6 +5,22 @@ using CivilCad.Core.Model;
 
 namespace CivilCad.App.IO;
 
+/// <summary>DXF / DWG の座標の単位。</summary>
+public enum ImportUnit
+{
+    /// <summary>実寸 m。</summary>
+    Meter,
+
+    /// <summary>実寸 cm。</summary>
+    Centimeter,
+
+    /// <summary>実寸 mm。</summary>
+    Millimeter,
+
+    /// <summary>用紙上の mm (図寸)。縮尺を掛けて実寸にする。</summary>
+    PaperMillimeter,
+}
+
 /// <summary>図面ファイルの形式 (拡張子) ごとの読み書きの振り分け。</summary>
 public static class DrawingFiles
 {
@@ -34,7 +50,10 @@ public static class DrawingFiles
 
     /// <param name="Note">ログに添える説明 (未対応の図形など)。</param>
     /// <param name="Sheet">用紙の範囲 (図面座標 m)。分からなければ null。</param>
-    public sealed record OpenResult(string Note, Box2? Sheet);
+    /// <param name="FileScale">ファイルに書いてあった縮尺 (分母)。無ければ null。</param>
+    /// <param name="FileUnit">DXF / DWG の座標の単位 ($INSUNITS)。分からなければ null。</param>
+    /// <param name="PaperFormat">SFC / P21 / JWW: 用紙上の mm とファイルの縮尺から実寸 (m) に換算して読んだ。</param>
+    public sealed record OpenResult(string Note, Box2? Sheet, double? FileScale = null, ImportUnit? FileUnit = null, bool PaperFormat = false);
 
     /// <summary>ファイルを読み込んで doc を置き換える。</summary>
     public static OpenResult Open(CadDocument doc, string path)
@@ -44,35 +63,82 @@ public static class DrawingFiles
             case ".sfc":
             {
                 var r = SfcIO.Load(doc, path);
-                var note = $"  縮尺 {doc.ScaleText} として実寸 (m) に換算しました。";
-                if (r.Skipped > 0) note += $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}"));
-                return new OpenResult(note, r.Sheet);
+                var note = r.Skipped > 0 ? $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}")) : "";
+                return new OpenResult(note, r.Sheet, r.ScaleDenominator, null, true);
             }
             case ".p21" or ".p2z":
             {
                 var r = P21IO.Load(doc, path);
-                var note = $"  縮尺 {doc.ScaleText} として実寸 (m) に換算しました。";
-                if (r.Skipped > 0) note += $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}"));
-                return new OpenResult(note, r.Sheet);
+                var note = r.Skipped > 0 ? $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}")) : "";
+                return new OpenResult(note, r.Sheet, r.ScaleDenominator, null, true);
             }
             case ".jww":
             {
                 var r = JwwIO.Load(doc, path);
-                var note = $"  Jw_cad のデータ版 {r.Version}。縮尺 {doc.ScaleText} として実寸 (m) に換算しました。";
+                var note = $"  Jw_cad のデータ版 {r.Version}。";
                 if (r.Skipped > 0) note += "  ※" + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}"));
-                return new OpenResult(note, r.Sheet);
+                return new OpenResult(note, r.Sheet, r.ScaleDenominator, null, true);
             }
             case ".dwg":
             {
-                var skipped = DwgIO.Load(doc, path);
-                return new OpenResult(skipped > 0 ? $"  ※未対応の図形 {skipped} 個は読み込んでいません (寸法など)。ブロックは分解して読み込みました" : "", null);
+                var skipped = DwgIO.Load(doc, path, out var scale, out var unit);
+                return new OpenResult(skipped > 0 ? $"  ※未対応の図形 {skipped} 個は読み込んでいません (寸法など)。ブロックは分解して読み込みました" : "", null, scale, unit);
             }
             default:
             {
-                var skipped = DxfIO.Load(doc, path);
-                return new OpenResult(skipped > 0 ? $"  ※未対応の図形 {skipped} 個は読み込んでいません (ブロック・寸法・ハッチング等)" : "", null);
+                var skipped = DxfIO.Load(doc, path, out var scale, out var unit);
+                return new OpenResult(skipped > 0 ? $"  ※未対応の図形 {skipped} 個は読み込んでいません (ブロック・寸法・ハッチング等)" : "", null, scale, unit);
             }
         }
+    }
+
+    /// <summary>
+    /// 読み込んだ図形を、選んだ縮尺 (と DXF / DWG の座標の単位) で読み直したときの倍率。
+    /// SFC / P21 / JWW と、縮尺の書いてある DXF / DWG は「用紙上の大きさのまま」(図寸固定): ファイルの縮尺と違う縮尺にすると実寸が縮尺の比で変わる。
+    /// DXF / DWG の座標が用紙上の mm (図寸) なら、選んだ縮尺で実寸 (m) にする。
+    /// </summary>
+    public static double ImportFactor(OpenResult r, double scale, ImportUnit unit)
+    {
+        var ratio = r.FileScale is double fs && fs > 0 ? scale / fs : 1;
+        if (r.PaperFormat) return ratio;
+        return unit switch
+        {
+            ImportUnit.Millimeter => 0.001 * ratio,
+            ImportUnit.Centimeter => 0.01 * ratio,
+            ImportUnit.PaperMillimeter => scale / 1000,
+            _ => ratio,
+        };
+    }
+
+    /// <summary>
+    /// 読み込んだ図面を、選んだ縮尺・単位にする (図形を原点を基準に拡大・縮小し、シートの縮尺を scale にする)。
+    /// 文字・記号は用紙上の大きさのまま。戻り値は倍率と、用紙の範囲 (あれば)。
+    /// </summary>
+    public static (double Factor, Box2? Sheet) ApplyImportScale(CadDocument doc, OpenResult r, double scale, ImportUnit unit)
+    {
+        var k = ImportFactor(r, scale, unit);
+        if (Math.Abs(k - 1) > 1e-12)
+        {
+            foreach (var e in doc.Entities)
+            {
+                if (e is SymbolEntity s)
+                {
+                    var mm = s.SizeMm;
+                    s.Scale(Vec2.Zero, k);
+                    s.SizeMm = mm;
+                }
+                else
+                {
+                    e.Scale(Vec2.Zero, k);
+                }
+            }
+        }
+        doc.ScaleDenominator = scale;
+        foreach (var s in doc.Entities.OfType<SymbolEntity>()) s.Size = doc.PaperMmToMeters(s.SizeMm);
+        doc.History.Clear();
+        doc.NotifyChanged();
+        var sheet = r.Sheet is Box2 b ? new Box2(b.Min * k, b.Max * k) : (Box2?)null;
+        return (k, sheet);
     }
 
     /// <summary>拡張子の形式で保存し、ログに出す文を返す。</summary>

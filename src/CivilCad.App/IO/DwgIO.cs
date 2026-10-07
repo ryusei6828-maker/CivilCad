@@ -29,7 +29,11 @@ public static class DwgIO
     private const int MaxBlockDepth = 16;
 
     /// <summary>DWG を読み込んで doc を置き換える。戻り値は読み込めなかった図形の数。</summary>
-    public static int Load(CadDocument doc, string path)
+    public static int Load(CadDocument doc, string path) => Load(doc, path, out _, out _);
+
+    /// <param name="fileScale">ファイルの縮尺 ($DIMSCALE)。無ければ null。</param>
+    /// <param name="unit">ファイルの単位 ($INSUNITS)。m / cm / mm 以外は null。</param>
+    public static int Load(CadDocument doc, string path, out double? fileScale, out ImportUnit? unit)
     {
         AcadDocument dwg;
         try
@@ -40,6 +44,14 @@ public static class DwgIO
         {
             throw new InvalidDataException("DWG ファイルを読み込めませんでした (対応は AutoCAD R14 以降の形式): " + ex.Message, ex);
         }
+        fileScale = dwg.Header.DimensionScaleFactor > 1 ? dwg.Header.DimensionScaleFactor : null;
+        unit = dwg.Header.InsUnits switch
+        {
+            ACadSharp.Types.Units.UnitsType.Meters => ImportUnit.Meter,
+            ACadSharp.Types.Units.UnitsType.Centimeters => ImportUnit.Centimeter,
+            ACadSharp.Types.Units.UnitsType.Millimeters => ImportUnit.Millimeter,
+            _ => null,
+        };
         return new Importer(doc).Run(dwg);
     }
 

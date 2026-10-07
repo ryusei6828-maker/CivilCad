@@ -455,11 +455,24 @@ public partial class MainWindow : Window
 
         // 空のシートならそこに、そうでなければ新しいタブに読み込む
         var previous = _active;
+        var sheetScale = _doc.ScaleDenominator;
         var created = !_active.IsBlank;
         ActivateSheet(created ? AddSheet() : _active);
         try
         {
-            var (note, sheet) = DrawingFiles.Open(_doc, dlg.FileName);
+            var loaded = DrawingFiles.Open(_doc, dlg.FileName);
+            var note = loaded.Note;
+            // 図面の縮尺 (と DXF / DWG の座標の単位) を選んでもらう
+            var extents = _doc.Entities.Where(_doc.IsVisible).Aggregate(Box2.Empty, (acc, x) => acc.Union(x.Bounds));
+            if (ImportScaleWindow.Ask(this, dlg.FileName, loaded, extents.IsEmpty ? null : extents, sheetScale) is not var (scale, unit))
+            {
+                if (created) RemoveSheet(_active, previous);
+                else _doc.Clear();
+                Log($"読み込みをやめました: {dlg.FileName}");
+                return;
+            }
+            var (factor, sheet) = DrawingFiles.ApplyImportScale(_doc, loaded, scale, unit);
+            note = $"  縮尺 {_doc.ScaleText}" + (Math.Abs(factor - 1) > 1e-12 ? $" (ファイルの値を {factor:0.######} 倍)" : "") + " で読み込みました。" + note;
             if (_doc.PlaneZone == null && _settings.DefaultPlaneZone is int defZone)
             {
                 _doc.PlaneZone = defZone;

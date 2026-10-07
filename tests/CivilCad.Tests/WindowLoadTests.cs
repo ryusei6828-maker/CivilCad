@@ -58,6 +58,10 @@ public class WindowLoadTests
                     .GetField("_ok", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(pdfSel)!;
                 Assert.Equal("範囲を指定する", okButton.Content);
                 pdfSel.Close();
+                var importWin = new CivilCad.App.Views.ImportScaleWindow("a.dxf", new CivilCad.App.IO.DrawingFiles.OpenResult("", null, 100, CivilCad.App.IO.ImportUnit.Millimeter),
+                    new CivilCad.Core.Geometry.Box2(new(0, 0), new(38000, 25700)), 500);
+                Assert.NotNull(importWin.Content);
+                importWin.Close();
                 var textEdit = new CivilCad.App.Views.TextEditWindow("No.1");
                 Assert.NotNull(textEdit.Content);
                 textEdit.Close();

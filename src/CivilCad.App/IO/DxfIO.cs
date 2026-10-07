@@ -58,20 +58,33 @@ public static class DxfIO
         }
         // 図面の縮尺は AutoCAD 等と同じく DIMSCALE (寸法スタイルの全体尺度, ヘッダの $DIMSCALE) に入れる
         dxf.DimensionStyles[dxf.DrawingVariables.DimStyle].DimScaleOverall = doc.ScaleDenominator;
+        dxf.DrawingVariables.InsUnits = netDxf.Units.DrawingUnits.Meters; // 座標は実寸 m
         // 平面直角座標系の系番号は AutoCAD のユーザー変数 USERI1 に入れる (0 = 未設定)
         dxf.DrawingVariables.AddCustomVariable(new netDxf.Header.HeaderVariable(PlaneZoneVariable, 70, (short)(doc.PlaneZone ?? 0)));
         dxf.Save(path);
     }
 
     /// <summary>DXF を読み込んで doc を置き換える。戻り値は読み込めなかった図形の数。</summary>
-    public static int Load(CadDocument doc, string path)
+    public static int Load(CadDocument doc, string path) => Load(doc, path, out _, out _);
+
+    /// <param name="fileScale">ファイルの縮尺 ($DIMSCALE)。無ければ null。</param>
+    /// <param name="unit">ファイルの単位 ($INSUNITS)。m / cm / mm 以外は null。</param>
+    public static int Load(CadDocument doc, string path, out double? fileScale, out ImportUnit? unit)
     {
+        fileScale = null;
         var dxf = DxfDocument.Load(path) ?? throw new System.IO.InvalidDataException("DXF ファイルを読み込めませんでした (未対応の形式の可能性があります)。");
 
         doc.Clear();
         if (dxf.DimensionStyles.Contains(dxf.DrawingVariables.DimStyle) &&
             dxf.DimensionStyles[dxf.DrawingVariables.DimStyle].DimScaleOverall is > 1 and var scale)
-            doc.ScaleDenominator = scale; // 1 以下 (他 CAD の未設定値) は無視
+            doc.ScaleDenominator = (fileScale = scale).Value; // 1 以下 (他 CAD の未設定値) は無視
+        unit = dxf.DrawingVariables.InsUnits switch
+        {
+            netDxf.Units.DrawingUnits.Meters => ImportUnit.Meter,
+            netDxf.Units.DrawingUnits.Centimeters => ImportUnit.Centimeter,
+            netDxf.Units.DrawingUnits.Millimeters => ImportUnit.Millimeter,
+            _ => null,
+        };
         if (dxf.DrawingVariables.TryGetCustomVariable(PlaneZoneVariable, out var zoneVar) &&
             Convert.ToInt32(zoneVar.Value, System.Globalization.CultureInfo.InvariantCulture) is >= 1 and <= 19 and var zone)
             doc.PlaneZone = zone;
