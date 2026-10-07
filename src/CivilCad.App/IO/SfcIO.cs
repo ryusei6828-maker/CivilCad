@@ -235,7 +235,16 @@ public static partial class SfcIO
                 .GroupBy(x => Math.Round(1 / x.Ratio))
                 .OrderByDescending(g => g.Sum(x => x.Count))
                 .FirstOrDefault();
-            return best?.Key ?? 1;
+            if (best != null) return best.Key;
+            // 部分図が無い (図枠・表題欄だけなど) ときは、用紙上の縮尺の文字 (表題欄の「1:100」「S=1/100」) から
+            var fromText = top.Where(f => f.Name == "text_string_feature" && f.Args.Count > 3).Select(f => ScaleFromText(f.Args[3])).FirstOrDefault(s => s > 1);
+            return fromText > 1 ? fromText : 1;
+        }
+
+        private static double ScaleFromText(string s)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(s, @"^\s*(?:[SsＳ]\s*[=＝]\s*)?[1１]\s*[:：/／]\s*([0-9]+(?:\.[0-9]+)?)\s*$");
+            return m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0;
         }
 
         private void Emit(List<Feature> features, Affine t, int depth)

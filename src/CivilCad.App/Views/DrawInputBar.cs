@@ -389,7 +389,7 @@ public sealed class DrawInputBar : Border
         }
     }
 
-    /// <summary>計測結果の単位 (mm / cm / m)。結果は CAD 上の長さに縮尺を掛けた値。</summary>
+    /// <summary>計測結果の単位 (mm / cm / m)。結果は実寸 (縮尺は掛けない)。</summary>
     private void AddMeasureUnit(CadDocument doc)
     {
         AddLabel("単位");
@@ -400,7 +400,7 @@ public sealed class DrawInputBar : Border
             Margin = new Thickness(0, 0, 6, 0),
             ItemsSource = units.Select(u => u.Label()).ToList(),
             SelectedIndex = Array.IndexOf(units, MeasureSettings.Unit),
-            ToolTip = $"計測結果の単位。結果は CAD 上の長さに縮尺 ({doc.ScaleText}) を掛けた値 (面積は縮尺の 2 乗)",
+            ToolTip = "計測結果の単位。図面は実寸 (m) で描いているので、結果は縮尺によらない実寸の値",
         };
         box.SelectionChanged += (_, _) =>
         {
@@ -409,13 +409,6 @@ public sealed class DrawInputBar : Border
             Committed?.Invoke(this, EventArgs.Empty);
         };
         _panel.Children.Add(box);
-        _panel.Children.Add(new TextBlock
-        {
-            Text = $"(×縮尺 {doc.ScaleText})",
-            Foreground = LabelBrush,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 14, 0),
-        });
     }
 
     private void AddCheck(string label, bool value, Action<bool> set, string tip)

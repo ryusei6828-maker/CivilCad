@@ -35,27 +35,27 @@ public static class MeasureSettings
     public static string Num(double v) => v.ToString("F" + Decimals, CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// CAD 上の長さ (図面の座標の単位 = m) に縮尺を掛けて、選んだ単位で表した値。
-    /// 例: 1:100 で CAD 上 0.01 (1cm) → 1m → 100cm。
+    /// 図面上の長さ (座標の単位 = 実寸 m) を、選んだ単位で表した値。図面は実寸で描いているので縮尺は掛けない
+    /// (縮尺は用紙に印刷するときの大きさにだけ使う。例: 1:100 の A3 図枠は 38m)。
     /// </summary>
-    public static double Length(double cadLength, double scale) => cadLength * scale / Unit.Meters();
+    public static double Length(double cadLength) => cadLength / Unit.Meters();
 
-    /// <summary>面積は縮尺の 2 乗を掛ける。</summary>
-    public static double Area(double cadArea, double scale) => cadArea * scale * scale / (Unit.Meters() * Unit.Meters());
+    /// <summary>図面上の面積 (実寸 m²) を、選んだ単位で表した値。</summary>
+    public static double Area(double cadArea) => cadArea / (Unit.Meters() * Unit.Meters());
 
     public static string UnitLabel => Unit.Label();
 
-    public static string DistanceText(Vec2 a, Vec2 b, double scale)
+    public static string DistanceText(Vec2 a, Vec2 b)
     {
         var d = b - a;
-        var text = $"L={Num(Length(d.Length, scale))}{UnitLabel}";
+        var text = $"L={Num(Length(d.Length))}{UnitLabel}";
         return Detail ? $"{text}  θ={Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}" : text;
     }
 
-    public static string AreaText(double cadArea, double cadPerimeter, double scale)
+    public static string AreaText(double cadArea, double cadPerimeter)
     {
-        var text = $"A={Num(Area(cadArea, scale))}{UnitLabel}²";
-        return Detail ? $"{text}  (周長 {Num(Length(cadPerimeter, scale))}{UnitLabel})" : text;
+        var text = $"A={Num(Area(cadArea))}{UnitLabel}²";
+        return Detail ? $"{text}  (周長 {Num(Length(cadPerimeter))}{UnitLabel})" : text;
     }
 
     /// <summary>線の向きに沿った文字の角度 (逆さまにならないよう -90°〜90° に収める)。</summary>
@@ -208,12 +208,10 @@ public sealed class DistanceTool : MeasureToolBase
         if (p.DistanceTo(a) < 1e-12) return;
         _second = p;
         var d = p - a;
-        var s = Doc.ScaleDenominator;
         var u = MeasureSettings.UnitLabel;
-        string L(double v) => $"{MeasureSettings.Num(MeasureSettings.Length(v, s))} {u}";
-        Canvas.ShowMessage($"距離 = {L(d.Length)}   ΔX(北) = {L(d.Y)}  ΔY(東) = {L(d.X)}   方向角 = {Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}" +
-                           $"   (CAD上 {d.Length:F3} × 縮尺 {Doc.ScaleText})");
-        Measured(MeasureSettings.DistanceText(a, p, s), MeasureSettings.ReadableAngle(a, p), TextHAlign.Center, TextVAlign.Bottom);
+        string L(double v) => $"{MeasureSettings.Num(MeasureSettings.Length(v))} {u}";
+        Canvas.ShowMessage($"距離 = {L(d.Length)}   ΔX(北) = {L(d.Y)}  ΔY(東) = {L(d.X)}   方向角 = {Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}");
+        Measured(MeasureSettings.DistanceText(a, p), MeasureSettings.ReadableAngle(a, p), TextHAlign.Center, TextVAlign.Bottom);
     }
 
     protected override void DrawMeasurePreview(DrawingContext dc)
@@ -275,12 +273,11 @@ public sealed class AreaTool : MeasureToolBase
             perimeter += a.DistanceTo(b);
         }
         var area = Math.Abs(sum) / 2;
-        var s = Doc.ScaleDenominator;
         var u = MeasureSettings.UnitLabel;
-        Canvas.ShowMessage($"面積 = {MeasureSettings.Num(MeasureSettings.Area(area, s))} {u}²   周長 = {MeasureSettings.Num(MeasureSettings.Length(perimeter, s))} {u}" +
-                           $"   ({_points.Count} 点、CAD上 {area:F3} / {perimeter:F3} × 縮尺 {Doc.ScaleText})");
+        Canvas.ShowMessage($"面積 = {MeasureSettings.Num(MeasureSettings.Area(area))} {u}²   周長 = {MeasureSettings.Num(MeasureSettings.Length(perimeter))} {u}" +
+                           $"   ({_points.Count} 点)");
         _closed = true;
-        Measured(MeasureSettings.AreaText(area, perimeter, s), 0, TextHAlign.Center, TextVAlign.Middle);
+        Measured(MeasureSettings.AreaText(area, perimeter), 0, TextHAlign.Center, TextVAlign.Middle);
     }
 
     protected override void DrawMeasurePreview(DrawingContext dc)

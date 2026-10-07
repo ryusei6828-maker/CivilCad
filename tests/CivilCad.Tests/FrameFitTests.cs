@@ -54,4 +54,31 @@ public class FrameFitTests
         var ext = DrawingFrame.DrawingExtents(doc)!.Value;
         Assert.Equal((5.0, 2.0), (ext.Width, ext.Height));
     }
+
+    [Theory]
+    [InlineData(".sfc")]
+    [InlineData(".p21")]
+    [InlineData(".jww")]
+    [InlineData(".dxf")]
+    public void FrameOnly_SaveAndOpen_KeepsSize(string ext)
+    {
+        // 図枠だけの図面 (部分図が無い SFC) も、表題欄の縮尺から 1:100 と分かり、外枠は 38m のまま
+        var doc = new CadDocument { ScaleDenominator = 100 };
+        doc.Entities.AddRange(DrawingFrame.Build(doc, A3(100), Vec2.Zero));
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "civilcad-test-" + Guid.NewGuid().ToString("N") + ext);
+        try
+        {
+            CivilCad.App.IO.DrawingFiles.Save(doc, path);
+            var back = new CadDocument();
+            CivilCad.App.IO.DrawingFiles.Open(back, path);
+            Assert.Equal(100, back.ScaleDenominator);
+            var outer = back.Entities.Aggregate(Box2.Empty, (a, e) => a.Union(e.Bounds)); // JWW では外枠は 4 本の線になる
+            Assert.Equal(38, outer.Width, 6);
+            Assert.Equal(25.7, outer.Height, 6);
+        }
+        finally
+        {
+            System.IO.File.Delete(path);
+        }
+    }
 }

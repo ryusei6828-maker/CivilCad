@@ -68,32 +68,43 @@ public class MeasureTextTests
     });
 
     [Fact]
-    public void Scale_IsApplied_InChosenUnit() => RunSta((doc, canvas) =>
+    public void Scale_IsNotApplied_InChosenUnit() => RunSta((doc, canvas) =>
     {
-        // 1:100 で CAD 上 1cm (0.01) → 100cm
+        // 図面は実寸 (m) で描いているので、縮尺 1:100 でも 1m の線は 1m = 100cm
         doc.ScaleDenominator = 100;
         MeasureSettings.Unit = LengthUnit.Cm;
         MeasureSettings.Decimals = 1;
         var tool = new DistanceTool();
         canvas.SetTool(tool);
         tool.OnPoint(new Vec2(0, 0));
-        tool.OnPoint(new Vec2(0.01, 0));
+        tool.OnPoint(new Vec2(1, 0));
         tool.OnPoint(new Vec2(1, 1));
         Assert.Equal("L=100.0cm", doc.Entities.OfType<TextEntity>().Last().Text);
 
-        // 面積は縮尺の 2 乗: CAD 上 0.02 × 0.03 = 0.0006 → 実寸 2m × 3m = 6m² = 60000cm²
+        // 面積: 2m × 3m = 6m²
         MeasureSettings.Unit = LengthUnit.M;
         MeasureSettings.Detail = true;
         var area = new AreaTool();
         canvas.SetTool(area);
-        foreach (var p in new Vec2[] { new(0, 0), new(0.02, 0), new(0.02, 0.03), new(0, 0.03) }) area.OnPoint(p);
+        foreach (var p in new Vec2[] { new(0, 0), new(2, 0), new(2, 3), new(0, 3) }) area.OnPoint(p);
         area.OnEnter();
-        area.OnPoint(new Vec2(0.01, 0.01));
+        area.OnPoint(new Vec2(1, 1));
         Assert.Equal("A=6.0m²  (周長 10.0m)", doc.Entities.OfType<TextEntity>().Last().Text);
 
-        Assert.Equal(60000, MeasureSettings.Area(0.0006, 100) * 10000, 6); // m² → cm² の確認 (×10⁴)
+        Assert.Equal(60000, MeasureSettings.Area(6) * 10000, 6); // m² → cm² の確認 (×10⁴)
         MeasureSettings.Unit = LengthUnit.Mm;
-        Assert.Equal(1000, MeasureSettings.Length(0.01, 100), 9);           // 1:100 で 1cm → 1000mm
+        Assert.Equal(1000, MeasureSettings.Length(1), 9);        // 1m → 1000mm
+
+        // A3・1:100 の図枠は端から端まで 38m
+        MeasureSettings.Unit = LengthUnit.M;
+        MeasureSettings.Detail = false;
+        var frame = CivilCad.App.Drawing.DrawingFrame.Build(doc, new CivilCad.App.Drawing.DrawingFrameOptions { Paper = "A3", ScaleDenominator = 100, Margin = 20 }, Vec2.Zero);
+        var outer = frame.OfType<PolylineEntity>().First().Bounds;
+        canvas.SetTool(tool);
+        tool.OnPoint(outer.Min);
+        tool.OnPoint(new Vec2(outer.Max.X, outer.Min.Y));
+        tool.OnPoint(new Vec2(5, 5));
+        Assert.Equal("L=38.0m", doc.Entities.OfType<TextEntity>().Last().Text);
     });
 
     [Fact]
