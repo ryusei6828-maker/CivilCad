@@ -753,13 +753,13 @@ public partial class MainWindow : Window
         CommandBox.Focus();
     }
 
-    /// <summary>シートの縮尺を変える。keepPaperSize なら図枠・文字・記号を新しい縮尺に合わせる (元に戻すで一度に戻る)。</summary>
+    /// <summary>シートの縮尺を変える。keepPaperSize なら図枠を新しい縮尺に合わせる (元に戻すで一度に戻る)。</summary>
     private void ChangeScale(double scale, bool keepPaperSize)
     {
         var changed = keepPaperSize ? PaperRescale.Rescaled(_doc, scale).Count : 0;
         _doc.History.Execute(PaperRescale.Command(_doc, scale, keepPaperSize));
         Log($"シートの縮尺を {_doc.ScaleText} にしました (用紙 1mm = {_doc.PaperMmToMeters(1):0.####} m)。" +
-            (changed > 0 ? $" 図枠・文字など {changed} 個を新しい縮尺の大きさにしました。" : "") + " 線・円などの実寸と計測の値は変わりません。");
+            (changed > 0 ? " 図枠を新しい縮尺の大きさにしました。" : "") + " 文字・線などはそのままです。");
     }
 
     private void UpdateScaleText() => ScaleButton.Content = $"シートの縮尺 {_doc.ScaleText}";

@@ -17,7 +17,7 @@ public partial class ScaleWindow : Window
 
     public double Result { get; private set; }
 
-    /// <summary>図枠・文字・記号を新しい縮尺に合わせる (用紙上の大きさを保つ)。</summary>
+    /// <summary>図枠を新しい縮尺に合わせる。</summary>
     public bool KeepPaperSize { get; private set; }
 
     private static bool TryParse(string text, out double scale) =>

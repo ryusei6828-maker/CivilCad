@@ -4,7 +4,7 @@ using CivilCad.Core.Model;
 
 namespace CivilCad.Tests;
 
-/// <summary>シートの縮尺を変えたとき、図枠・文字を新しい縮尺に合わせる。</summary>
+/// <summary>シートの縮尺を変えたとき、図枠を新しい縮尺に合わせる (ほかの文字はそのまま)。</summary>
 public class PaperRescaleTests
 {
     private static (CadDocument Doc, LineEntity Line, TextEntity Text) Sample()
@@ -21,7 +21,7 @@ public class PaperRescaleTests
         doc.Entities.OfType<PolylineEntity>().First(p => p.Tag == DrawingFrame.Tag && p.Layer.Name == DrawingFrame.LayerFrame).Bounds;
 
     [Fact]
-    public void ChangeScale_KeepsPaperSize_OfFrameAndText()
+    public void ChangeScale_RescalesFrame_KeepsOtherText()
     {
         var (doc, line, text) = Sample();
         doc.History.Execute(PaperRescale.Command(doc, 250, keepPaperSize: true));
@@ -34,10 +34,10 @@ public class PaperRescaleTests
         // 表題欄の縮尺の文字も書き換わる
         Assert.Contains(doc.Entities.OfType<TextEntity>(), t => t.Tag == DrawingFrame.Tag && t.Text == "1:250");
         Assert.DoesNotContain(doc.Entities.OfType<TextEntity>(), t => t.Text == "1:100");
-        // 文字は用紙上 3.5mm のまま (図面上 0.35m → 0.875m)、置いた点は同じ
-        var t2 = doc.Entities.OfType<TextEntity>().Single(t => t.Text == "No.1");
-        Assert.Equal(0.875, t2.Height, 9);
-        Assert.Equal(new Vec2(15, 25), t2.Position);
+        // 図枠以外の文字は変えない (画面上の大きさのまま)
+        Assert.Contains(text, doc.Entities);
+        Assert.Equal(0.35, text.Height, 9);
+        Assert.Equal(new Vec2(15, 25), text.Position);
         // 実寸の線は変わらない (計測の値も同じ)
         Assert.Contains(line, doc.Entities);
         Assert.Equal(20, line.Length, 9);

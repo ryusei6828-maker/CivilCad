@@ -6,12 +6,12 @@ namespace CivilCad.App.Drawing;
 
 /// <summary>
 /// シートの縮尺を変えるとき、「用紙上の大きさ (mm) で決まる物」を新しい縮尺に合わせて作り直す。
-/// 図枠 (外枠の左下を基準に拡大・縮小、表題欄の縮尺の文字も書き換え)、文字の高さ、座標読込の点の印。
-/// プリセット (記号) は縮尺の変更 (SetScaleCommand) が合わせる。実寸で描いた線・円などはそのまま (計測の値は変わらない)。
+/// 図枠 (外枠の左下を基準に拡大・縮小、表題欄の縮尺の文字も書き換え)。
+/// 図枠以外の文字・線・円などはそのまま (画面上の大きさも計測の値も変わらない)。
 /// </summary>
 public static class PaperRescale
 {
-    /// <summary>縮尺を変えるコマンド。keepPaperSize なら用紙上の物も合わせる (元に戻すで一度に戻る)。</summary>
+    /// <summary>縮尺を変えるコマンド。keepPaperSize なら図枠も合わせる (元に戻すで一度に戻る)。</summary>
     public static IUndoableCommand Command(CadDocument doc, double newScale, bool keepPaperSize)
     {
         var set = new SetScaleCommand(newScale);
@@ -48,28 +48,8 @@ public static class PaperRescale
                     made.Scale(origin, k);
                 if (made is TextEntity t && t.Text == oldText) t.Text = newText; // 表題欄の縮尺
             }
-            else if (e is TextEntity { ScreenHeightPx: null } text)
-            {
-                // 文字は置いた点 (配置の基準) を動かさずに大きさだけ変える
-                var t = (TextEntity)text.Clone();
-                t.Height *= k;
-                if (t.FitWidth is double fit) t.FitWidth = fit * k;
-                made = t;
-            }
-            else if (e is CircleEntity c && c.Tag?.StartsWith("POINT:", StringComparison.Ordinal) == true)
-            {
-                made = new CircleEntity(c.Layer, c.Center, c.Radius * k);
-                CopyStyle(c, made);
-            }
             if (made != null) pairs.Add((e, made));
         }
         return pairs;
-    }
-
-    private static void CopyStyle(Entity from, Entity to)
-    {
-        to.Color = from.Color;
-        to.Tag = from.Tag;
-        to.LineWeight = from.LineWeight;
     }
 }

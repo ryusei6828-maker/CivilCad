@@ -10,7 +10,7 @@
         </StackPanel>
         <TextBlock x:Name="InfoText" Margin="0,8,0,0" Foreground="Gray" TextWrapping="Wrap"/>
         <CheckBox x:Name="KeepPaperCheck" Margin="0,10,0,0" IsChecked="True">
-            <TextBlock TextWrapping="Wrap" Text="図枠・文字・記号を新しい縮尺に合わせる (用紙上の大きさを保つ。A3 の図枠なら 1:100 で 38m、1:250 で 95m)"/>
+            <TextBlock TextWrapping="Wrap" Text="図枠を新しい縮尺に合わせる (A3 の図枠なら 1:100 で 38m、1:250 で 95m。表題欄の縮尺も書き換え)。図枠以外の文字・線などは画面上の大きさのまま"/>
         </CheckBox>
         <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="Gray"
                    Text="図面は実寸 (m) で描いているので、線・円などの図形と計測の値は縮尺を変えても変わりません。縮尺は、印刷するときの大きさと、文字の高さ・図枠・記号など「用紙上の mm」で決まる物の換算に使います。"/>
