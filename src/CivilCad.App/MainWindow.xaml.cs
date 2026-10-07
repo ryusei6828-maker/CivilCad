@@ -111,6 +111,8 @@ public partial class MainWindow : Window
             _propsDock.ShuttingDown = _layerDock.ShuttingDown = true;
             SaveSettingsQuietly();
         };
+        // 本体を閉じたらアプリを終える (隠れているフロートのパネルなどが残ってプロセスが終わらないことがあった)
+        Closed += (_, _) => Application.Current?.Shutdown();
         OnPanelStateChanged();
     }
 
