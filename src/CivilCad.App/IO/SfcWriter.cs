@@ -271,6 +271,12 @@ public static class SfcWriter
                     }
                     break;
 
+                case PointEntity pt:
+                    // 点マーカー (既定義の点マーカーのコード: 3 = 点。読み込んだ別のマーカーはそのコードのまま)
+                    var pp = map(pt.Position);
+                    Feature($"point_marker_feature({Q(layer)},{Q(color)},{Q(pp.X)},{Q(pp.Y)},{Q(SfcIO.MarkerCode(pt))},{Q(0.0)},{Q(1.0)})");
+                    break;
+
                 case CircleEntity c:
                     var cc = map(c.Center);
                     Feature($"circle_feature({head},{Q(cc.X)},{Q(cc.Y)},{Q(c.Radius * lengthScale)})");

@@ -416,7 +416,24 @@ public sealed class CadCanvas : FrameworkElement
             case ImageEntity img:
                 DrawImage(dc, img, color, selected);
                 break;
+            case PointEntity pt:
+                DrawPoint(dc, pt, color, selected, pen);
+                break;
         }
+    }
+
+    // ---- 点 ----
+
+    /// <summary>点の印の半径 (画面 px)。拡大率によらず同じ大きさ。</summary>
+    public const double PointRadiusPx = 2.5;
+
+    /// <summary>点: 大きさ一定の黒丸 (線幅が太ければ少し大きく)。選択中は周りに破線の丸。</summary>
+    private void DrawPoint(DrawingContext dc, PointEntity pt, RgbColor color, bool selected, Pen pen)
+    {
+        var c = WorldToScreen(pt.Position);
+        var r = Math.Max(PointRadiusPx, pen.Thickness / 2 + 1);
+        dc.DrawEllipse(GetBrush(color), null, c, r, r);
+        if (selected) dc.DrawEllipse(null, pen, c, r + 4, r + 4);
     }
 
     // ---- 画像 ----

@@ -16,6 +16,17 @@ namespace CivilCad.App.IO;
 /// </summary>
 public static partial class SfcIO
 {
+    /// <summary>既定義の点マーカーのコード (1 asterisk, 2 circle, 3 dot, 4 plus, 5 square, 6 triangle, 7 x)。点は dot。</summary>
+    public const int DotMarker = 3;
+
+    /// <summary>点以外の点マーカーから作った点の Tag (後ろにコード)。</summary>
+    public const string MarkerTagPrefix = "SXF:MARKER:";
+
+    /// <summary>点を書くときのマーカーのコード。</summary>
+    public static int MarkerCode(PointEntity p) =>
+        p.Tag is { } tag && tag.StartsWith(MarkerTagPrefix, StringComparison.Ordinal) &&
+        int.TryParse(tag[MarkerTagPrefix.Length..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var c) && c is >= 1 and <= 7 ? c : DotMarker;
+
     /// <param name="Sheet">用紙の範囲 (図面座標 m)。drawing_sheet_feature が無ければ null。</param>
     public sealed record LoadResult(int Entities, int Skipped, double ScaleDenominator, IReadOnlyDictionary<string, int> SkippedKinds, Box2? Sheet = null);
 
@@ -311,11 +322,9 @@ public static partial class SfcIO
                     break;
 
                 case "point_marker_feature":
-                    // 点マーカーは用紙上 1mm の × 印で表す
-                    var c = t.Apply(P(a[2], a[3]));
-                    var s = 0.5 * _paperMmToMeter;
-                    Add(new LineEntity(L(a[0]), c + new Vec2(-s, -s), c + new Vec2(s, s)), a[1], null);
-                    Add(new LineEntity(L(a[0]), c + new Vec2(-s, s), c + new Vec2(s, -s)), a[1], null);
+                    // 点マーカーは点にする (点 (3) 以外のマーカーはコードを Tag に残し、保存で元に戻す)
+                    var marker = int.TryParse(a[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out var mc) ? mc : DotMarker;
+                    Add(new PointEntity(L(a[0]), t.Apply(P(a[2], a[3]))) { Tag = marker == DotMarker ? null : MarkerTagPrefix + marker }, a[1], null);
                     break;
 
                 case "text_string_feature":

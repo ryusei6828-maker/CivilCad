@@ -22,9 +22,9 @@ public class JwwTests
         Assert.Equal(50, doc.ScaleDenominator);
         // 線 32 + 寸法 (寸法線・補助線 2) 3 + ブロック MARK ×4 の線 8
         Assert.Equal(43, Count<LineEntity>(doc));
-        // 円 1 + ブロックの円 4 + 実点 3 (仮点は読まない)
-        Assert.Equal(8, Count<CircleEntity>(doc));
-        Assert.Equal(3, doc.Entities.OfType<CircleEntity>().Count(c => c.Tag == JwwIO.PointTag));
+        // 円 1 + ブロックの円 4。実点 3 は点 (仮点は読まない)
+        Assert.Equal(5, Count<CircleEntity>(doc));
+        Assert.Equal(3, Count<PointEntity>(doc));
         Assert.Equal(1, Count<ArcEntity>(doc));
         Assert.Equal(2, Count<PolylineEntity>(doc)); // 楕円と楕円弧
         Assert.Equal(14, Count<TextEntity>(doc));
@@ -95,7 +95,8 @@ public class JwwTests
         doc.Entities.Add(new TextEntity(text, new Vec2(-34940, 12130), "No.1+5.000 測点", 1.75, 0.2));
         doc.Entities.Add(new LineEntity(hidden, new Vec2(-34950, 12000), new Vec2(-34900, 12000)));
         doc.Entities.Add(new HatchEntity(center, [[new Vec2(-34950, 12150), new Vec2(-34930, 12150), new Vec2(-34930, 12160), new Vec2(-34940, 12155), new Vec2(-34950, 12160)]], [], solid: true));
-        doc.Entities.Add(new CircleEntity(center, new Vec2(-34920, 12140), 0.0625) { Tag = JwwIO.PointTag });
+        doc.Entities.Add(new PointEntity(center, new Vec2(-34920, 12140)));
+        doc.Entities.Add(new CircleEntity(center, new Vec2(-34925, 12140), 0.0625) { Tag = JwwIO.PointTag }); // 以前の版の点の印も実点で書く
 
         var path = Temp(".jww");
         try
@@ -118,7 +119,9 @@ public class JwwTests
             var arc = Assert.Single(loaded.Entities.OfType<ArcEntity>());
             Assert.Equal(0.3, arc.StartAngle, 9);
             Assert.Equal(2.5, arc.EndAngle, 9);
-            Assert.Single(loaded.Entities.OfType<CircleEntity>(), c => c.Tag == JwwIO.PointTag);
+            Assert.Equal(2, loaded.Entities.OfType<PointEntity>().Count());
+            Assert.Contains(loaded.Entities.OfType<PointEntity>(), p => p.Position.DistanceTo(new Vec2(-34920, 12140)) < 1e-6);
+            Assert.DoesNotContain(loaded.Entities.OfType<CircleEntity>(), c => c.Tag == JwwIO.PointTag);
 
             // ポリラインは線分 (閉じているので 3 本)
             Assert.Equal(1 + 3 + 1, loaded.Entities.OfType<LineEntity>().Count());

@@ -518,8 +518,7 @@ public static partial class JwwIO
                     break;
                 case Ten t:
                     if (t.Kari) break; // 仮点は印刷されない
-                    // 実点は用紙上 φ0.5mm の小さな円で表す
-                    Add(f, new CircleEntity(layer, W(t.P), 0.25 * k) { Tag = PointTag });
+                    Add(f, new PointEntity(layer, W(t.P)));
                     break;
                 case Moji t:
                     EmitText(t, layer, W, k * lengthScale, m);
@@ -699,7 +698,7 @@ public static partial class JwwIO
     [GeneratedRegex(@"CivilCad 原点 ([-+0-9.Ee]+),([-+0-9.Ee]+)")]
     private static partial Regex OriginMemoRegex();
 
-    /// <summary>JWW の実点から作った円の印。保存すると実点に戻す。</summary>
+    /// <summary>以前の版で JWW の実点から作った円の印。保存すると実点に戻す (今は点 (PointEntity) として読む)。</summary>
     public const string PointTag = "JWW:POINT";
 
     /// <summary>JWW でハッチ属性の付いていた線。</summary>

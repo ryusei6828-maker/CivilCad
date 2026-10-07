@@ -143,6 +143,15 @@
         <GeometryDrawing Brush="{StaticResource IcoInk}" Geometry="{StaticResource PencilTip}"/>
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
+    <DrawingImage x:Key="IconPoint" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Brush="{StaticResource IcoBlue}">
+            <GeometryDrawing.Geometry><EllipseGeometry Center="7,17" RadiusX="2.2" RadiusY="2.2"/></GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="{StaticResource IcoPencil}" Pen="{StaticResource IcoInkPen}" Geometry="{StaticResource PencilBody}"/>
+        <GeometryDrawing Brush="{StaticResource IcoInk}" Geometry="{StaticResource PencilTip}"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <DrawingImage x:Key="IconArc" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
         <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M2,22 A9,9 0 0 1 10,15"/>

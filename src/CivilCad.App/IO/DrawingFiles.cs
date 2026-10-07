@@ -65,7 +65,7 @@ public static class DrawingFiles
             case ".dwg":
             {
                 var skipped = DwgIO.Load(doc, path);
-                return new OpenResult(skipped > 0 ? $"  ※未対応の図形 {skipped} 個は読み込んでいません (寸法・点など)。ブロックは分解して読み込みました" : "", null);
+                return new OpenResult(skipped > 0 ? $"  ※未対応の図形 {skipped} 個は読み込んでいません (寸法など)。ブロックは分解して読み込みました" : "", null);
             }
             default:
             {

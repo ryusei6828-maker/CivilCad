@@ -122,6 +122,9 @@ public static class DwgIO
                 case Polyline2D pl:
                     made.Add(new PolylineEntity(layer, ExpandBulges(pl.Vertices.Select(v => (V(v.Location), v.Bulge)).ToList(), pl.IsClosed), pl.IsClosed));
                     break;
+                case ACadSharp.Entities.Point pt:
+                    made.Add(new PointEntity(layer, V(pt.Location)));
+                    break;
                 case Arc a: // Arc は Circle を継承しているので先に判定する
                     made.Add(new ArcEntity(layer, V(a.Center), a.Radius, a.StartAngle, a.EndAngle));
                     break;

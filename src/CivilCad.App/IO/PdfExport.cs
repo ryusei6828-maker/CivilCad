@@ -69,6 +69,9 @@ public static class PdfExport
     private const float PtPerMm = 72f / 25.4f;
     private const double Margin = 20; // 図枠が無いときの用紙余白 (mm)
 
+    /// <summary>点を印刷する黒丸の直径 (用紙 mm)。</summary>
+    public const double PointDiameterMm = 0.5;
+
     /// <summary>用紙 (幅・高さ mm) と、用紙の左下に当たる図面座標 (m)、用紙 1mm が図面で何 m か。</summary>
     public sealed record Layout(string PaperName, double Width, double Height, Vec2 Origin, double MetersPerMm);
 
@@ -288,6 +291,14 @@ public static class PdfExport
                 case CircleEntity c:
                     canvas.DrawCircle(P(c.Center), Len(c.Radius), paint);
                     break;
+                case PointEntity pt:
+                {
+                    // 点は用紙上 φ0.5mm (線幅が太ければ線幅の 2 倍) の黒丸
+                    var d = Math.Max(PointDiameterMm, 2 * (e.LineWeight ?? 0));
+                    using var dot = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Color = Color(e) };
+                    canvas.DrawCircle(P(pt.Position), (float)(d / 2 * PtPerMm), dot);
+                    break;
+                }
                 case ArcEntity a:
                 {
                     var c = P(a.Center);

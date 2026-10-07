@@ -87,7 +87,7 @@ public static class SnapFinder
         SnapKind.Midpoint => "中点",
         SnapKind.Center => "中心",
         SnapKind.Quadrant => "四半円点",
-        SnapKind.Node => "挿入点",
+        SnapKind.Node => "点・挿入点",
         SnapKind.Intersection => "交点",
         SnapKind.Perpendicular => "垂線の足",
         SnapKind.Tangent => "接点",

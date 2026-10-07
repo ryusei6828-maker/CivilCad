@@ -193,6 +193,15 @@ public static partial class JwwIO
             _a.U16(flag);
         }
 
+        /// <summary>実点 (CDataTen)。</summary>
+        private void Ten(Entity e, Vec2 p) => _figures.Add(() =>
+        {
+            _a.Tag("CDataTen");
+            Base(e);
+            _a.P(Paper(p));
+            _a.U32(0);
+        });
+
         private void Sen(Entity e, Vec2 a, Vec2 b, int flag = 0) => _figures.Add(() =>
         {
             _a.Tag("CDataSen");
@@ -213,14 +222,11 @@ public static partial class JwwIO
                     foreach (var (a, b) in pl.Segments)
                         if (a.DistanceTo(b) > 0) Sen(e, a, b);
                     break;
+                case PointEntity pt:
+                    Ten(e, pt.Position);
+                    break;
                 case CircleEntity c when c.Tag == PointTag:
-                    _figures.Add(() =>
-                    {
-                        _a.Tag("CDataTen");
-                        Base(e);
-                        _a.P(Paper(c.Center));
-                        _a.U32(0);
-                    });
+                    Ten(e, c.Center);
                     break;
                 case CircleEntity c:
                     Enko(e, c.Center, c.Radius, 0, GeoMath.TwoPi, full: true);

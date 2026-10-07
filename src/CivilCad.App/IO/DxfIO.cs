@@ -40,6 +40,7 @@ public static class DxfIO
                 LineEntity l => new Line(V(l.Start), V(l.End)),
                 PolylineEntity pl => new Polyline2D(pl.Points.Select(p => new Polyline2DVertex(V(p))), pl.IsClosed),
                 CircleEntity c => new Circle(V(c.Center), c.Radius),
+                PointEntity pt => new netDxf.Entities.Point(V(pt.Position)),
                 ArcEntity a => new Arc(V(a.Center), a.Radius, GeoMath.NormalizeAngle(a.StartAngle) * Deg, GeoMath.NormalizeAngle(a.EndAngle) * Deg),
                 TextEntity t => ToDxfText(t),
                 HatchEntity h when h.Loops.Count > 0 => ToDxfHatch(h),
@@ -104,6 +105,8 @@ public static class DxfIO
             Add(o, new LineEntity(LayerOf(o), V(o.StartPoint), V(o.EndPoint)));
         foreach (var o in dxf.Entities.Polylines2D)
             Add(o, new PolylineEntity(LayerOf(o), ExpandBulges(o), o.IsClosed));
+        foreach (var o in dxf.Entities.Points)
+            Add(o, new PointEntity(LayerOf(o), new Vec2(o.Position.X, o.Position.Y)));
         foreach (var o in dxf.Entities.Circles)
             Add(o, new CircleEntity(LayerOf(o), V(o.Center), o.Radius));
         foreach (var o in dxf.Entities.Arcs)

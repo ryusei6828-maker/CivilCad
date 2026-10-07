@@ -186,6 +186,15 @@ public sealed class PropertiesPanel : UserControl
                 if (p.Filled) AddReadOnly("塗りつぶし", "あり");
                 break;
 
+            case PointEntity pt:
+                AddEditable("x (m)", pt.Position.X.ToString("F3"), s =>
+                    TryNumber(s, out var x) && Apply(e2 => ((PointEntity)e2).Position = new Vec2(x, ((PointEntity)e2).Position.Y), "点の移動"));
+                AddEditable("y (m)", pt.Position.Y.ToString("F3"), s =>
+                    TryNumber(s, out var y) && Apply(e2 => ((PointEntity)e2).Position = new Vec2(((PointEntity)e2).Position.X, y), "点の移動"));
+                var (sx, sy) = pt.Position.ToSurvey();
+                AddReadOnly("測量座標", $"X {sx:F3}, Y {sy:F3}");
+                break;
+
             case CircleEntity c:
                 AddReadOnly("中心", Xy(c.Center));
                 AddEditable("半径 (m)", c.Radius.ToString("F3"), s =>
@@ -592,6 +601,7 @@ public sealed class PropertiesPanel : UserControl
         PolylineEntity { Filled: true } => "塗りつぶし",
         PolylineEntity => "ポリライン",
         CircleEntity => "円",
+        PointEntity => "点",
         ArcEntity => "円弧",
         TextEntity => "文字",
         HatchEntity => "ハッチング",
@@ -608,6 +618,9 @@ public sealed class PropertiesPanel : UserControl
 
     private static bool TryPositive(string s, out double v) =>
         double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out v) && v > 0;
+
+    private static bool TryNumber(string s, out double v) =>
+        double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out v) && double.IsFinite(v);
 
     private static Brush Frozen(Brush b)
     {

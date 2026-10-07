@@ -163,6 +163,9 @@ public static class P21IO
                     Fill(I(a[0]), I(a[2 + n]), Ints(a[4 + n]), styles);
                     break;
                 }
+                case "point_marker_feature":
+                    Marker(I(a[0]), I(a[1]), D(a[2]), D(a[3]), I(a[4]), D(a[5]), D(a[6]));
+                    break;
                 case "text_string_feature":
                     Text(I(a[0]), I(a[1]), a[3], D(a[4]), D(a[5]), D(a[6]), D(a[7]), D(a[8]), D(a[9]), D(a[10]), I(a[11]), I(a[12]));
                     break;
@@ -260,6 +263,23 @@ public static class P21IO
                 $"TEXT_STYLE_WITH_SPACING(LENGTH_MEASURE({StepWriter.F(spc)}))");
             var style = _p.E($"PRESENTATION_STYLE_ASSIGNMENT(({ts}))");
             Occurrence(layer, "ANNOTATION_TEXT_OCCURRENCE()", style, lit);
+        }
+
+        /// <summary>点マーカー (既定義の点マーカー記号を SYMBOL_TARGET の位置・角度・倍率で置く)。</summary>
+        private void Marker(int layer, int color, double x, double y, int code, double angleDeg, double scale)
+        {
+            string[] markers = ["asterisk", "circle", "dot", "plus", "square", "triangle", "x"];
+            var symbol = _p.E($"PRE_DEFINED_POINT_MARKER_SYMBOL('{markers[Math.Clamp(code, 1, 7) - 1]}')");
+            var t = angleDeg * Math.PI / 180;
+            var dir = _p.E($"DIRECTION(' ',({StepWriter.A(Math.Cos(t))},{StepWriter.A(Math.Sin(t))}))");
+            var pl = _p.E($"AXIS2_PLACEMENT_2D(' ',{Point(x, y)},{dir})");
+            var k = StepWriter.A(scale > 0 ? scale : 1);
+            var target = _p.E($"SYMBOL_TARGET(' ',{pl},{k},{k})");
+            var defined = _p.E($"DEFINED_SYMBOL(' ',{symbol},{target})");
+            var sc = _p.E($"SYMBOL_COLOUR({Colour(color)})");
+            var ss = _p.E($"SYMBOL_STYLE(' ',{sc})");
+            var style = _p.E($"PRESENTATION_STYLE_ASSIGNMENT(({ss}))");
+            Occurrence(layer, "ANNOTATION_SYMBOL_OCCURRENCE()", style, defined);
         }
 
         private void Occurrence(int layer, string kind, string style, string item)

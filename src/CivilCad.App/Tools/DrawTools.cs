@@ -388,3 +388,40 @@ public sealed class TextTool : CadTool, IStyledDrawTool
         ? new TextEntity(layer, pos, text, DefaultScreenPx / pixelsPerMeter) { ScreenHeightPx = DefaultScreenPx }
         : new TextEntity(layer, pos, text, Doc.PaperMmToMeters(DefaultHeightMm));
 }
+
+/// <summary>
+/// 点。クリック、または座標の入力 (x,y / @dx,dy / sX,Y の測量座標) で置く。続けて置ける (Esc で終了)。
+/// 「一つ戻す」で直前に置いた点を取り消す。
+/// </summary>
+public sealed class PointTool : CadTool, IStyledDrawTool
+{
+    private readonly List<(IUndoableCommand Command, PointEntity Point)> _placed = [];
+
+    public override string Name => "点";
+
+    /// <summary>相対座標 (@) は直前に置いた点から。</summary>
+    public override Vec2? BasePoint => _placed.Count > 0 ? _placed[^1].Point.Position : null;
+
+    public override bool CanStepBack => _placed.Count > 0;
+
+    protected override void OnActivated() =>
+        SetPrompt("点の位置を指定 (座標の入力も可: x,y / @dx,dy / s X,Y は測量座標)" + (_placed.Count > 0 ? $"  {_placed.Count} 点を配置" : ""));
+
+    public override void OnPoint(Vec2 p)
+    {
+        var point = Styled(new PointEntity(Doc.CurrentLayer, p));
+        var command = new AddEntitiesCommand([point], "点");
+        Execute(command);
+        _placed.Add((command, point));
+        OnActivated();
+    }
+
+    public override void StepBack()
+    {
+        if (_placed.Count == 0) return;
+        var (command, point) = _placed[^1];
+        _placed.RemoveAt(_placed.Count - 1);
+        Retract(command, [point]);
+        OnActivated();
+    }
+}

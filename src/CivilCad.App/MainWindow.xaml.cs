@@ -129,6 +129,7 @@ public partial class MainWindow : Window
             case "C": StartTool(new CircleTool(), c); break;
             case "A": StartTool(new ArcTool(), c); break;
             case "T": StartTool(new TextTool(), c); break;
+            case "PO": StartTool(new PointTool(), c); break;
             case "PE": StartTool(new PerpendicularTool(), c); break;
             case "FI": StartTool(new HatchTool(fill: true), c); break;
             case "PS": StartTool(new PresetTool(), c); break;
