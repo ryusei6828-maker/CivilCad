@@ -214,12 +214,25 @@ public sealed class PropertiesPanel : UserControl
                         sx.SizeMm = mm;
                         sx.Size = Doc.PaperMmToMeters(mm);
                     }, "プリセットの大きさ変更"), "用紙上の大きさ。縮尺を変えても用紙上の大きさは変わらない");
-                if (sym.Definition.PointsNorth)
+                if (sym.Definition.PointsNorth && sym.AutoNorth)
                 {
-                    // 方位記号の向きは常に北 (変更できない)
-                    AddReadOnly("向き", Tools.PresetTool.NorthText(Doc));
+                    // 自動: 向きは常に北。角度を入れると手動になる
+                    AddReadOnly("向き", $"自動: {Tools.PresetTool.NorthText(Doc)}");
                     if (Math.Abs(sym.Rotation) > 1e-12)
                         AddReadOnly("座標北との差", $"{Angles.ToDms(Math.Abs(sym.Rotation))} {(sym.Rotation > 0 ? "西" : "東")}へ");
+                    AddEditable("手動の向き (°)", "", s =>
+                        double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var deg) &&
+                        Apply(x => { var sx = (SymbolEntity)x; sx.AutoNorth = false; sx.Rotation = deg * Math.PI / 180; }, "方位記号の向き (手動)"),
+                        "角度を入れると手動になる (図面の上 = 0、反時計回り)。北に戻すには 自動セット (NA)");
+                }
+                else if (sym.Definition.PointsNorth)
+                {
+                    AddEditable("向き (°, 手動)", Deg(sym.Rotation).ToString("0.###", CultureInfo.InvariantCulture), s =>
+                        s.Trim() == "自動"
+                            ? Apply(x => ((SymbolEntity)x).AutoNorth = true, "方位記号を北に合わせる")
+                            : double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var deg) &&
+                              Apply(x => ((SymbolEntity)x).Rotation = deg * Math.PI / 180, "方位記号の向き (手動)"),
+                        "手動の向き。図面の上 = 0、反時計回り。北に戻すには「自動」と入力するか 自動セット (NA)");
                 }
                 else
                 {

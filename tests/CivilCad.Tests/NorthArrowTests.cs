@@ -1,5 +1,6 @@
 using CivilCad.Alignment;
 using CivilCad.App;
+using CivilCad.App.Tools;
 using CivilCad.Core.Commands;
 using CivilCad.Core.Geometry;
 using CivilCad.Core.Model;
@@ -55,6 +56,64 @@ public class NorthArrowTests
         Assert.True(mark.Rotation < -0.003);
         doc.History.Execute(new SetPlaneZoneCommand(null));
         Assert.Equal(0, mark.Rotation);
+    }
+
+    [Fact]
+    public void ManualThenAutoSet() => RunSta(() =>
+    {
+        MainWindow.RegisterTrueNorth();
+        var doc = new CadDocument { ScaleDenominator = 500 };
+        doc.History.Execute(new SetPlaneZoneCommand(9));
+        var p = new Vec2(50000, 0);
+        doc.History.Execute(new AddEntitiesCommand([new SymbolEntity(doc.CurrentLayer, SymbolLibrary.NorthArrow, p, 20, 10)]));
+        var canvas = new CivilCad.App.Views.CadCanvas { Document = doc };
+        canvas.SetSelection(doc.Entities);
+
+        // 手動: 東 (右) をクリック → N が東を向く (図面の上から -90°)
+        var tool = new NorthManualTool();
+        canvas.SetTool(tool);
+        tool.OnPoint(p + new Vec2(10, 0));
+        var mark = doc.Entities.OfType<SymbolEntity>().Single();
+        Assert.False(mark.AutoNorth);
+        Assert.Equal(-Math.PI / 2, mark.Rotation, 9);
+
+        // 手動のものは移動・回転しても北に戻らない (回転した分だけ回る)
+        doc.History.Execute(new TranslateEntitiesCommand([mark], new Vec2(-100000, 0)));
+        Assert.Equal(-Math.PI / 2, mark.Rotation, 9);
+        doc.History.Execute(new RotateTranslateCommand([mark], mark.Position, Math.PI / 2, Vec2.Zero));
+        Assert.Equal(0, mark.Rotation, 9);
+
+        // 自動セット (選択なし → 手動の方位記号すべて) → 北に戻る、元に戻すで手動に戻る
+        Assert.Equal(1, NorthArrows.SetAuto(doc, []));
+        mark = doc.Entities.OfType<SymbolEntity>().Single();
+        Assert.True(mark.AutoNorth);
+        Assert.Equal(doc.NorthRotation(mark.Position), mark.Rotation, 9);
+        Assert.True(mark.Rotation < -0.003);
+        doc.History.Undo();
+        mark = doc.Entities.OfType<SymbolEntity>().Single();
+        Assert.False(mark.AutoNorth);
+        Assert.Equal(0, mark.Rotation, 9);
+
+        // 角度の入力でも手動にできる
+        canvas.SetSelection([mark]);
+        var tool2 = new NorthManualTool();
+        canvas.SetTool(tool2);
+        Assert.True(tool2.OnText("30"));
+        Assert.Equal(30 * Deg, doc.Entities.OfType<SymbolEntity>().Single().Rotation, 9);
+    });
+
+    private static void RunSta(Action action)
+    {
+        Exception? error = null;
+        var t = new Thread(() =>
+        {
+            try { action(); }
+            catch (Exception ex) { error = ex; }
+        });
+        t.SetApartmentState(ApartmentState.STA);
+        t.Start();
+        t.Join();
+        if (error != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();
     }
 
     [Fact]

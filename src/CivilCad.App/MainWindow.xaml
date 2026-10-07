@@ -51,6 +51,8 @@
                 <MenuItem Header="塗りつぶし (FI)" Tag="FI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFill}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="プリセット (方位記号など) (PS)" Tag="PS" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPreset}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="選択した図形をプリセットに登録 (PSR)" Tag="PSR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPresetAdd}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="方位記号の向き (手動) (NM)" Tag="NM" Click="Tool_Click"/>
+                <MenuItem Header="方位記号を北に合わせる (自動セット) (NA)" Tag="NA" Click="Tool_Click"/>
             </MenuItem>
             <MenuItem Header="図面(_Z)">
                 <MenuItem Header="図枠 (外枠・表題欄) (FR)..." Tag="FR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFrame}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>

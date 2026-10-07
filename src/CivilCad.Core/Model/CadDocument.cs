@@ -160,11 +160,11 @@ public sealed class CadDocument : INotifyPropertyChanged
     public double NorthRotation(Vec2 p) =>
         UseTrueNorth && PlaneZone is int zone && TrueNorthProvider?.Invoke(zone, p) is double r && double.IsFinite(r) ? r : 0;
 
-    /// <summary>方位記号の向きを、置いてある位置の北に合わせる (移動・回転・系の変更のたびに呼ばれる)。</summary>
+    /// <summary>方位記号 (自動のもの) の向きを、置いてある位置の北に合わせる (移動・回転・系の変更のたびに呼ばれる)。</summary>
     public void AlignNorthArrows()
     {
         foreach (var e in Entities)
-            if (e is SymbolEntity s && s.Definition.PointsNorth) s.Rotation = NorthRotation(s.Position);
+            if (e is SymbolEntity { AutoNorth: true } s && s.Definition.PointsNorth) s.Rotation = NorthRotation(s.Position);
     }
 
     public bool IsVisible(Entity e) => e.Layer.IsVisible;

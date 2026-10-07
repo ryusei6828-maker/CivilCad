@@ -194,6 +194,9 @@ public sealed class SymbolEntity(Layer layer, string kind, Vec2 position, double
 
     public double Rotation { get; set; } = rotation;
 
+    /// <summary>方位記号のとき: true = 向きを常に北に合わせる (自動)、false = Rotation のまま (手動)。</summary>
+    public bool AutoNorth { get; set; } = true;
+
     public SymbolDefinition Definition => SymbolLibrary.Get(Kind);
 
     /// <summary>記号の座標 → 図面の座標。</summary>
@@ -269,7 +272,7 @@ public sealed class SymbolEntity(Layer layer, string kind, Vec2 position, double
         Rotation += rad;
     }
 
-    public override Entity Clone() => CopyPropertiesTo(new SymbolEntity(Layer, Kind, Position, SizeMm, Size, Rotation));
+    public override Entity Clone() => CopyPropertiesTo(new SymbolEntity(Layer, Kind, Position, SizeMm, Size, Rotation) { AutoNorth = AutoNorth });
 
     public override IEnumerable<SnapPoint> SnapPoints => [new(Position, SnapKind.Node)];
 }

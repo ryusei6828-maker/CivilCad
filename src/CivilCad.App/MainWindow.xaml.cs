@@ -128,6 +128,12 @@ public partial class MainWindow : Window
             case "FI": StartTool(new HatchTool(fill: true), c); break;
             case "PS": StartTool(new PresetTool(), c); break;
             case "PSR": StartTool(new PresetRegisterTool(AskPresetName), c); break;
+            case "NM": StartTool(new NorthManualTool(), c); break;
+            case "NA":
+                var count = NorthArrows.SetAuto(_doc, Canvas.Selection);
+                Log(count > 0 ? $"方位記号 {count} 個を北に合わせました (自動: 移動・回転しても北を指します)。"
+                              : "北に合わせる方位記号がありません (手動にした方位記号は無く、方位記号も選択されていません)。");
+                break;
             case "J": JoinSelection(); break;
             case "H": StartTool(new HatchTool(), c); break;
             case "PI": ImportPoints(); break;
