@@ -131,6 +131,7 @@ public partial class MainWindow : Window
             case "C": StartTool(new CircleTool(), c); break;
             case "A": StartTool(new ArcTool(), c); break;
             case "T": StartTool(new TextTool(), c); break;
+            case "REC" or "RECT": StartTool(new RectangleTool(), "REC"); break;
             case "PO": StartTool(new PointTool(), c); break;
             case "PE": StartTool(new PerpendicularTool(), c); break;
             case "FI": StartTool(new HatchTool(fill: true), c); break;
@@ -322,7 +323,7 @@ public partial class MainWindow : Window
         else if (tool.OnText(text))
         {
         }
-        else if (CoordinateInput.TryParse(text, tool.BasePoint, out var p))
+        else if (CoordinateInput.TryParse(text, tool.BasePoint, out var p, _doc))
         {
             tool.OnPoint(p);
         }
@@ -1345,7 +1346,7 @@ public partial class MainWindow : Window
     {
         var ext = _doc.VisibleExtents();
         var dlg = new ZoneWindow(_doc.PlaneZone, _settings.DefaultPlaneZone == _doc.PlaneZone && _doc.PlaneZone != null,
-            ext.IsEmpty ? null : ext.Center) { Owner = this };
+            ext.IsEmpty ? null : _doc.ToSurveyCad(ext.Center)) { Owner = this }; // 確認に使う図面の中心は測量座標で
         if (dlg.ShowDialog() != true) return;
         if (dlg.Result != _doc.PlaneZone) _doc.History.Execute(new SetPlaneZoneCommand(dlg.Result));
         if (dlg.MakeDefault)
@@ -1369,15 +1370,15 @@ public partial class MainWindow : Window
 
     private void UpdateCoordinates()
     {
-        var p = Canvas.CursorWorld;
+        var (sx, sy) = _doc.ToSurvey(Canvas.CursorWorld); // 測量座標 (座標設定の向きを含む)
         var snap = Canvas.CurrentSnap is { } s ? $"  [{SnapFinder.Label(s.Kind)}]" : "";
         var latLon = "";
         if (_doc.PlaneZone is int n && PlaneRectangular.Find(n) is { } zone)
         {
-            var (lat, lon) = PlaneRectangular.ToLatLon(zone, p.Y, p.X);
+            var (lat, lon) = PlaneRectangular.ToLatLon(zone, sx, sy);
             latLon = $"   北緯 {PlaneRectangular.ToDms(lat, 2)}  東経 {PlaneRectangular.ToDms(lon, 2)}";
         }
-        CoordText.Text = $"X(北) {p.Y,13:F3}  Y(東) {p.X,13:F3}{latLon}{snap}";
+        CoordText.Text = $"X(北) {sx,13:F3}  Y(東) {sy,13:F3}{latLon}{snap}";
     }
 
     private void Log(string message)

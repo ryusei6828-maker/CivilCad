@@ -35,7 +35,7 @@ public sealed class PointImportOptions
         var list = new List<Entity>();
         foreach (var p in file.Points)
         {
-            var c = Vec2.FromSurvey(p.X, p.Y);
+            var c = doc.FromSurvey(p.X, p.Y); // 座標設定の向きで図面上の点に
             list.Add(new CircleEntity(layer, c, r) { Tag = "POINT:" + p.Label });
             var x = c.X + r * 1.5;
             if (ShowName && p.Label.Length > 0)
@@ -49,7 +49,7 @@ public sealed class PointImportOptions
             foreach (var p in file.Points) byNumber.TryAdd(p.Number, p);
             foreach (var (_, numbers) in file.Lots)
             {
-                var pts = numbers.Where(byNumber.ContainsKey).Select(n => Vec2.FromSurvey(byNumber[n].X, byNumber[n].Y)).ToList();
+                var pts = numbers.Where(byNumber.ContainsKey).Select(n => doc.FromSurvey(byNumber[n].X, byNumber[n].Y)).ToList();
                 if (pts.Count >= 2) list.Add(new PolylineEntity(layer, pts, pts.Count >= 3));
             }
         }

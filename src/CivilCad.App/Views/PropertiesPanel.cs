@@ -174,7 +174,7 @@ public sealed class PropertiesPanel : UserControl
                     TryPositive(s, out var len) && l.Length > 0 &&
                     Apply(x => ((LineEntity)x).End = l.Start + (l.End - l.Start).Normalized() * len, "長さ変更"));
                 var d = l.End - l.Start;
-                AddReadOnly("方向角", Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle)));
+                AddReadOnly("方向角", Angles.ToDms(Angles.ToSurveyAzimuth(Doc.ToSurveyAngle(d.Angle)))); // 測量座標の向きで
                 AddReadOnly("Δx / Δy", $"{d.X:F3} / {d.Y:F3}");
                 break;
 
@@ -191,7 +191,7 @@ public sealed class PropertiesPanel : UserControl
                     TryNumber(s, out var x) && Apply(e2 => ((PointEntity)e2).Position = new Vec2(x, ((PointEntity)e2).Position.Y), "点の移動"));
                 AddEditable("y (m)", pt.Position.Y.ToString("F3"), s =>
                     TryNumber(s, out var y) && Apply(e2 => ((PointEntity)e2).Position = new Vec2(((PointEntity)e2).Position.X, y), "点の移動"));
-                var (sx, sy) = pt.Position.ToSurvey();
+                var (sx, sy) = Doc.ToSurvey(pt.Position);
                 AddReadOnly("測量座標", $"X {sx:F3}, Y {sy:F3}");
                 break;
 

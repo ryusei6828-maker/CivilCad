@@ -209,3 +209,19 @@ public sealed class DrawOrderCommand(IEnumerable<Entity> entities, bool toFront)
         doc.NotifyChanged();
     }
 }
+
+/// <summary>測量座標の向き (座標設定で図面を回さずに持つ角度) を変える。</summary>
+public sealed class SetSurveyFrameCommand(double rotation, Vec2 pivot) : IUndoableCommand
+{
+    private double _oldRotation;
+    private Vec2 _oldPivot;
+    public string Name => "測量座標の向き";
+
+    public void Do(CadDocument doc)
+    {
+        (_oldRotation, _oldPivot) = (doc.SurveyRotation, doc.SurveyPivot);
+        doc.SetSurveyFrame(rotation, pivot);
+    }
+
+    public void Undo(CadDocument doc) => doc.SetSurveyFrame(_oldRotation, _oldPivot);
+}

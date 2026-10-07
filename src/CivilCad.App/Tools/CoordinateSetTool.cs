@@ -102,14 +102,18 @@ public sealed class CoordinateSetTool : CadTool
 
     private void Apply(Vec2? p2, Vec2? s2)
     {
+        // 図面は回さない: 基準点1 が測量座標に来るよう移動するだけにし、2 点の向きの違いは「測量座標の向き」としてシートに持つ
+        // (座標の表示・入力、計測の方向角、座標読込、路線、方位記号はこの向きで計算する)
         var r = ComputeTransform(_p1, _s1, p2, s2);
-        Execute(new RotateTranslateCommand(Doc.Entities.ToList(), _p1, r.Angle, r.Delta, "座標設定"));
+        Execute(new CompositeCommand("座標設定",
+            new TranslateEntitiesCommand(Doc.Entities.ToList(), r.Delta),
+            new SetSurveyFrameCommand(r.Angle, _s1)));
 
         var (x, y) = _s1.ToSurvey();
         var msg = $"座標を設定しました: 基準点1 → X={x:F3}, Y={y:F3}";
         if (p2 != null)
         {
-            msg += $"、回転 {r.Angle * 180 / Math.PI:+0.0000;-0.0000;0}°";
+            msg += $"、測量座標の向き {r.Angle * 180 / Math.PI:+0.0000;-0.0000;0}° (図面は回していません)";
             msg += $"  (2点間: 図面 {r.DrawingDistance:F3} m / 測量 {r.SurveyDistance:F3} m, 差 {r.SurveyDistance - r.DrawingDistance:+0.000;-0.000;0.000} m)";
             if (Math.Abs(r.ScaleRatio - 1) > 0.005)
                 msg += $"  ※距離が {Math.Abs(r.ScaleRatio - 1) * 100:F1}% 違います。縮尺や点の指定を確認してください (大きさは変えていません)";

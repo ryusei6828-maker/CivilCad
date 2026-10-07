@@ -18,6 +18,7 @@ public static class AlignmentDrawer
     {
         var old = doc.Entities.Where(e => e.Tag == input.Tag).ToList();
         var entities = Build(doc, al, input);
+        doc.PlaceFromSurvey(entities); // 路線は測量座標で作るので、座標設定の向きで図面に置く
         return new CompositeCommand($"路線作図 {input.Name}",
             new RemoveEntitiesCommand(old), new AddEntitiesCommand(entities));
     }

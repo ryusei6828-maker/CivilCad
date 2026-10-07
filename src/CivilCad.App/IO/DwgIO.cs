@@ -83,6 +83,9 @@ public static class DwgIO
             doc.Clear();
             if (dwg.Header.DimensionScaleFactor > 1) doc.ScaleDenominator = dwg.Header.DimensionScaleFactor; // 1 以下は未設定とみなす
             if (dwg.Header.UserShort1 is >= 1 and <= 19) doc.PlaneZone = dwg.Header.UserShort1;
+            // 測量座標の向き (CivilCad の DXF と同じ $USERR1〜3)
+            if (dwg.Header.UserDouble1 is var rot && rot != 0 && double.IsFinite(rot) && double.IsFinite(dwg.Header.UserDouble2) && double.IsFinite(dwg.Header.UserDouble3))
+                doc.SetSurveyFrame(rot, new Vec2(dwg.Header.UserDouble2, dwg.Header.UserDouble3));
             foreach (var al in dwg.Layers)
             {
                 var color = ToRgb(al.Color) ?? RgbColor.White;

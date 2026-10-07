@@ -130,6 +130,48 @@ public sealed class CadDocument : INotifyPropertyChanged
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    // ---- 測量座標の向き ----
+
+    /// <summary>
+    /// 測量座標の向き (ラジアン、反時計回り)。座標設定を 2 点で行ったとき、図面は回さずにここへ角度を持つ。
+    /// 図面上の点 p の測量座標 (CAD の向き x=東, y=北) は SurveyPivot を中心に p を SurveyRotation だけ回した位置。0 なら図面の座標がそのまま測量座標。
+    /// </summary>
+    public double SurveyRotation { get; private set; }
+
+    /// <summary>測量座標の向きの回転の中心 (図面座標 = 測量座標が一致する点)。</summary>
+    public Vec2 SurveyPivot { get; private set; }
+
+    /// <summary>測量座標の向きを変える (元に戻すは <see cref="Commands.SetSurveyFrameCommand"/>)。</summary>
+    public void SetSurveyFrame(double rotation, Vec2 pivot)
+    {
+        SurveyRotation = GeoMath.NormalizeSignedAngle(rotation);
+        SurveyPivot = pivot;
+        OnPropertyChanged(nameof(SurveyRotation));
+        NotifyChanged();
+    }
+
+    /// <summary>図面上の点 → 測量座標 (CAD の向き x=東, y=北)。</summary>
+    public Vec2 ToSurveyCad(Vec2 p) => SurveyRotation == 0 ? p : SurveyPivot + (p - SurveyPivot).Rotate(SurveyRotation);
+
+    /// <summary>測量座標 (CAD の向き x=東, y=北) → 図面上の点。</summary>
+    public Vec2 FromSurveyCad(Vec2 s) => SurveyRotation == 0 ? s : SurveyPivot + (s - SurveyPivot).Rotate(-SurveyRotation);
+
+    /// <summary>図面上の点 → 測量座標 (X = 北, Y = 東)。</summary>
+    public (double X, double Y) ToSurvey(Vec2 p) => ToSurveyCad(p).ToSurvey();
+
+    /// <summary>測量座標 (X = 北, Y = 東) → 図面上の点。</summary>
+    public Vec2 FromSurvey(double surveyX, double surveyY) => FromSurveyCad(Vec2.FromSurvey(surveyX, surveyY));
+
+    /// <summary>図面上の向き (東から反時計回り) → 測量座標での向き (東から反時計回り)。方向角はこれを Angles.ToSurveyAzimuth に渡す。</summary>
+    public double ToSurveyAngle(double drawingAngle) => drawingAngle + SurveyRotation;
+
+    /// <summary>測量座標で作った図形 (路線など) を図面に置く向きにする。</summary>
+    public void PlaceFromSurvey(IEnumerable<Entity> entities)
+    {
+        if (SurveyRotation == 0) return;
+        foreach (var e in entities) e.Rotate(SurveyPivot, -SurveyRotation);
+    }
+
     // ---- 北の向き ----
 
     /// <summary>
@@ -156,9 +198,12 @@ public sealed class CadDocument : INotifyPropertyChanged
     /// <summary>真北で求められるか (系が設定されている)。</summary>
     public bool CanUseTrueNorth => PlaneZone != null && TrueNorthProvider != null;
 
-    /// <summary>位置 p での北の向き (図面の上から反時計回り、ラジアン)。</summary>
-    public double NorthRotation(Vec2 p) =>
-        UseTrueNorth && PlaneZone is int zone && TrueNorthProvider?.Invoke(zone, p) is double r && double.IsFinite(r) ? r : 0;
+    /// <summary>
+    /// 位置 p での北の向き (図面の上から反時計回り、ラジアン)。座標北は測量座標の向き (SurveyRotation) の分だけ図面の上からずれ、
+    /// 真北はさらに子午線収差 (系と測量座標の位置から) だけずれる。
+    /// </summary>
+    public double NorthRotation(Vec2 p) => -SurveyRotation +
+        (UseTrueNorth && PlaneZone is int zone && TrueNorthProvider?.Invoke(zone, ToSurveyCad(p)) is double r && double.IsFinite(r) ? r : 0);
 
     /// <summary>方位記号 (自動のもの) の向きを、置いてある位置の北に合わせる (移動・回転・系の変更のたびに呼ばれる)。</summary>
     public void AlignNorthArrows()
@@ -250,6 +295,8 @@ public sealed class CadDocument : INotifyPropertyChanged
         if (!Layers.Contains(layer0)) Layers.Add(layer0);
         OnlyCurrentLayerEditable = false;
         PlaneZone = null;
+        SurveyRotation = 0;
+        SurveyPivot = Vec2.Zero;
         History.Clear();
         NotifyChanged();
     }

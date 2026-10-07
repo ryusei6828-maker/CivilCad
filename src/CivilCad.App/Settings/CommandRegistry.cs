@@ -11,6 +11,7 @@ public static class CommandRegistry
         new("PL", "ポリライン", "IconPolyline"),
         new("C", "円", "IconCircle"),
         new("A", "円弧 (3点)", "IconArc"),
+        new("REC", "矩形", "IconRect", "1 つ目の角 → 対角の角 (「@幅,高さ」でも可) で四角を描く。続けて描ける"),
         new("PO", "点", "IconPoint", "クリックか座標の入力 (x,y / @dx,dy / s X,Y) で点を置く。続けて置ける"),
         new("PE", "垂線", "IconPerpendicular", "基準の線 → 線上の点 → 終点 の順に指定"),
         new("T", "文字", "IconText"),

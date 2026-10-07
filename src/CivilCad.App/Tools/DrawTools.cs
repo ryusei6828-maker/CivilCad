@@ -426,3 +426,62 @@ public sealed class PointTool : CadTool, IStyledDrawTool
         OnActivated();
     }
 }
+
+/// <summary>
+/// 矩形 (REC): 1 つ目の角 → 対角の角 を指定すると、閉じたポリライン (四角) を描く。
+/// 対角は「@幅,高さ」(1 つ目の角から) でも入力できる。続けて描ける (Esc で終了)。
+/// </summary>
+public sealed class RectangleTool : CadTool, IStyledDrawTool
+{
+    private Vec2? _first;
+    private Vec2 _cursor;
+
+    public override string Name => "矩形";
+    public override Vec2? BasePoint => _first;
+    public override bool CanStepBack => _first != null;
+
+    protected override void OnActivated() =>
+        SetPrompt(_first == null ? "矩形の 1 つ目の角を指定" : "対角の角を指定 (「@幅,高さ」で大きさを入力も可。例: @10,5)");
+
+    public override void StepBack()
+    {
+        _first = null;
+        OnActivated();
+    }
+
+    public override void OnPoint(Vec2 p)
+    {
+        if (_first is not Vec2 a)
+        {
+            _first = p;
+            OnActivated();
+            return;
+        }
+        if (Math.Abs(p.X - a.X) < 1e-9 || Math.Abs(p.Y - a.Y) < 1e-9)
+        {
+            Canvas.ShowMessage("矩形: 幅と高さが 0 にならないよう、対角の角を指定してください。");
+            return;
+        }
+        Execute(new AddEntitiesCommand([Styled(new PolylineEntity(Doc.CurrentLayer, Corners(a, p), true))], "矩形"));
+        Canvas.ShowMessage($"矩形を描きました (幅 {Math.Abs(p.X - a.X):0.###} m × 高さ {Math.Abs(p.Y - a.Y):0.###} m)。");
+        _first = null;
+        OnActivated();
+    }
+
+    /// <summary>対角の 2 点から四隅 (反時計回り、1 つ目の角から)。</summary>
+    public static Vec2[] Corners(Vec2 a, Vec2 b)
+    {
+        Vec2[] c = [a, new Vec2(b.X, a.Y), b, new Vec2(a.X, b.Y)];
+        // 反時計回りにそろえる (面積が正)
+        var area = (c[1] - c[0]).Cross(c[2] - c[0]);
+        return area >= 0 ? c : [c[0], c[3], c[2], c[1]];
+    }
+
+    public override void OnMouseMove(Vec2 p) => _cursor = p;
+
+    public override void DrawPreview(DrawingContext dc)
+    {
+        if (_first is not Vec2 a) return;
+        Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen, Corners(a, _cursor), true);
+    }
+}

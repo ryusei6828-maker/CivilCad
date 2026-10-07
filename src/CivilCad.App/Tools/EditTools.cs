@@ -298,8 +298,7 @@ public sealed class ScaleTool : CadTool
 /// <summary>
 /// 2 点指示 (位置合わせ): 選択した図形 (画像など) の上の 2 点を、図面上の 2 点に合わせる。
 /// 元の 1 点目 → 合わせ先の 1 点目 → 元の 2 点目 → 合わせ先の 2 点目 の順に指定すると、
-/// 1 点目どうしが重なるよう移動し、ScaleToFit なら 2 点間の長さも合わせる (拡大縮小)。
-/// 向きはそのまま (回転しない)。RotateToFit なら 2 点目の方向へ回転もする。
+/// 1 点目どうしが重なるよう移動し、2 点目の方向へ回転する。ScaleToFit なら 2 点間の長さも合わせる (拡大縮小)。
 /// </summary>
 public sealed class AlignTool : CadTool
 {
@@ -308,9 +307,6 @@ public sealed class AlignTool : CadTool
 
     /// <summary>2 点間の長さも合わせる (拡大縮小する)。次の 2 点指示でも同じ設定を使う。</summary>
     public static bool ScaleToFit { get; set; } = true;
-
-    /// <summary>2 点目の方向へ回転もする。既定はオフ (向きはそのまま)。次の 2 点指示でも同じ設定を使う。</summary>
-    public static bool RotateToFit { get; set; }
 
     private List<Entity> _targets = [];
     private readonly List<Vec2> _points = [];
@@ -323,15 +319,9 @@ public sealed class AlignTool : CadTool
 
     public override IEnumerable<(string Label, Action Run)> MenuItems =>
     [
-        (ScaleToFit ? "大きさも合わせる: オン → オフにする" : "大きさも合わせる: オフ → オンにする (拡大縮小もする)", () =>
+        (ScaleToFit ? "大きさも合わせる: オン → オフにする (回転と移動だけ)" : "大きさも合わせる: オフ → オンにする (拡大縮小もする)", () =>
         {
             ScaleToFit = !ScaleToFit;
-            UpdatePrompt();
-            Canvas.RedrawOverlay();
-        }),
-        (RotateToFit ? "回転も合わせる: オン → オフにする (向きはそのまま)" : "回転も合わせる: オフ → オンにする (2 点目の方向へ回転する)", () =>
-        {
-            RotateToFit = !RotateToFit;
             UpdatePrompt();
             Canvas.RedrawOverlay();
         }),
@@ -343,7 +333,7 @@ public sealed class AlignTool : CadTool
         UpdatePrompt();
     }
 
-    private static string Mode => "移動" + (ScaleToFit ? "・大きさ" : "") + (RotateToFit ? "・回転" : "、回転しない");
+    private static string Mode => ScaleToFit ? "回転・移動・大きさ" : "回転・移動のみ";
 
     private void UpdatePrompt() => SetPrompt(_points.Count switch
     {
@@ -383,9 +373,8 @@ public sealed class AlignTool : CadTool
         Execute(new ReplaceEntitiesCommand(pairs, "2 点指示"));
         _targets = [.. pairs.Select(x => x.New)];
         Canvas.SetSelection(_targets);
-        Canvas.ShowMessage($"2 点指示: {pairs.Count} 個を " + (RotateToFit ? $"回転 {rad * 180 / Math.PI:0.####}°" : "回転せず") +
-                           (ScaleToFit ? $"、{k:0.######} 倍" : "") + " で合わせました。" +
-                           (!RotateToFit && ScaleToFit ? " (1 点目を合わせ、2 点間の長さで大きさを合わせました。向きを合わせるには右クリックで「回転も合わせる」)" : ""));
+        Canvas.ShowMessage($"2 点指示: {pairs.Count} 個を 回転 {rad * 180 / Math.PI:0.####}°" +
+                           (ScaleToFit ? $"、{k:0.######} 倍" : "") + " で合わせました。");
         // 続けて合わせ直せる (Esc で終了)
         _points.Clear();
         UpdatePrompt();
@@ -396,7 +385,7 @@ public sealed class AlignTool : CadTool
     {
         var vs = s2 - s1;
         var vd = d2 - d1;
-        var rad = RotateToFit ? vd.Angle - vs.Angle : 0;
+        var rad = vd.Angle - vs.Angle;
         var k = ScaleToFit && vs.Length > 0 ? vd.Length / vs.Length : 1;
         return (rad, k);
     }

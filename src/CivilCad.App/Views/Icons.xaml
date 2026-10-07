@@ -162,6 +162,13 @@
         <GeometryDrawing Brush="{StaticResource IcoInk}" Geometry="{StaticResource PencilTip}"/>
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
+    <DrawingImage x:Key="IconRect" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M2,12 L12,12 L12,22 L2,22 Z"/>
+        <GeometryDrawing Brush="{StaticResource IcoPencil}" Pen="{StaticResource IcoInkPen}" Geometry="{StaticResource PencilBody}"/>
+        <GeometryDrawing Brush="{StaticResource IcoInk}" Geometry="{StaticResource PencilTip}"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <DrawingImage x:Key="IconPoint" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
         <GeometryDrawing Brush="{StaticResource IcoBlue}">

@@ -45,9 +45,10 @@ public static class MeasureSettings
 
     public static string UnitLabel => Unit.Label();
 
-    public static string DistanceText(Vec2 a, Vec2 b)
+    /// <param name="surveyRotation">測量座標の向き (方向角を測量座標で出す)。</param>
+    public static string DistanceText(Vec2 a, Vec2 b, double surveyRotation = 0)
     {
-        var d = b - a;
+        var d = (b - a).Rotate(surveyRotation);
         var text = $"L={Num(Length(d.Length))}{UnitLabel}";
         return Detail ? $"{text}  θ={Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}" : text;
     }
@@ -207,11 +208,11 @@ public sealed class DistanceTool : MeasureToolBase
         }
         if (p.DistanceTo(a) < 1e-12) return;
         _second = p;
-        var d = p - a;
+        var d = (p - a).Rotate(Doc.SurveyRotation); // ΔX・ΔY・方向角は測量座標の向きで (長さは同じ)
         var u = MeasureSettings.UnitLabel;
         string L(double v) => $"{MeasureSettings.Num(MeasureSettings.Length(v))} {u}";
         Canvas.ShowMessage($"距離 = {L(d.Length)}   ΔX(北) = {L(d.Y)}  ΔY(東) = {L(d.X)}   方向角 = {Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}");
-        Measured(MeasureSettings.DistanceText(a, p), MeasureSettings.ReadableAngle(a, p), TextHAlign.Center, TextVAlign.Bottom);
+        Measured(MeasureSettings.DistanceText(a, p, Doc.SurveyRotation), MeasureSettings.ReadableAngle(a, p), TextHAlign.Center, TextVAlign.Bottom);
     }
 
     protected override void DrawMeasurePreview(DrawingContext dc)
@@ -297,8 +298,9 @@ public sealed class StationQueryTool(HorizontalAlignment alignment, double pitch
 
     public override void OnPoint(Vec2 p)
     {
-        var (st, off) = alignment.Project(p);
-        var (x, y) = p.ToSurvey();
+        var survey = Doc.ToSurveyCad(p); // 路線は測量座標で持っている
+        var (st, off) = alignment.Project(survey);
+        var (x, y) = survey.ToSurvey();
         var side = off >= 0 ? "右" : "左";
         Canvas.ShowMessage($"{Station.Format(st, pitch)} (追加距離 {st:F3})   幅 {side} {Math.Abs(off):F3} m   X = {x:F3}  Y = {y:F3}");
     }
@@ -308,7 +310,7 @@ public sealed class StationQueryTool(HorizontalAlignment alignment, double pitch
 
     public override void DrawPreview(DrawingContext dc)
     {
-        var (st, _) = alignment.Project(_cursor);
-        Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, alignment.PointAt(st), _cursor);
+        var (st, _) = alignment.Project(Doc.ToSurveyCad(_cursor));
+        Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, Doc.FromSurveyCad(alignment.PointAt(st)), _cursor);
     }
 }

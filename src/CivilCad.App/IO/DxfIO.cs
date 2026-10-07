@@ -15,6 +15,11 @@ public static class DxfIO
     private const double Deg = 180 / Math.PI;
     private const string PlaneZoneVariable = "$USERI1";
 
+    /// <summary>測量座標の向き (ラジアン) と回転の中心 x, y。</summary>
+    private const string SurveyRotationVariable = "$USERR1";
+    private const string SurveyPivotXVariable = "$USERR2";
+    private const string SurveyPivotYVariable = "$USERR3";
+
     /// <summary>CivilCad 独自の情報 (PDF のページ番号など) を図形の XData に書くときのアプリ名。</summary>
     private const string AppId = "CIVILCAD";
 
@@ -61,6 +66,9 @@ public static class DxfIO
         dxf.DrawingVariables.InsUnits = netDxf.Units.DrawingUnits.Meters; // 座標は実寸 m
         // 平面直角座標系の系番号は AutoCAD のユーザー変数 USERI1 に入れる (0 = 未設定)
         dxf.DrawingVariables.AddCustomVariable(new netDxf.Header.HeaderVariable(PlaneZoneVariable, 70, (short)(doc.PlaneZone ?? 0)));
+        dxf.DrawingVariables.AddCustomVariable(new netDxf.Header.HeaderVariable(SurveyRotationVariable, 40, doc.SurveyRotation));
+        dxf.DrawingVariables.AddCustomVariable(new netDxf.Header.HeaderVariable(SurveyPivotXVariable, 40, doc.SurveyPivot.X));
+        dxf.DrawingVariables.AddCustomVariable(new netDxf.Header.HeaderVariable(SurveyPivotYVariable, 40, doc.SurveyPivot.Y));
         dxf.Save(path);
     }
 
@@ -85,6 +93,10 @@ public static class DxfIO
             netDxf.Units.DrawingUnits.Millimeters => ImportUnit.Millimeter,
             _ => null,
         };
+        if (dxf.DrawingVariables.TryGetCustomVariable(SurveyRotationVariable, out var rotVar) && Real(rotVar.Value) is double rot && rot != 0 &&
+            dxf.DrawingVariables.TryGetCustomVariable(SurveyPivotXVariable, out var pxVar) && Real(pxVar.Value) is double px &&
+            dxf.DrawingVariables.TryGetCustomVariable(SurveyPivotYVariable, out var pyVar) && Real(pyVar.Value) is double py)
+            doc.SetSurveyFrame(rot, new Vec2(px, py));
         if (dxf.DrawingVariables.TryGetCustomVariable(PlaneZoneVariable, out var zoneVar) &&
             Convert.ToInt32(zoneVar.Value, System.Globalization.CultureInfo.InvariantCulture) is >= 1 and <= 19 and var zone)
             doc.PlaneZone = zone;
@@ -145,6 +157,12 @@ public static class DxfIO
         doc.Entities.AddRange(list);
         doc.NotifyChanged();
         return dxf.Entities.All.Count() - converted;
+    }
+
+    private static double? Real(object? v)
+    {
+        try { return v == null ? null : Convert.ToDouble(v, System.Globalization.CultureInfo.InvariantCulture) is var d && double.IsFinite(d) ? d : null; }
+        catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException) { return null; }
     }
 
     /// <summary>画像は埋め込まず、画像ファイルの場所 (絶対パス) を書く。同じ画像は 1 つの定義を共有する。</summary>

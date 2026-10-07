@@ -118,14 +118,18 @@ public static class CoordinateInput
 {
     /// <summary>
     /// "x,y" (絶対) / "@dx,dy" (相対) / "@距離&lt;角度" (極座標、角度は東から反時計回りの度) /
-    /// "sX,Y" (測量座標 X=北, Y=東) を解釈する。
+    /// "sX,Y" (測量座標 X=北, Y=東。doc があれば座標設定の向きで図面上の点にする) を解釈する。
     /// </summary>
-    public static bool TryParse(string text, Vec2? basePoint, out Vec2 point)
+    public static bool TryParse(string text, Vec2? basePoint, out Vec2 point, CadDocument? doc = null)
     {
         point = default;
         text = text.Trim().Replace('，', ',').Replace('＠', '@').Replace('＜', '<');
         if (text.StartsWith('s') || text.StartsWith('S'))
-            return CoordinateSetTool.TryParseSurvey(text, out point);
+        {
+            if (!CoordinateSetTool.TryParseSurvey(text, out var survey)) return false;
+            point = doc?.FromSurveyCad(survey) ?? survey;
+            return true;
+        }
         var relative = text.StartsWith('@');
         if (relative)
         {
