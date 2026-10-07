@@ -28,6 +28,7 @@ public static class DxfIO
             layers[l] = dl;
         }
 
+        var images = new Dictionary<string, netDxf.Objects.ImageDefinition>(StringComparer.OrdinalIgnoreCase);
         // プリセット (記号) は線・塗り・円・文字に展開して書く (他の CAD でも表示できるように)
         foreach (var e in doc.Entities.SelectMany(x => x is SymbolEntity s ? s.Explode() : [x]))
         {
@@ -39,6 +40,7 @@ public static class DxfIO
                 ArcEntity a => new Arc(V(a.Center), a.Radius, GeoMath.NormalizeAngle(a.StartAngle) * Deg, GeoMath.NormalizeAngle(a.EndAngle) * Deg),
                 TextEntity t => ToDxfText(t),
                 HatchEntity h when h.Loops.Count > 0 => ToDxfHatch(h),
+                ImageEntity img => ToDxfImage(img, images),
                 _ => null,
             };
             if (de == null) continue;
@@ -47,6 +49,7 @@ public static class DxfIO
             de.Lineweight = e.LineWeight is double w ? ToDxfWeight(w) : Lineweight.ByLayer;
             // 透明度 (DXF は 0〜90%)
             if (e is HatchEntity { TransparencyPercent: > 0 } th) de.Transparency = new Transparency((short)Math.Clamp(Math.Round(th.TransparencyPercent), 0, 90));
+            if (e is ImageEntity { TransparencyPercent: > 0 } ti) de.Transparency = new Transparency((short)Math.Clamp(Math.Round(ti.TransparencyPercent), 0, 90));
             dxf.Entities.Add(de);
         }
         // 図面の縮尺は AutoCAD 等と同じく DIMSCALE (寸法スタイルの全体尺度, ヘッダの $DIMSCALE) に入れる
@@ -113,9 +116,54 @@ public static class DxfIO
                 Add(o, hatch);
             }
 
+        foreach (var o in dxf.Entities.Images)
+            if (FromDxfImage(o, LayerOf(o), path) is { } image)
+            {
+                if (!o.Transparency.IsByLayer && !o.Transparency.IsByBlock && o.Transparency.Value > 0) image.TransparencyPercent = o.Transparency.Value;
+                Add(o, image);
+            }
+
         doc.Entities.AddRange(list);
         doc.NotifyChanged();
         return dxf.Entities.All.Count() - converted;
+    }
+
+    /// <summary>画像は埋め込まず、画像ファイルの場所 (絶対パス) を書く。同じ画像は 1 つの定義を共有する。</summary>
+    private static Image ToDxfImage(ImageEntity img, Dictionary<string, netDxf.Objects.ImageDefinition> defs)
+    {
+        if (!defs.TryGetValue(img.Path, out var def))
+        {
+            var name = System.IO.Path.GetFileNameWithoutExtension(img.Path);
+            var unique = name;
+            for (var i = 2; defs.Values.Any(d => string.Equals(d.Name, unique, StringComparison.OrdinalIgnoreCase)); i++) unique = $"{name}_{i}";
+            def = new netDxf.Objects.ImageDefinition(unique, img.Path, img.PixelWidth, 72, img.PixelHeight, 72, netDxf.Units.ImageResolutionUnits.Unitless);
+            defs[img.Path] = def;
+        }
+        var u = img.U.Normalized();
+        var v = img.V.Normalized();
+        return new Image(def, V(img.Origin), img.Width, img.Height)
+        {
+            Uvector = new Vector2(u.X, u.Y),
+            Vvector = new Vector2(v.X, v.Y),
+        };
+    }
+
+    private static ImageEntity? FromDxfImage(Image o, Layer layer, string dxfPath)
+    {
+        var def = o.Definition;
+        if (def == null || def.Width <= 0 || def.Height <= 0) return null;
+        var file = def.File;
+        // DXF と一緒にフォルダごと移した場合などは、DXF と同じフォルダの同じ名前の画像を使う
+        var dir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(dxfPath)) ?? "";
+        if (!System.IO.Path.IsPathRooted(file)) file = System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, file));
+        if (!System.IO.File.Exists(file))
+        {
+            var near = System.IO.Path.Combine(dir, System.IO.Path.GetFileName(file));
+            if (System.IO.File.Exists(near)) file = near;
+        }
+        var u = new Vec2(o.Uvector.X, o.Uvector.Y).Normalized() * o.Width;
+        var v = new Vec2(o.Vvector.X, o.Vvector.Y).Normalized() * o.Height;
+        return new ImageEntity(layer, file, def.Width, def.Height, V(o.Position), u, v);
     }
 
     private static Text ToDxfText(TextEntity t)

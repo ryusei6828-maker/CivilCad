@@ -124,6 +124,7 @@ public partial class MainWindow : Window
             case "J": JoinSelection(); break;
             case "H": StartTool(new HatchTool(), c); break;
             case "PI": ImportPoints(); break;
+            case "IM": ImportImage(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
             case "DI": StartTool(new DistanceTool(), c); break;
@@ -501,11 +502,15 @@ public partial class MainWindow : Window
                 SfcWriter.Save(_doc, dlg.FileName);
                 var (paper, pw, ph, _) = SfcWriter.Layout(_doc);
                 Log($"SFC で保存しました: {dlg.FileName}  (用紙 {paper?.Name ?? $"自由 {pw:0}×{ph:0}mm"} 横, 縮尺 {_doc.ScaleText})");
+                if (_doc.Entities.OfType<ImageEntity>().Count() is > 0 and var n)
+                    Log($"※ SFC には画像を保存できないため、画像 {n} 枚は保存していません (画像も残すには DXF で保存してください)。");
             }
             else
             {
                 DxfIO.Save(_doc, dlg.FileName);
                 Log($"保存しました: {dlg.FileName}");
+                if (_doc.Entities.OfType<ImageEntity>().Any())
+                    Log("※ 画像は DXF に埋め込まず、画像ファイルの場所を記録しています。DXF を別の場所へ移すときは画像ファイルも同じフォルダに入れてください。");
             }
             _filePath = dlg.FileName;
             _active.MarkSaved();
@@ -899,6 +904,48 @@ public partial class MainWindow : Window
             (file.Lots.Count > 0 && options.DrawLots ? $"、画地 {file.Lots.Count} 区画" : "") +
             $" をレイヤ「{entities[0].Layer.Name}」に配置しました。" +
             (file.SkippedLines > 0 ? $" (読めなかった行 {file.SkippedLines})" : ""));
+    }
+
+    // ---- 画像読込 ----
+
+    /// <summary>
+    /// 画像 (オルソ画像など) を読み込む。ここでは画像の大きさと位置情報だけを読み、画素は表示するときに裏で読む
+    /// (大きな画像でも画面が止まらないように)。ワールドファイル / GeoTIFF があればその位置に置き、無ければ位置を指定する。
+    /// </summary>
+    private void ImportImage()
+    {
+        var open = new OpenFileDialog
+        {
+            Title = "画像ファイルを開く",
+            Filter = "画像ファイル (*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif)|*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif|すべてのファイル (*.*)|*.*",
+        };
+        if (open.ShowDialog(this) != true) return;
+        var path = open.FileName;
+
+        ImageInfo info;
+        try
+        {
+            info = ImageCache.ReadInfo(path);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"{Path.GetFileName(path)} を画像として読み込めませんでした。\n{ex.Message}", "画像読込", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        ImageCache.Forget(path); // 同じ名前で中身が替わっている場合に備えて読み直す
+
+        if (info.Placement is not { } pl)
+        {
+            Log($"画像「{Path.GetFileName(path)}」({info.PixelWidth}×{info.PixelHeight}) には位置情報 (ワールドファイル) がありません。配置する位置を指定してください。");
+            StartTool(new ImagePlaceTool(path, info.PixelWidth, info.PixelHeight), "IM");
+            return;
+        }
+        var img = new ImageEntity(_doc.CurrentLayer, path, info.PixelWidth, info.PixelHeight, pl.Origin, pl.U, pl.V);
+        _doc.History.Execute(new AddEntitiesCommand([img], "画像読込"));
+        if (!Canvas.VisibleWorldBox.Contains(img.Bounds))
+            Canvas.ZoomTo(img.Bounds.Inflate(Math.Max(img.Bounds.Width, img.Bounds.Height) * 0.05));
+        Log($"画像読込: {Path.GetFileName(path)} ({info.PixelWidth}×{info.PixelHeight}) を {info.PlacementSource} の位置に配置しました " +
+            $"(幅 {img.Width:0.###}m × 高さ {img.Height:0.###}m、1 画素 {img.Width / info.PixelWidth:0.####}m)。");
     }
 
     // ---- 路線 ----

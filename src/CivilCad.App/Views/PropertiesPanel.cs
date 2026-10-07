@@ -153,7 +153,7 @@ public sealed class PropertiesPanel : UserControl
         AddColorRow("色", sel.Select(e => e.Color).ToList(), c => Apply(x => x.Color = c, "色変更"));
         AddWeightRow("線幅 (mm)", sel.Select(e => e.LineWeight).ToList(), w => Apply(x => x.LineWeight = w, "線幅変更"));
         AddTextSizeRows(sel.OfType<TextEntity>().ToList());
-        AddTransparencyRow(sel.OfType<HatchEntity>().ToList());
+        AddTransparencyRow([.. sel.Where(e => e is HatchEntity or ImageEntity)]);
         var lengths = sel.Select(LengthOf).Where(l => l != null).Select(l => l!.Value).ToList();
         if (sel.Count > 1 && lengths.Count > 0) AddReadOnly("長さ合計", $"{lengths.Sum():F3} m  ({lengths.Count} 個)");
 
@@ -219,6 +219,24 @@ public sealed class PropertiesPanel : UserControl
                     Apply(x => ((SymbolEntity)x).Rotation = deg * Math.PI / 180, "プリセットの向き変更"),
                     "記号の上 (北) の向き。0 = 図面の上、反時計回りが正");
                 AddReadOnly("図面上の大きさ", $"{sym.Size:F3} m");
+                break;
+
+            case ImageEntity img:
+                AddReadOnly("ファイル", img.Path);
+                AddReadOnly("画素数", $"{img.PixelWidth} × {img.PixelHeight}");
+                AddEditable("幅 (m)", img.Width.ToString("0.###", CultureInfo.InvariantCulture), s =>
+                    TryPositive(s, out var w) && Apply(x =>
+                    {
+                        // 左下を基準に、縦横比を保って大きさを変える
+                        var ix = (ImageEntity)x;
+                        var k = w / ix.Width;
+                        ix.U *= k;
+                        ix.V *= k;
+                    }, "画像の大きさ変更"), "左下を基準に、縦横比を保って大きさを変える");
+                AddReadOnly("高さ", $"{img.Height:F3} m");
+                AddReadOnly("1 画素の大きさ", $"{img.Width / img.PixelWidth:0.####} m");
+                AddReadOnly("左下", Xy(img.Origin));
+                AddReadOnly("回転角", $"{Deg(img.U.Angle):F2}°");
                 break;
 
             case HatchEntity h:
@@ -384,14 +402,19 @@ public sealed class PropertiesPanel : UserControl
             "文字の横幅の倍率 (1 = 標準、0.8 = 細め)");
     }
 
-    /// <summary>ハッチング・塗りつぶしの透明度 (複数選択なら、選んだハッチングすべてに)。</summary>
-    private void AddTransparencyRow(List<HatchEntity> hatches)
+    /// <summary>ハッチング・塗りつぶし・画像の透明度 (複数選択なら、選んだものすべてに)。</summary>
+    private void AddTransparencyRow(List<Entity> targets)
     {
-        if (hatches.Count == 0) return;
-        var values = hatches.Select(h => Math.Round(h.TransparencyPercent, 1)).Distinct().ToList();
+        if (targets.Count == 0) return;
+        static double Get(Entity e) => e switch { HatchEntity h => h.TransparencyPercent, ImageEntity i => i.TransparencyPercent, _ => 0 };
+        var values = targets.Select(h => Math.Round(Get(h), 1)).Distinct().ToList();
         AddEditable("透明度 (%)", values.Count == 1 ? values[0].ToString("0.#", CultureInfo.InvariantCulture) : "", s =>
             double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var pct) && pct is >= 0 and <= 100 &&
-            Apply(x => { if (x is HatchEntity h) h.TransparencyPercent = pct; }, "透明度変更"),
+            Apply(x =>
+            {
+                if (x is HatchEntity h) h.TransparencyPercent = pct;
+                else if (x is ImageEntity i) i.TransparencyPercent = pct;
+            }, "透明度変更"),
             "0 = 不透明、50 = 半透明、100 = 透明。下の線や文字を透かして見せたいときに");
     }
 
@@ -519,6 +542,7 @@ public sealed class PropertiesPanel : UserControl
         TextEntity => "文字",
         HatchEntity => "ハッチング",
         SymbolEntity s => s.Definition.Name,
+        ImageEntity => "画像",
         _ => e.GetType().Name,
     };
 

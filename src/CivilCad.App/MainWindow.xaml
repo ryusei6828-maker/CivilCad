@@ -29,6 +29,7 @@
                 <MenuItem Header="名前を付けて保存 DXF / SFC(_S)..." Command="Save"><MenuItem.Icon><Image Source="{StaticResource IconSave}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
                 <MenuItem Header="座標読込 SIMA / CSV (PI)..." Tag="PI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPoints}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="画像読込 JPG / PNG / TIFF (IM)..." Tag="IM" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconImage}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
                 <MenuItem Header="終了(_X)" Click="Exit_Click"/>
             </MenuItem>
@@ -132,6 +133,7 @@
                         <Button Style="{StaticResource ToolButton}" Tag="CS" Click="Tool_Click" ToolTip="座標設定 (CS)"><StackPanel><Image Source="{StaticResource IconCoord}" Width="24" Height="24"/><TextBlock Text="座標" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="ZN" Click="Tool_Click" ToolTip="平面直角座標系の系番号 (ZN)"><StackPanel><Image Source="{StaticResource IconCoord}" Width="24" Height="24"/><TextBlock Text="座標系" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="PI" Click="Tool_Click" ToolTip="座標読込 SIMA / CSV (PI)"><StackPanel><Image Source="{StaticResource IconPoints}" Width="24" Height="24"/><TextBlock Text="座標読込" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="IM" Click="Tool_Click" ToolTip="画像読込 JPG / PNG / TIFF (IM): オルソ画像などを配置"><StackPanel><Image Source="{StaticResource IconImage}" Width="24" Height="24"/><TextBlock Text="画像読込" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="計測">

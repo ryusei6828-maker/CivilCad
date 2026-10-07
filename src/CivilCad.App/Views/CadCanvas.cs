@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using CivilCad.App.Tools;
 using CivilCad.Core.Geometry;
 using CivilCad.Core.Model;
@@ -337,18 +338,27 @@ public sealed class CadCanvas : FrameworkElement
         using var dc = _scene.RenderOpen();
         if (ActualWidth <= 0) return;
         var view = VisibleWorldBox;
-        // 塗りつぶしは先 (下) に描き、線や文字が塗りに隠れないようにする
-        foreach (var fillPass in new[] { true, false })
+        // 画像 → 塗りつぶし → 線・文字 の順に描き、線や文字が画像や塗りに隠れないようにする
+        foreach (var pass in new[] { 0, 1, 2 })
         {
             foreach (var e in Document.Entities)
             {
-                if (IsFill(e) != fillPass || !Document.IsVisible(e) || !e.Bounds.Intersects(view)) continue;
+                if (DrawPass(e) != pass || !Document.IsVisible(e) || !e.Bounds.Intersects(view)) continue;
                 var dim = Document.OnlyCurrentLayerEditable && e.Layer != Document.CurrentLayer;
                 var color = dim ? DimColor : e.EffectiveColor;
                 DrawEntity(dc, e, color, Selection.Contains(e));
             }
         }
+        // 拡大していて縮小版では粗い画像は、止まってから見えている範囲を細かく読み直す
+        if (Document.Entities.OfType<ImageEntity>().Any())
+        {
+            _detailTimer ??= CreateDetailTimer();
+            _detailTimer.Stop();
+            _detailTimer.Start();
+        }
     }
+
+    private static int DrawPass(Entity e) => e is ImageEntity ? 0 : IsFill(e) ? 1 : 2;
 
     private static bool IsFill(Entity e) => e is HatchEntity { Solid: true } or PolylineEntity { Filled: true };
 
@@ -386,7 +396,142 @@ public sealed class CadCanvas : FrameworkElement
             case SymbolEntity s:
                 DrawSymbol(dc, s, color, selected);
                 break;
+            case ImageEntity img:
+                DrawImage(dc, img, color, selected);
+                break;
         }
+    }
+
+    // ---- 画像 ----
+
+    private System.Windows.Threading.DispatcherTimer? _detailTimer;
+    private static readonly Brush ImagePlaceholder = Frozen(new SolidColorBrush(Color.FromArgb(40, 128, 128, 128)));
+
+    private System.Windows.Threading.DispatcherTimer CreateDetailTimer()
+    {
+        // 読み込みが終わったら描き直す (読み込みは別スレッドで行われる)
+        IO.ImageCache.Updated += (_, path) => Dispatcher.BeginInvoke(() =>
+        {
+            if (Document.Entities.OfType<ImageEntity>().Any(i => string.Equals(i.Path, path, StringComparison.OrdinalIgnoreCase))) RedrawScene();
+        });
+        var timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background, Dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(250),
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            RequestImageDetails();
+        };
+        return timer;
+    }
+
+    /// <summary>画像の中の位置 (0〜1, 上から下) を画面に写す変換。</summary>
+    private Matrix ImageMatrix(ImageEntity img)
+    {
+        var p00 = WorldToScreen(img.Map(0, 0));
+        var p10 = WorldToScreen(img.Map(1, 0));
+        var p01 = WorldToScreen(img.Map(0, 1));
+        return new Matrix(p10.X - p00.X, p10.Y - p00.Y, p01.X - p00.X, p01.Y - p00.Y, p00.X, p00.Y);
+    }
+
+    /// <summary>画像: 縮小版を全体に、細かく読み直した部分があればその上に描く。読込中・失敗は枠と文字で示す。</summary>
+    private void DrawImage(DrawingContext dc, ImageEntity img, RgbColor color, bool selected)
+    {
+        var entry = IO.ImageCache.Get(img.Path);
+        var frame = new StreamGeometry();
+        using (var ctx = frame.Open())
+        {
+            var c = img.Corners.Select(WorldToScreen).ToArray();
+            ctx.BeginFigure(c[0], true, true);
+            for (var i = 1; i < 4; i++) ctx.LineTo(c[i], true, false);
+        }
+        frame.Freeze();
+        if (entry.Preview is BitmapSource preview)
+        {
+            var opacity = 1 - Math.Clamp(img.TransparencyPercent, 0, 100) / 100;
+            if (opacity < 1) dc.PushOpacity(opacity);
+            dc.PushClip(frame);
+            dc.PushTransform(new MatrixTransform(ImageMatrix(img)));
+            dc.DrawImage(preview, new Rect(0, 0, 1, 1));
+            if (entry.Detail is { } d)
+            {
+                dc.DrawImage(d.Bitmap, new Rect((double)d.Region.X / img.PixelWidth, (double)d.Region.Y / img.PixelHeight,
+                    (double)d.Region.Width / img.PixelWidth, (double)d.Region.Height / img.PixelHeight));
+            }
+            dc.Pop();
+            dc.Pop();
+            if (opacity < 1) dc.Pop();
+            if (selected) dc.DrawGeometry(null, GetPen(color, true), frame);
+            return;
+        }
+        // 読込中・読み込めない: 枠と説明を出す
+        dc.DrawGeometry(ImagePlaceholder, GetPen(color, selected), frame);
+        var label = entry.Loading ? "画像を読み込み中…" : $"{entry.Error}: {System.IO.Path.GetFileName(img.Path)}";
+        var ft = new FormattedText(label, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Yu Gothic UI"), 12,
+            GetBrush(color), VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        var center = WorldToScreen(img.Map(0.5, 0.5));
+        dc.DrawText(ft, new Point(center.X - ft.Width / 2, center.Y - ft.Height / 2));
+    }
+
+    /// <summary>
+    /// 見えている画像のうち、縮小版より細かく表示している (拡大している) ものについて、
+    /// 見えている範囲を画面の細かさに合わせて読み直すよう頼む。
+    /// </summary>
+    private void RequestImageDetails()
+    {
+        if (ActualWidth <= 0) return;
+        var view = VisibleWorldBox;
+        foreach (var img in Document.Entities.OfType<ImageEntity>())
+        {
+            if (!Document.IsVisible(img) || !img.Bounds.Intersects(view) || img.PixelWidth <= 0 || img.PixelHeight <= 0) continue;
+            var entry = IO.ImageCache.Get(img.Path);
+            if (entry.Preview is not BitmapSource preview) continue;
+            // 画面の細かさ (元画像 1 画素が画面の何画素か) と縮小版の細かさを比べる
+            var screenPerPixel = img.Width * Scale / img.PixelWidth;
+            var previewScale = (double)preview.PixelWidth / img.PixelWidth;
+            if (screenPerPixel <= previewScale * 1.2) continue;
+            var need = Math.Min(1.0, screenPerPixel);
+
+            // 見えている範囲 (少し広め) を元画像の画素の範囲にする
+            double s0 = 1, s1 = 0, t0 = 1, t1 = 0;
+            foreach (var p in ViewCorners(view))
+            {
+                var (s, t) = img.Unmap(p);
+                s0 = Math.Min(s0, s); s1 = Math.Max(s1, s);
+                t0 = Math.Min(t0, t); t1 = Math.Max(t1, t);
+            }
+            var ms = (s1 - s0) * 0.15;
+            var mt = (t1 - t0) * 0.15;
+            var x0 = (int)Math.Floor(Math.Clamp(s0 - ms, 0, 1) * img.PixelWidth);
+            var x1 = (int)Math.Ceiling(Math.Clamp(s1 + ms, 0, 1) * img.PixelWidth);
+            var y0 = (int)Math.Floor(Math.Clamp(t0 - mt, 0, 1) * img.PixelHeight);
+            var y1 = (int)Math.Ceiling(Math.Clamp(t1 + mt, 0, 1) * img.PixelHeight);
+            if (x1 - x0 < 1 || y1 - y0 < 1) continue;
+            var region = new Int32Rect(x0, y0, x1 - x0, y1 - y0);
+            // 出力が大きくなりすぎないよう細かさを落とす
+            need = Math.Min(need, Math.Min((double)IO.ImageCache.DetailMax / region.Width, (double)IO.ImageCache.DetailMax / region.Height));
+
+            // 今ある部分画像で足りていれば頼まない
+            if (entry.Detail is { } d && d.Scale >= need * 0.9 && Covers(d.Region, img, view)) continue;
+            IO.ImageCache.RequestDetail(entry, region,
+                Math.Max(1, (int)Math.Round(region.Width * need)), Math.Max(1, (int)Math.Round(region.Height * need)));
+        }
+    }
+
+    private static Vec2[] ViewCorners(Box2 view) => [view.Min, view.Max, new Vec2(view.Min.X, view.Max.Y), new Vec2(view.Max.X, view.Min.Y)];
+
+    /// <summary>部分画像の範囲が、見えている画像の部分を覆っているか。</summary>
+    private static bool Covers(Int32Rect region, ImageEntity img, Box2 view)
+    {
+        foreach (var p in ViewCorners(view))
+        {
+            var (s, t) = img.Unmap(p);
+            var x = Math.Clamp(s, 0, 1) * img.PixelWidth;
+            var y = Math.Clamp(t, 0, 1) * img.PixelHeight;
+            if (x < region.X - 1 || x > region.X + region.Width + 1 || y < region.Y - 1 || y > region.Y + region.Height + 1) return false;
+        }
+        return true;
     }
 
     /// <summary>プリセット (記号): 定義の図形を位置・大きさ・向きに合わせて描く。選択中は範囲を破線で囲む。</summary>

@@ -66,7 +66,7 @@ public static class SfcWriter
         }
 
         // 図枠が無ければ、図形全体が余白付きで収まる最小の A 判の中央に置く
-        var ext = doc.Entities.Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
+        var ext = doc.Entities.Where(e => e is not ImageEntity).Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
         if (ext.IsEmpty) ext = new Box2(Vec2.Zero, Vec2.Zero);
         var needW = ext.Width / k + 2 * Margin;
         var needH = ext.Height / k + 2 * Margin;
@@ -85,7 +85,8 @@ public static class SfcWriter
         private int _compositeCount;
 
         /// <summary>書き出す図形。プリセット (記号) は線・塗り・円・文字に展開する (他の CAD でも表示できるように)。</summary>
-        private List<Entity> Entities => _entities ??= [.. doc.Entities.SelectMany(e => e is SymbolEntity s ? s.Explode() : [e])];
+        // 画像は SFC (SXF レベル 2) には書けないので除く
+        private List<Entity> Entities => _entities ??= [.. doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e])];
         private List<Entity>? _entities;
 
         public string Build(string fileName)
@@ -154,7 +155,7 @@ public static class SfcWriter
         /// </summary>
         private List<Layer> UsableLayers()
         {
-            var used = doc.Entities.Select(e => e.Layer).ToHashSet();
+            var used = Entities.Select(e => e.Layer).ToHashSet();
             var list = doc.Layers.Where(l => used.Contains(l) || l.Name != "0").ToList();
             list.AddRange(used.Where(l => !list.Contains(l)));
             if (list.Count > MaxLayers) list = [.. list.Where(used.Contains).Concat(list.Where(l => !used.Contains(l))).Take(MaxLayers)];
