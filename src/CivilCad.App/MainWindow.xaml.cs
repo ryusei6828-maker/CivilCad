@@ -749,17 +749,23 @@ public partial class MainWindow : Window
     {
         var dlg = new ScaleWindow(_doc.ScaleDenominator) { Owner = this };
         if (dlg.ShowDialog() != true || dlg.Result == _doc.ScaleDenominator) return;
-        ChangeScale(dlg.Result, dlg.KeepPaperSize);
+        ChangeScale(dlg.Result, dlg.Mode);
         CommandBox.Focus();
     }
 
-    /// <summary>シートの縮尺を変える。keepPaperSize なら図枠を新しい縮尺に合わせる (元に戻すで一度に戻る)。</summary>
-    private void ChangeScale(double scale, bool keepPaperSize)
+    /// <summary>シートの縮尺を変える (元に戻すで一度に戻る)。</summary>
+    private void ChangeScale(double scale, ScaleChangeMode mode)
     {
-        var changed = keepPaperSize ? PaperRescale.Rescaled(_doc, scale).Count : 0;
-        _doc.History.Execute(PaperRescale.Command(_doc, scale, keepPaperSize));
-        Log($"シートの縮尺を {_doc.ScaleText} にしました (用紙 1mm = {_doc.PaperMmToMeters(1):0.####} m)。" +
-            (changed > 0 ? " 図枠を新しい縮尺の大きさにしました。" : "") + " 文字・線などはそのままです。");
+        var k = scale / _doc.ScaleDenominator;
+        _doc.History.Execute(PaperRescale.Command(_doc, scale, mode, Canvas.ScaleView)); // 図寸固定は表示も同じだけ広げて見た目を変えない
+        if (mode == ScaleChangeMode.KeepPaper)
+        {
+            Log($"シートの縮尺を {_doc.ScaleText} にしました (図面をそのまま: 図面全体を {k:0.####} 倍。計測の値も {_doc.ScaleText} の値になります)。");
+        }
+        else
+        {
+            Log($"シートの縮尺を {_doc.ScaleText} にしました (実寸を保つ: 線などの長さはそのまま、図枠を新しい縮尺の大きさにしました)。");
+        }
     }
 
     private void UpdateScaleText() => ScaleButton.Content = $"シートの縮尺 {_doc.ScaleText}";
@@ -867,7 +873,7 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog() != true || dlg.Result is not { } options) return;
         if (options.ScaleDenominator != _doc.ScaleDenominator)
         {
-            ChangeScale(options.ScaleDenominator, keepPaperSize: true);
+            ChangeScale(options.ScaleDenominator, ScaleChangeMode.KeepReal); // 図形が収まる縮尺を選ぶ窓なので、図形の実寸は変えない
         }
         _settings.FrameDefaults = options;
         try

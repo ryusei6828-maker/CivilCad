@@ -12,13 +12,17 @@ public partial class ScaleWindow : Window
         InitializeComponent();
         ScaleBox.ItemsSource = CommonScales;
         ScaleBox.Text = current.ToString(CultureInfo.InvariantCulture);
+        (s_lastMode == ScaleChangeMode.KeepReal ? KeepRealRadio : KeepPaperRadio).IsChecked = true;
         Loaded += (_, _) => ScaleBox.Focus();
     }
 
     public double Result { get; private set; }
 
-    /// <summary>図枠を新しい縮尺に合わせる。</summary>
-    public bool KeepPaperSize { get; private set; }
+    /// <summary>すでに描いた図形の扱い。</summary>
+    public ScaleChangeMode Mode { get; private set; }
+
+    /// <summary>前回選んだ扱い (アプリを閉じるまで覚える)。</summary>
+    private static ScaleChangeMode s_lastMode = ScaleChangeMode.KeepPaper;
 
     private static bool TryParse(string text, out double scale) =>
         double.TryParse(text.Replace("1:", "").Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out scale) && scale > 0;
@@ -36,7 +40,8 @@ public partial class ScaleWindow : Window
             return;
         }
         Result = s;
-        KeepPaperSize = KeepPaperCheck.IsChecked == true;
+        Mode = KeepRealRadio.IsChecked == true ? ScaleChangeMode.KeepReal : ScaleChangeMode.KeepPaper;
+        s_lastMode = Mode;
         DialogResult = true;
     }
 }

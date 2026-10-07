@@ -178,6 +178,15 @@ public sealed class CadCanvas : FrameworkElement
     }
 
     /// <summary>指定範囲が画面いっぱい (9 割) に入るように表示する。</summary>
+    /// <summary>図形を原点を基準に k 倍したとき、表示も同じだけ広げて見た目を変えない。</summary>
+    public void ScaleView(double k)
+    {
+        if (!(k > 0)) return;
+        ViewCenter *= k;
+        Scale = Math.Clamp(Scale / k, 1e-4, 1e5);
+        RedrawAll();
+    }
+
     public void ZoomTo(Box2 box)
     {
         if (box.IsEmpty || ActualWidth <= 0) return;

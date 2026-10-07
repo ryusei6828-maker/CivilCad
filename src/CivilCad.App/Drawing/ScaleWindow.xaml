@@ -9,11 +9,15 @@
             <ComboBox x:Name="ScaleBox" Width="120" IsEditable="True" FontSize="14" TextBoxBase.TextChanged="ScaleBox_TextChanged"/>
         </StackPanel>
         <TextBlock x:Name="InfoText" Margin="0,8,0,0" Foreground="Gray" TextWrapping="Wrap"/>
-        <CheckBox x:Name="KeepPaperCheck" Margin="0,10,0,0" IsChecked="True">
-            <TextBlock TextWrapping="Wrap" Text="図枠を新しい縮尺に合わせる (A3 の図枠なら 1:100 で 38m、1:250 で 95m。表題欄の縮尺も書き換え)。図枠以外の文字・線などは画面上の大きさのまま"/>
-        </CheckBox>
+        <TextBlock Margin="0,10,0,2" Text="すでに描いた図形:"/>
+        <RadioButton x:Name="KeepPaperRadio" GroupName="mode" Margin="0,2">
+            <TextBlock TextWrapping="Wrap" Text="図面をそのまま (図寸固定・おすすめ): 画面の見た目は変わらず、図面全体が新しい縮尺の大きさになる。1:100 で 10m の線は 1:250 で 25m と測れる"/>
+        </RadioButton>
+        <RadioButton x:Name="KeepRealRadio" GroupName="mode" Margin="0,2">
+            <TextBlock TextWrapping="Wrap" Text="実寸を保つ (実寸固定): 線などの長さ (計測の値) はそのまま。図枠だけ新しい縮尺の大きさにする。測量座標に合わせて描いた図面向け"/>
+        </RadioButton>
         <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="Gray"
-                   Text="図面は実寸 (m) で描いているので、線・円などの図形と計測の値は縮尺を変えても変わりません。縮尺は、印刷するときの大きさと、文字の高さ・図枠・記号など「用紙上の mm」で決まる物の換算に使います。"/>
+                   Text="計測の値は図面上の実寸です。文字の高さ・図枠・記号は「用紙上の mm」をこの縮尺で実寸に換算します。表題欄の縮尺の文字は新しい縮尺に書き換えます。"/>
         <TextBlock x:Name="ErrorText" Foreground="Firebrick"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
             <Button Content="OK" Width="90" Margin="0,0,8,0" IsDefault="True" Click="Ok_Click"/>

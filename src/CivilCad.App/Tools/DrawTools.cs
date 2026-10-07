@@ -332,10 +332,11 @@ public sealed class ArcTool : CadTool, IStyledDrawTool, IRadiusInput
 public sealed class TextTool : CadTool, IStyledDrawTool
 {
     /// <summary>
-    /// true なら、新しい文字は画面上で一定の大きさ (<see cref="DefaultScreenPx"/>) にする。縮尺・拡大率によらず同じ大きさで見える。
-    /// false なら用紙上の mm (<see cref="DefaultHeightMm"/>) を図面の縮尺で m に換算する (1:500 で 3.5mm → 1.75m)。
+    /// false (既定) なら用紙上の mm (<see cref="DefaultHeightMm"/>) を図面の縮尺で m に換算する (1:500 で 3.5mm → 1.75m)。
+    /// 拡大・縮小すると線と一緒に大きく・小さくなる。
+    /// true なら、新しい文字は画面上で一定の大きさ (<see cref="DefaultScreenPx"/>) にする (拡大率によらず同じ大きさで見える)。
     /// </summary>
-    public static bool ScreenFixed { get; set; } = true;
+    public static bool ScreenFixed { get; set; }
 
     /// <summary>画面で一定の文字の高さ (ピクセル)。</summary>
     public static double DefaultScreenPx { get; set; } = 16;
