@@ -30,6 +30,14 @@ public sealed class PdfOptions
     /// </summary>
     public bool EmbedFonts { get; set; }
 
+    /// <summary>
+    /// 画像を劣化なし (可逆圧縮) で書く。ファイルが大きくなる。false なら高画質の JPEG (画質 95)。
+    /// </summary>
+    public bool LosslessImages { get; set; }
+
+    /// <summary>画像の JPEG の画質 (0〜100)。<see cref="LosslessImages"/> でなければこの画質で書く。</summary>
+    public const int JpegQuality = 95;
+
     /// <summary>印刷範囲の選び方 (窓で覚えておく用。実際の範囲は <see cref="Region"/> と <see cref="Only"/>)。</summary>
     public PdfRange Range { get; set; } = PdfRange.Drawing;
 
@@ -157,6 +165,8 @@ public static class PdfExport
                 Creator = "CivilCad",
                 Producer = "CivilCad",
                 RasterDpi = 300,
+                // 画像の画質。指定しないと 0 (いちばん低い画質の JPEG) になり、画像の色がくすんでぼやける
+                EncodingQuality = o.LosslessImages ? SKDocumentPdfMetadata.DefaultEncodingQuality : PdfOptions.JpegQuality,
             };
             using var pdf = SKDocument.CreatePdf(stream, metadata);
             var canvas = pdf.BeginPage((float)(layout.Width * PtPerMm), (float)(layout.Height * PtPerMm));

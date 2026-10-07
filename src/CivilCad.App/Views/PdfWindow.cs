@@ -29,6 +29,7 @@ public sealed class PdfWindow : Window
     private readonly CheckBox _mono = new() { Content = "白黒で印刷する (線はすべて黒、塗りは灰色)" };
     private readonly TextBox _weight = new() { Width = 60 };
     private readonly CheckBox _embed = new() { Content = "文字を検索・コピーできるようにする (フォントを埋め込む。数 MB 大きくなる)" };
+    private readonly CheckBox _lossless = new() { Content = "画像を劣化なしで保存する (ファイルが大きくなる)" };
     private readonly CheckBox _open = new() { Content = "印刷したら PDF を開く" };
     private readonly TextBlock _summary = new() { Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
     private readonly Button _ok = new() { Content = "保存先を選んで印刷", IsDefault = true, Padding = new Thickness(12, 2, 12, 2), Margin = new Thickness(0, 0, 8, 0) };
@@ -58,6 +59,7 @@ public sealed class PdfWindow : Window
         _mono.IsChecked = Last.Monochrome;
         _weight.Text = Last.DefaultLineWeightMm.ToString("0.##", CultureInfo.InvariantCulture);
         _embed.IsChecked = Last.EmbedFonts;
+        _lossless.IsChecked = Last.LosslessImages;
         _open.IsChecked = s_openAfter;
         _fit.IsChecked = Last.FitToPaper;
 
@@ -113,6 +115,7 @@ public sealed class PdfWindow : Window
         Row("既定の線幅", weight, "線幅を指定していない図形の線の太さ");
         Row("", _mono);
         Row("", _embed, "オフなら文字は形 (アウトライン) で印刷する (見た目は同じで、ファイルが小さい)");
+        Row("", _lossless, $"オフなら画像は高画質の JPEG (画質 {PdfOptions.JpegQuality}) で保存する (見た目はほぼ同じで、ファイルが小さい)");
         Row("", _open);
 
         var cancel = new Button { Content = "キャンセル", IsCancel = true, Padding = new Thickness(12, 2, 12, 2) };
@@ -164,6 +167,7 @@ public sealed class PdfWindow : Window
         Last.Monochrome = o.Monochrome;
         Last.DefaultLineWeightMm = o.DefaultLineWeightMm;
         Last.EmbedFonts = o.EmbedFonts;
+        Last.LosslessImages = o.LosslessImages;
         Last.Range = o.Range;
         Last.FitToPaper = o.FitToPaper;
         s_openAfter = openAfter;
@@ -185,6 +189,7 @@ public sealed class PdfWindow : Window
             Monochrome = _mono.IsChecked == true,
             DefaultLineWeightMm = weight,
             EmbedFonts = _embed.IsChecked == true,
+            LosslessImages = _lossless.IsChecked == true,
             Range = range,
             FitToPaper = fit,
             Region = range switch
