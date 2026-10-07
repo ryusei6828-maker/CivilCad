@@ -198,10 +198,12 @@ public static class PdfExport
             // プリセット (記号) は線・塗り・円・文字に展開する
             var visible = (o.Only ?? doc.Entities).Where(doc.IsVisible).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e]).ToList();
             // 画像は一番下
-            foreach (var img in visible.OfType<ImageEntity>()) DrawImage(img);
+            foreach (var img in visible.OfType<ImageEntity>().Where(i => !i.InFront)) DrawImage(img);
             // 塗りは線の下に描く (画面と同じ)
             foreach (var e in visible.Where(IsFill)) DrawFill(e);
             foreach (var e in visible.Where(e => !IsFill(e))) DrawEntity(e);
+            // 最前面にした画像は線・文字の上
+            foreach (var img in visible.OfType<ImageEntity>().Where(i => i.InFront)) DrawImage(img);
         }
 
         /// <summary>画像 (オルソ画像・PDF のページ)。用紙上で 300dpi 相当の画素で読む。読めなければ描かない。</summary>
@@ -218,6 +220,13 @@ public static class PdfExport
             if (o.Monochrome) paint.ColorFilter = SKColorFilter.CreateColorMatrix([0.299f, 0.587f, 0.114f, 0, 0, 0.299f, 0.587f, 0.114f, 0, 0, 0.299f, 0.587f, 0.114f, 0, 0, 0, 0, 0, 1, 0]);
             using var image = SKImage.FromBitmap(bmp);
             canvas.Save();
+            // トリミングした範囲だけ
+            var clip = new SKPathBuilder();
+            var corners = img.Corners;
+            clip.MoveTo(P(corners[0]));
+            foreach (var c in corners.Skip(1)) clip.LineTo(P(c));
+            clip.Close();
+            using (var clipPath = clip.Detach()) canvas.ClipPath(clipPath, antialias: true);
             canvas.Concat(in m);
             canvas.DrawImage(image, 0, 0, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear), paint);
             canvas.Restore();

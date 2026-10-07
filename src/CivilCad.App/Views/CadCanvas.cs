@@ -156,7 +156,13 @@ public sealed class CadCanvas : FrameworkElement
             var d = e.DistanceTo(world);
             if (d <= bestD) (best, bestD) = (e, d);
         }
-        return best;
+        if (best != null) return best;
+        // 近くに線などが無ければ、クリックした所に見えている画像 (上に描いてあるもの) を選ぶ
+        for (var i = Document.Entities.Count - 1; i >= 0; i--)
+            if (Document.Entities[i] is ImageEntity { InFront: true } front && Document.IsEditable(front) && front.Contains(world)) return front;
+        for (var i = Document.Entities.Count - 1; i >= 0; i--)
+            if (Document.Entities[i] is ImageEntity img && Document.IsEditable(img) && img.Contains(world)) return img;
+        return null;
     }
 
     // ---- 表示範囲 ----
@@ -365,7 +371,7 @@ public sealed class CadCanvas : FrameworkElement
         if (ActualWidth <= 0) return;
         var view = VisibleWorldBox;
         // 画像 → 塗りつぶし → 線・文字 の順に描き、線や文字が画像や塗りに隠れないようにする
-        foreach (var pass in new[] { 0, 1, 2 })
+        foreach (var pass in new[] { 0, 1, 2, 3 })
         {
             foreach (var e in Document.Entities)
             {
@@ -384,7 +390,8 @@ public sealed class CadCanvas : FrameworkElement
         }
     }
 
-    private static int DrawPass(Entity e) => e is ImageEntity ? 0 : IsFill(e) ? 1 : 2;
+    /// <summary>描く順: 画像 → 塗りつぶし → 線・文字 → 最前面にした画像。同じ段の中は図形の並び順 (前面へ / 背面へ で変わる)。</summary>
+    private static int DrawPass(Entity e) => e is ImageEntity img ? (img.InFront ? 3 : 0) : IsFill(e) ? 1 : 2;
 
     private static bool IsFill(Entity e) => e is HatchEntity { Solid: true } or PolylineEntity { Filled: true };
 

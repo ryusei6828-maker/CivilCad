@@ -147,6 +147,12 @@ public partial class MainWindow : Window
             case "PDF": PrintPdf(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
             case "SCL": StartTool(new ScaleTool(), c); break;
+            case "IC": StartTool(new ImageCropTool(), c); break;
+            case "DF" or "DB":
+                if (Canvas.Selection.Count == 0) { Log("先に図形を選択してください。"); break; }
+                _doc.History.Execute(new DrawOrderCommand([.. Canvas.Selection], toFront: c == "DF"));
+                Log($"{Canvas.Selection.Count} 個を{(c == "DF" ? "最前面" : "最背面")}にしました。");
+                break;
             case "AL": StartTool(new AlignTool(), c); break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
             case "RO": StartTool(new RotateTool(), c); break;
@@ -248,6 +254,11 @@ public partial class MainWindow : Window
             Item("拡大縮小", () => RunCommand("SCL"), hasSel, "SCL");
             Item("2 点指示 (位置合わせ)", () => RunCommand("AL"), hasSel, "AL");
             Item("削除", DeleteSelection, hasSel, "Delete");
+            menu.Items.Add(new Separator());
+            Item("最前面へ (画像は線・文字より上)", () => RunCommand("DF"), hasSel, "DF");
+            Item("最背面へ (画像は一番下)", () => RunCommand("DB"), hasSel, "DB");
+            if (Canvas.Selection.Count == 1 && Canvas.Selection.First() is ImageEntity)
+                Item("画像のトリミング", () => RunCommand("IC"), true, "IC");
             Item("選択を解除", Canvas.ClearSelection, hasSel, "Esc");
             menu.Items.Add(new Separator());
             Item("元に戻す", () => Undo_Executed(this, null!), _doc.History.CanUndo, "Ctrl+Z");

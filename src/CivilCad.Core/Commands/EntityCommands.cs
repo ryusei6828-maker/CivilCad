@@ -173,3 +173,39 @@ public sealed class SplitEntityCommand(Entity original, IEnumerable<Entity> piec
         doc.Entities.Insert(_index, original);
     }
 }
+
+/// <summary>
+/// 表示の順番: 図形を最前面 (並びの最後) / 最背面 (並びの最初) へ。画像は最前面にすると線・文字より上、最背面にすると一番下になる。
+/// </summary>
+public sealed class DrawOrderCommand(IEnumerable<Entity> entities, bool toFront) : IUndoableCommand
+{
+    private readonly List<Entity> _targets = [.. entities];
+    private List<Entity> _oldOrder = [];
+    private readonly Dictionary<ImageEntity, bool> _oldFront = [];
+
+    public string Name => toFront ? "最前面へ" : "最背面へ";
+
+    public void Do(CadDocument doc)
+    {
+        _oldOrder = [.. doc.Entities];
+        var set = _targets.ToHashSet();
+        var moved = doc.Entities.Where(set.Contains).ToList(); // 選んだ図形どうしの順番は保つ
+        var rest = doc.Entities.Where(e => !set.Contains(e)).ToList();
+        foreach (var img in moved.OfType<ImageEntity>())
+        {
+            _oldFront[img] = img.InFront;
+            img.InFront = toFront;
+        }
+        doc.Entities.Clear();
+        doc.Entities.AddRange(toFront ? rest.Concat(moved) : moved.Concat(rest));
+        doc.NotifyChanged();
+    }
+
+    public void Undo(CadDocument doc)
+    {
+        foreach (var (img, front) in _oldFront) img.InFront = front;
+        doc.Entities.Clear();
+        doc.Entities.AddRange(_oldOrder);
+        doc.NotifyChanged();
+    }
+}

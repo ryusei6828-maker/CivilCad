@@ -89,6 +89,25 @@
         <GeometryDrawing Brush="#FFF0B429" Geometry="M15.5,8.5 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"/>
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
+    <DrawingImage x:Key="IconCrop" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Brush="#FFE8F1FB" Geometry="M7,7 L19,7 L19,17 L7,17 Z"/>
+        <GeometryDrawing Brush="#FF6FAF5F" Geometry="M8,16 L12,11 L15,14 L18,16 Z"/>
+        <GeometryDrawing Pen="{StaticResource IcoInkPen}" Geometry="M7,2 L7,17 L22,17 M2,7 L17,7 L17,22"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
+    <DrawingImage x:Key="IconBringFront" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Brush="#FFD0D0D0" Pen="{StaticResource IcoInkPen}" Geometry="M3,3 L14,3 L14,14 L3,14 Z"/>
+        <GeometryDrawing Brush="{StaticResource IcoBlue}" Pen="{StaticResource IcoInkPen}" Geometry="M9,9 L21,9 L21,21 L9,21 Z"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
+    <DrawingImage x:Key="IconSendBack" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Brush="{StaticResource IcoBlue}" Pen="{StaticResource IcoInkPen}" Geometry="M9,9 L21,9 L21,21 L9,21 Z"/>
+        <GeometryDrawing Brush="#FFD0D0D0" Pen="{StaticResource IcoInkPen}" Geometry="M3,3 L14,3 L14,14 L3,14 Z"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <DrawingImage x:Key="IconPerpendicular" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
         <GeometryDrawing Pen="{StaticResource IcoInkPen}" Geometry="M1,22 L14,22"/>

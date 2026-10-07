@@ -7,7 +7,8 @@ namespace CivilCad.Core.Model;
 /// 画像 (写真・オルソ画像など)。画像ファイルは図面に埋め込まず、ファイルの場所 (Path) を持つ。
 /// 画像の左下が Origin、U = 画像の下辺 (左→右) のベクトル、V = 左辺 (下→上) のベクトル。
 /// U と V が直交でなくてもよい (ワールドファイルの回転・ゆがみもそのまま表せる)。
-/// 選択は枠の線で行う (画像の上に作図するとき、中をクリックしても画像が選ばれないように)。
+/// 選択は枠の線で行う (画像の上に作図するとき、中をクリックしても画像が選ばれないように)。近くに線などが無ければ中のクリックでも選べる。
+/// トリミング (Crop*) は画像の中の範囲 (0〜1) で持ち、見えている範囲だけを表示・印刷・選択に使う。
 /// </summary>
 public sealed class ImageEntity(Layer layer, string path, int pixelWidth, int pixelHeight, Vec2 origin, Vec2 u, Vec2 v) : Entity(layer)
 {
@@ -23,6 +24,26 @@ public sealed class ImageEntity(Layer layer, string path, int pixelWidth, int pi
 
     /// <summary>透明度 (%)。0 = 不透明。</summary>
     public double TransparencyPercent { get; set; }
+
+    /// <summary>トリミング: 見える範囲の左端・上端・右端・下端 (画像の中の位置 0〜1。上端・下端は上から)。既定は全体。</summary>
+    public double CropLeft { get; set; }
+    public double CropTop { get; set; }
+    public double CropRight { get; set; } = 1;
+    public double CropBottom { get; set; } = 1;
+
+    public bool IsCropped => CropLeft > 1e-9 || CropTop > 1e-9 || CropRight < 1 - 1e-9 || CropBottom < 1 - 1e-9;
+
+    /// <summary>トリミングを画像の中の範囲 (s, t) で決める (範囲は 0〜1 に収め、幅・高さが 0 にならないようにする)。</summary>
+    public void SetCrop(double left, double top, double right, double bottom)
+    {
+        (left, right) = (Math.Clamp(Math.Min(left, right), 0, 1), Math.Clamp(Math.Max(left, right), 0, 1));
+        (top, bottom) = (Math.Clamp(Math.Min(top, bottom), 0, 1), Math.Clamp(Math.Max(top, bottom), 0, 1));
+        if (right - left < 1e-6 || bottom - top < 1e-6) throw new ArgumentException("トリミングの範囲が画像にかかっていません。");
+        (CropLeft, CropTop, CropRight, CropBottom) = (left, top, right, bottom);
+    }
+
+    /// <summary>線・文字などより前に描く (最前面)。既定は一番下 (線・塗りの下)。</summary>
+    public bool InFront { get; set; }
 
     public double Width => U.Length;
     public double Height => V.Length;
@@ -41,8 +62,18 @@ public sealed class ImageEntity(Layer layer, string path, int pixelWidth, int pi
         return (a, 1 - b);
     }
 
-    /// <summary>四隅 (左下・右下・右上・左上)。</summary>
-    public Vec2[] Corners => [Origin, Origin + U, Origin + U + V, Origin + V];
+    /// <summary>見えている範囲 (トリミング後) の四隅 (左下・右下・右上・左上)。</summary>
+    public Vec2[] Corners => [Map(CropLeft, CropBottom), Map(CropRight, CropBottom), Map(CropRight, CropTop), Map(CropLeft, CropTop)];
+
+    /// <summary>トリミング前の画像全体の四隅 (左下・右下・右上・左上)。</summary>
+    public Vec2[] FullCorners => [Origin, Origin + U, Origin + U + V, Origin + V];
+
+    /// <summary>点が見えている範囲 (トリミング後) の中にあるか。</summary>
+    public bool Contains(Vec2 p)
+    {
+        var (s, t) = Unmap(p);
+        return s >= CropLeft && s <= CropRight && t >= CropTop && t <= CropBottom;
+    }
 
     private IEnumerable<(Vec2 A, Vec2 B)> Edges
     {
@@ -80,7 +111,16 @@ public sealed class ImageEntity(Layer layer, string path, int pixelWidth, int pi
     public override IEnumerable<Curve> Curves => Edges.Select(e => (Curve)new SegmentCurve(e.A, e.B));
 
     public override Entity Clone() =>
-        CopyPropertiesTo(new ImageEntity(Layer, Path, PixelWidth, PixelHeight, Origin, U, V) { TransparencyPercent = TransparencyPercent, Page = Page });
+        CopyPropertiesTo(new ImageEntity(Layer, Path, PixelWidth, PixelHeight, Origin, U, V)
+        {
+            TransparencyPercent = TransparencyPercent,
+            Page = Page,
+            CropLeft = CropLeft,
+            CropTop = CropTop,
+            CropRight = CropRight,
+            CropBottom = CropBottom,
+            InFront = InFront,
+        });
 
     public override IEnumerable<SnapPoint> SnapPoints => Corners.Select(c => new SnapPoint(c, SnapKind.Endpoint));
 

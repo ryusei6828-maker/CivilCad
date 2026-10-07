@@ -32,6 +32,7 @@
                 <Separator/>
                 <MenuItem Header="座標読込 SIMA / CSV (PI)..." Tag="PI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPoints}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="画像読込 JPG / PNG / TIFF / PDF (IM)..." Tag="IM" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconImage}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="画像のトリミング (IC)" Tag="IC" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCrop}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
                 <MenuItem Header="終了(_X)" Click="Exit_Click"/>
             </MenuItem>
@@ -40,6 +41,8 @@
                 <MenuItem Header="やり直し(_R)" Command="Redo"><MenuItem.Icon><Image Source="{StaticResource IconRedo}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
                 <MenuItem Header="すべて選択(_A)" Command="SelectAll"/>
+                <MenuItem Header="最前面へ (DF)" Tag="DF" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconBringFront}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="最背面へ (DB)" Tag="DB" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconSendBack}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="削除モード (E)" Tag="E" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconErase}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
             <MenuItem Header="描画(_D)">
@@ -158,6 +161,9 @@
                         <Button Style="{StaticResource ToolButton}" Tag="ZN" Click="Tool_Click" ToolTip="平面直角座標系の系番号 (ZN)"><StackPanel><Image Source="{StaticResource IconCoord}" Width="24" Height="24"/><TextBlock Text="座標系" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="PI" Click="Tool_Click" ToolTip="座標読込 SIMA / CSV (PI)"><StackPanel><Image Source="{StaticResource IconPoints}" Width="24" Height="24"/><TextBlock Text="座標読込" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="IM" Click="Tool_Click" ToolTip="画像読込 JPG / PNG / TIFF / PDF (IM): オルソ画像や PDF の図面などを配置"><StackPanel><Image Source="{StaticResource IconImage}" Width="24" Height="24"/><TextBlock Text="画像読込" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="IC" Click="Tool_Click" ToolTip="画像のトリミング (IC): 画像を選んで、残す範囲の対角の 2 点を指定"><StackPanel><Image Source="{StaticResource IconCrop}" Width="24" Height="24"/><TextBlock Text="トリミング" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="DF" Click="Tool_Click" ToolTip="最前面へ (DF): 選択した図形を一番上に。画像は線・文字より上になる"><StackPanel><Image Source="{StaticResource IconBringFront}" Width="24" Height="24"/><TextBlock Text="最前面" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="DB" Click="Tool_Click" ToolTip="最背面へ (DB): 選択した図形を一番下に。画像は線・塗りの下になる"><StackPanel><Image Source="{StaticResource IconSendBack}" Width="24" Height="24"/><TextBlock Text="最背面" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="計測">

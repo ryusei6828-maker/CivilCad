@@ -165,11 +165,13 @@ public static class DxfIO
             Uvector = new Vector2(u.X, u.Y),
             Vvector = new Vector2(v.X, v.Y),
         };
-        if (img.Page > 0)
+        if (img.Page > 0 || img.IsCropped || img.InFront)
         {
-            // PDF のページ番号 (0 から) は XData に入れる
+            // PDF のページ番号 (0 から)・トリミング (左・上・右・下)・最前面 は XData に入れる
             var xd = new XData(new netDxf.Tables.ApplicationRegistry(AppId));
             xd.XDataRecord.Add(new XDataRecord(XDataCode.Int16, (short)img.Page));
+            foreach (var c in new[] { img.CropLeft, img.CropTop, img.CropRight, img.CropBottom }) xd.XDataRecord.Add(new XDataRecord(XDataCode.Real, c));
+            xd.XDataRecord.Add(new XDataRecord(XDataCode.Int16, (short)(img.InFront ? 1 : 0)));
             image.XData.Add(xd);
         }
         return image;
@@ -190,8 +192,20 @@ public static class DxfIO
         }
         var u = new Vec2(o.Uvector.X, o.Uvector.Y).Normalized() * o.Width;
         var v = new Vec2(o.Vvector.X, o.Vvector.Y).Normalized() * o.Height;
-        var page = o.XData.TryGetValue(AppId, out var xd) && xd.XDataRecord.FirstOrDefault(r => r.Code == XDataCode.Int16)?.Value is short p ? p : 0;
-        return new ImageEntity(layer, file, def.Width, def.Height, V(o.Position), u, v) { Page = Math.Max(0, (int)page) };
+        var records = o.XData.TryGetValue(AppId, out var xd) ? xd.XDataRecord : [];
+        var shorts = records.Where(r => r.Code == XDataCode.Int16).Select(r => r.Value is short s ? s : (short)0).ToList();
+        var reals = records.Where(r => r.Code == XDataCode.Real).Select(r => r.Value is double d ? d : 0).ToList();
+        var image = new ImageEntity(layer, file, def.Width, def.Height, V(o.Position), u, v)
+        {
+            Page = shorts.Count > 0 ? Math.Max(0, (int)shorts[0]) : 0,
+            InFront = shorts.Count > 1 && shorts[1] != 0,
+        };
+        if (reals.Count >= 4)
+        {
+            try { image.SetCrop(reals[0], reals[1], reals[2], reals[3]); }
+            catch (ArgumentException) { } // 壊れた値なら全体を表示
+        }
+        return image;
     }
 
     private static Text ToDxfText(TextEntity t)
