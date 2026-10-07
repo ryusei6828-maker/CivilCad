@@ -190,7 +190,7 @@
             </StatusBarItem>
             <Separator/>
             <StatusBarItem>
-                <Button x:Name="ScaleButton" Focusable="False" Click="ScaleButton_Click" Padding="6,0" ToolTip="図面の縮尺 (クリックで変更)"/>
+                <Button x:Name="ScaleButton" Focusable="False" Click="ScaleButton_Click" Padding="6,0" ToolTip="このシートの縮尺: 印刷の大きさと、文字・図枠など用紙上の mm の換算に使う。図形の実寸と計測の値は変わらない (クリックで変更)"/>
             </StatusBarItem>
             <StatusBarItem>
                 <Button x:Name="ZoneButton" Focusable="False" Click="ZoneButton_Click" Padding="6,0" ToolTip="平面直角座標系の系番号 (クリックで変更)"/>
@@ -350,7 +350,7 @@
                     <!-- 右端: 表示中のシートの縮尺と平面直角座標系 (クリックで変更) -->
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,6,0">
                         <Button x:Name="TabScaleButton" Click="ScaleButton_Click" Focusable="False" Style="{StaticResource SheetInfoButton}"
-                                ToolTip="表示中のシートの縮尺 (クリックで変更)"/>
+                                ToolTip="このシートの縮尺: 印刷の大きさと、文字・図枠など用紙上の mm の換算に使う。図形の実寸と計測の値は変わらない (クリックで変更)"/>
                         <Button x:Name="TabZoneButton" Click="ZoneButton_Click" Focusable="False" Style="{StaticResource SheetInfoButton}"
                                 ToolTip="表示中のシートの平面直角座標系 (クリックで変更)"/>
                     </StackPanel>

@@ -54,7 +54,7 @@ public sealed class Sheet : INotifyPropertyChanged
     /// <summary>タブの見出し (未保存の変更があれば *)。</summary>
     public string Title => FileName + (IsModified ? " *" : "");
 
-    public string ScaleText => $"縮尺 {Doc.ScaleText}";
+    public string ScaleText => $"シートの縮尺 {Doc.ScaleText}";
     public string ZoneText => Doc.PlaneZone is int n && PlaneRectangular.Find(n) is { } z ? $"座標系 {z.Name}" : "座標系 未設定";
 
     /// <summary>タブに小さく出す縮尺と系 (例: 1:500 ・ II系)。</summary>
