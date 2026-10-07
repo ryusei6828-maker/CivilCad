@@ -23,6 +23,12 @@ public sealed class CircleEntity(Layer layer, Vec2 center, double radius) : Enti
     public override void Translate(Vec2 delta) => Center += delta;
     public override void Rotate(Vec2 origin, double rad) => Center = Center.RotateAround(origin, rad);
 
+    public override void Scale(Vec2 origin, double k)
+    {
+        Center = ScalePoint(Center, origin, k);
+        Radius *= k;
+    }
+
     public override IEnumerable<Curve> Curves => [new CircleCurve(Center, Radius)];
 
     public override Entity Clone() => CopyPropertiesTo(new CircleEntity(Layer, Center, Radius));

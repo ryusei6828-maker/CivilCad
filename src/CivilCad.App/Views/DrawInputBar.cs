@@ -127,6 +127,18 @@ public sealed class DrawInputBar : Border
             case IRadiusInput ri:
                 AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
                 break;
+            case PresetTool:
+                AddPresetKind();
+                AddNumber($"大きさ (mm, {doc.ScaleText})", () => PresetSettings.SizeMm,
+                    v => { if (v is double s) { PresetSettings.SizeMm = s; _canvas?.Tool.RefreshPrompt(); } },
+                    "用紙上の大きさ。図面の縮尺によらず、用紙上 (図面全体を見たとき) この大きさになる", allowEmpty: false);
+                if (SymbolLibrary.Get(PresetSettings.Kind).PointsNorth)
+                    AddNorthReference(doc);
+                else
+                    AddNumber("向き (°)", () => PresetSettings.AngleDeg,
+                        v => { if (v is double a) { PresetSettings.AngleDeg = a; _canvas?.Tool.RefreshPrompt(); } },
+                        "記号の上の向き。0 = 図面の上、反時計回りが正", allowEmpty: false, allowNegative: true);
+                break;
             case MeasureToolBase:
                 AddMeasureUnit(doc);
                 AddCheck("結果を文字で記入", MeasureSettings.PlaceText, v => MeasureSettings.PlaceText = v,
@@ -425,6 +437,92 @@ public sealed class DrawInputBar : Border
             Committed?.Invoke(this, EventArgs.Empty);
         };
         _panel.Children.Add(box);
+    }
+
+    private void AddPresetKind()
+    {
+        AddLabel("種類");
+        var defs = SymbolLibrary.All;
+        var box = new ComboBox
+        {
+            Width = 170,
+            Margin = new Thickness(0, 0, 12, 0),
+            ItemsSource = defs.Select(d => d.IsUser ? $"★ {d.Name}" : d.Name).ToList(),
+            SelectedIndex = Math.Max(0, defs.ToList().FindIndex(d => d.Kind == PresetSettings.Kind)),
+            ToolTip = "置くプリセット",
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0 || defs[box.SelectedIndex].Kind == PresetSettings.Kind) return;
+            PresetSettings.Kind = defs[box.SelectedIndex].Kind;
+            PresetSettings.SizeMm = defs[box.SelectedIndex].DefaultSizeMm;
+            _canvas?.Tool.RefreshPrompt();
+            Dispatcher.BeginInvoke(Rebuild); // 大きさの欄を標準の大きさにする
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
+
+        // 登録したプリセットは削除できる
+        if (SymbolLibrary.Get(PresetSettings.Kind) is { IsUser: true } user)
+        {
+            var delete = new Button
+            {
+                Content = "削除",
+                Padding = new Thickness(6, 0, 6, 0),
+                Margin = new Thickness(-8, 0, 12, 0),
+                Focusable = false,
+                ToolTip = $"登録したプリセット「{user.Name}」を一覧から削除する (図面に置いたものは残る)",
+            };
+            delete.Click += (_, _) =>
+            {
+                if (MessageBox.Show(Window.GetWindow(this), $"プリセット「{user.Name}」を削除しますか？\n(図面に置いたものはそのまま残ります)",
+                        "プリセットの削除", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+                SymbolLibrary.RemoveUser(user.Kind);
+                Settings.UserPresetStore.Save();
+                var first = SymbolLibrary.BuiltIn[0];
+                PresetSettings.Kind = first.Kind;
+                PresetSettings.SizeMm = first.DefaultSizeMm;
+                _canvas?.Tool.RefreshPrompt();
+                Dispatcher.BeginInvoke(Rebuild);
+                Committed?.Invoke(this, EventArgs.Empty);
+            };
+            _panel.Children.Add(delete);
+        }
+    }
+
+    /// <summary>方位記号の北: 真北 (子午線収差を補正) か 座標北 (図面の上) か。図面の方位記号すべてに効く。</summary>
+    private void AddNorthReference(CadDocument doc)
+    {
+        AddLabel("北");
+        var box = new ComboBox
+        {
+            Width = 80,
+            Margin = new Thickness(0, 0, 8, 0),
+            ItemsSource = new[] { "真北", "座標北" },
+            SelectedIndex = doc.UseTrueNorth ? 0 : 1,
+            ToolTip = "方位記号の N の向き。置いた後も、移動・回転しても常にこの北を指す (図面の方位記号すべてに効く)\n" +
+                      "真北 = 平面直角座標の系から子午線収差を補正した北 / 座標北 = 図面の上 (X 軸)",
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0) return;
+            doc.UseTrueNorth = box.SelectedIndex == 0;
+            _canvas?.Tool.RefreshPrompt();
+            _canvas?.RedrawOverlay();
+            Dispatcher.BeginInvoke(Rebuild);
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
+        if (doc.UseTrueNorth && !doc.CanUseTrueNorth)
+            _panel.Children.Add(new TextBlock
+            {
+                Text = "系が未設定のため図面の上 (座標系の系番号 ZN で設定)",
+                Foreground = System.Windows.Media.Brushes.DarkOrange,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 12, 0),
+            });
+        else if (doc.UseTrueNorth)
+            _panel.Children.Add(new TextBlock { Text = $"{doc.PlaneZone}系", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) });
     }
 
     private void AddHatchStyle()

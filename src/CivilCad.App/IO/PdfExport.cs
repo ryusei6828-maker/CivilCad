@@ -131,10 +131,32 @@ public static class PdfExport
         public void Draw()
         {
             canvas.Clear(SKColors.White);
-            var visible = doc.Entities.Where(doc.IsVisible).ToList();
+            // プリセット (記号) は線・塗り・円・文字に展開する
+            var visible = doc.Entities.Where(doc.IsVisible).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e]).ToList();
+            // 画像は一番下
+            foreach (var img in visible.OfType<ImageEntity>()) DrawImage(img);
             // 塗りは線の下に描く (画面と同じ)
             foreach (var e in visible.Where(IsFill)) DrawFill(e);
             foreach (var e in visible.Where(e => !IsFill(e))) DrawEntity(e);
+        }
+
+        /// <summary>画像 (オルソ画像・PDF のページ)。用紙上で 300dpi 相当の画素で読む。読めなければ描かない。</summary>
+        private void DrawImage(ImageEntity img)
+        {
+            using var bmp = ImageRaster.Load(img, (int)Math.Ceiling(img.Width / layout.MetersPerMm / 25.4 * 300));
+            if (bmp == null) return;
+            // 画素 (x, y) (左上が原点) → 用紙: 左上の角 + U 方向 × x / 幅 + (−V) 方向 × y / 高さ
+            var topLeft = P(img.Origin + img.V);
+            var right = P(img.Origin + img.U + img.V) - topLeft;
+            var down = P(img.Origin) - topLeft;
+            var m = new SKMatrix(right.X / bmp.Width, down.X / bmp.Height, topLeft.X, right.Y / bmp.Width, down.Y / bmp.Height, topLeft.Y, 0, 0, 1);
+            using var paint = new SKPaint { Color = SKColors.White.WithAlpha((byte)Math.Round(255 * (1 - Math.Clamp(img.TransparencyPercent, 0, 100) / 100))) };
+            if (o.Monochrome) paint.ColorFilter = SKColorFilter.CreateColorMatrix([0.299f, 0.587f, 0.114f, 0, 0, 0.299f, 0.587f, 0.114f, 0, 0, 0.299f, 0.587f, 0.114f, 0, 0, 0, 0, 0, 1, 0]);
+            using var image = SKImage.FromBitmap(bmp);
+            canvas.Save();
+            canvas.Concat(in m);
+            canvas.DrawImage(image, 0, 0, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear), paint);
+            canvas.Restore();
         }
 
         private static bool IsFill(Entity e) => e is HatchEntity { Solid: true } or PolylineEntity { Filled: true };

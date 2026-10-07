@@ -122,5 +122,17 @@ public static class DrawingFiles
         }
     }
 
+    /// <summary>画像を含む図面を保存したときの注意 (無ければ null)。画像を残せるのは DXF だけ (ファイルの場所を記録する)。</summary>
+    public static string? ImageNote(CadDocument doc, string path)
+    {
+        var n = doc.Entities.OfType<ImageEntity>().Count();
+        if (n == 0) return null;
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext is ".dxf" or "")
+            return "※ 画像は DXF に埋め込まず、画像ファイルの場所を記録しています。DXF を別の場所へ移すときは画像ファイルも同じフォルダに入れてください。";
+        var name = ext switch { ".sfc" => "SFC", ".p21" => "SXF (P21)", ".jww" => "Jw_cad (JWW)", ".dwg" => "DWG", _ => ext.TrimStart('.').ToUpperInvariant() };
+        return $"※ {name} には画像を保存できないため、画像 {n} 枚は保存していません (画像も残すには DXF で保存してください)。";
+    }
+
     private static string PaperText(PaperSize? paper, double w, double h) => paper?.Name ?? $"自由 {w:0}×{h:0}mm";
 }

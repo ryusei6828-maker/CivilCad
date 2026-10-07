@@ -127,6 +127,15 @@ public sealed class HatchEntity : Entity
         _lines = null;
     }
 
+    /// <summary>境界と線の間隔をいっしょに拡大縮小する (線の本数は変わらない)。</summary>
+    public override void Scale(Vec2 origin, double k)
+    {
+        foreach (var l in Loops)
+            for (var i = 0; i < l.Count; i++) l[i] = ScalePoint(l[i], origin, k);
+        Patterns = [.. Patterns.Select(p => p with { Spacing = p.Spacing * k, Origin = ScalePoint(p.Origin, origin, k) })];
+        _lines = null;
+    }
+
     public override Entity Clone() =>
         CopyPropertiesTo(new HatchEntity(Layer, Loops, Patterns, Solid) { PatternName = PatternName, Opacity = Opacity });
 

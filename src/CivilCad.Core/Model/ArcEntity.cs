@@ -86,6 +86,12 @@ public sealed class ArcEntity(Layer layer, Vec2 center, double radius, double st
         EndAngle += rad;
     }
 
+    public override void Scale(Vec2 origin, double k)
+    {
+        Center = ScalePoint(Center, origin, k);
+        Radius *= k;
+    }
+
     public override IEnumerable<Curve> Curves => [new CircleCurve(Center, Radius, StartAngle, EndAngle, IsFull: false)];
 
     public override Entity Clone() => CopyPropertiesTo(new ArcEntity(Layer, Center, Radius, StartAngle, EndAngle));

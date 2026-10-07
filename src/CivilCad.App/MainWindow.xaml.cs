@@ -34,8 +34,14 @@ public partial class MainWindow : Window
     private AlignmentInput _alignmentInput { get => _active.AlignmentInput; set => _active.AlignmentInput = value; }
     private HorizontalAlignment? _alignment { get => _active.Alignment; set => _active.Alignment = value; }
 
+    /// <summary>方位記号の真北: 平面直角座標 (図面の x = 東, y = 北) から子午線収差を求める。</summary>
+    public static void RegisterTrueNorth() =>
+        CadDocument.TrueNorthProvider ??= (zone, p) =>
+            PlaneRectangular.Find(zone) is { } z ? PlaneRectangular.TrueNorthRotation(z, p.Y, p.X) : null;
+
     public MainWindow()
     {
+        RegisterTrueNorth();
         InitializeComponent();
         SheetTabs.ItemsSource = _sheets;
         ActivateSheet(AddSheet());
@@ -65,6 +71,7 @@ public partial class MainWindow : Window
         LoadSnapKinds();
         BuildSnapBar();
         LoadBoxSelectMode();
+        if (_settings.MessageLogHeight is double h) MessageLog.Height = Math.Clamp(h, MessageLogMin, 1000);
 
         // レイヤパネルは既定で閉じておき、現在レイヤはステータスバーに出す
         PropsPanel.Attach(Canvas);
@@ -124,11 +131,22 @@ public partial class MainWindow : Window
             case "T": StartTool(new TextTool(), c); break;
             case "PE": StartTool(new PerpendicularTool(), c); break;
             case "FI": StartTool(new HatchTool(fill: true), c); break;
+            case "PS": StartTool(new PresetTool(), c); break;
+            case "PSR": StartTool(new PresetRegisterTool(AskPresetName), c); break;
+            case "NM": StartTool(new NorthManualTool(), c); break;
+            case "NA":
+                var count = NorthArrows.SetAuto(_doc, Canvas.Selection);
+                Log(count > 0 ? $"方位記号 {count} 個を北に合わせました (自動: 移動・回転しても北を指します)。"
+                              : "北に合わせる方位記号がありません (手動にした方位記号は無く、方位記号も選択されていません)。");
+                break;
             case "J": JoinSelection(); break;
             case "H": StartTool(new HatchTool(), c); break;
             case "PI": ImportPoints(); break;
+            case "IM": ImportImage(); break;
             case "PDF": PrintPdf(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
+            case "SCL": StartTool(new ScaleTool(), c); break;
+            case "AL": StartTool(new AlignTool(), c); break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
             case "RO": StartTool(new RotateTool(), c); break;
             case "O": StartTool(new OffsetTool(), c); break;
@@ -226,6 +244,8 @@ public partial class MainWindow : Window
             var hasSel = Canvas.Selection.Count > 0;
             Item("移動", () => RunCommand("M"), hasSel, "M");
             Item("複写", () => RunCommand("CO"), hasSel, "CO");
+            Item("拡大縮小", () => RunCommand("SCL"), hasSel, "SCL");
+            Item("2 点指示 (位置合わせ)", () => RunCommand("AL"), hasSel, "AL");
             Item("削除", DeleteSelection, hasSel, "Delete");
             Item("選択を解除", Canvas.ClearSelection, hasSel, "Esc");
             menu.Items.Add(new Separator());
@@ -472,6 +492,7 @@ public partial class MainWindow : Window
         try
         {
             Log(DrawingFiles.Save(_doc, dlg.FileName));
+            if (DrawingFiles.ImageNote(_doc, dlg.FileName) is { } imageNote) Log(imageNote);
             _filePath = dlg.FileName;
             _active.MarkSaved();
             UpdateTitle();
@@ -889,6 +910,94 @@ public partial class MainWindow : Window
             (file.SkippedLines > 0 ? $" (読めなかった行 {file.SkippedLines})" : ""));
     }
 
+    private PresetRegisterInput? AskPresetName(string defaultName)
+    {
+        var dlg = new PresetNameWindow(defaultName) { Owner = this };
+        return dlg.ShowDialog() == true ? dlg.Result : null;
+    }
+
+    // ---- 画像読込 ----
+
+    /// <summary>
+    /// 画像 (オルソ画像など) を読み込む。ここでは画像の大きさと位置情報だけを読み、画素は表示するときに裏で読む
+    /// (大きな画像でも画面が止まらないように)。ワールドファイル / GeoTIFF があればその位置に置き、無ければ位置を指定する。
+    /// </summary>
+    private void ImportImage()
+    {
+        var open = new OpenFileDialog
+        {
+            Title = "画像・PDF ファイルを開く",
+            Filter = "画像・PDF (*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif;*.pdf)|*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif;*.pdf|" +
+                     "画像ファイル (*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif)|*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif|PDF (*.pdf)|*.pdf|すべてのファイル (*.*)|*.*",
+        };
+        if (open.ShowDialog(this) != true) return;
+        var path = open.FileName;
+        if (PdfRenderer.IsPdf(path))
+        {
+            ImportPdf(path);
+            return;
+        }
+
+        ImageInfo info;
+        try
+        {
+            info = ImageCache.ReadInfo(path);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"{Path.GetFileName(path)} を画像として読み込めませんでした。\n{ex.Message}", "画像読込", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        ImageCache.Forget(path); // 同じ名前で中身が替わっている場合に備えて読み直す
+
+        if (info.Placement is not { } pl)
+        {
+            Log($"画像「{Path.GetFileName(path)}」({info.PixelWidth}×{info.PixelHeight}) には位置情報 (ワールドファイル) がありません。配置する位置を指定してください。" +
+                "置いた後に 2 点指示 (AL) で、画像の上の 2 点を図面の 2 点に合わせられます。");
+            StartTool(new ImagePlaceTool(path, info.PixelWidth, info.PixelHeight), "IM");
+            return;
+        }
+        var img = new ImageEntity(_doc.CurrentLayer, path, info.PixelWidth, info.PixelHeight, pl.Origin, pl.U, pl.V);
+        _doc.History.Execute(new AddEntitiesCommand([img], "画像読込"));
+        if (!Canvas.VisibleWorldBox.Contains(img.Bounds))
+            Canvas.ZoomTo(img.Bounds.Inflate(Math.Max(img.Bounds.Width, img.Bounds.Height) * 0.05));
+        Log($"画像読込: {Path.GetFileName(path)} ({info.PixelWidth}×{info.PixelHeight}) を {info.PlacementSource} の位置に配置しました " +
+            $"(幅 {img.Width:0.###}m × 高さ {img.Height:0.###}m、1 画素 {img.Width / info.PixelWidth:0.####}m)。");
+    }
+
+    /// <summary>PDF のページを画像として置く (ページを選び、位置と幅を指定。Enter で原寸)。</summary>
+    private void ImportPdf(string path)
+    {
+        List<PdfPageInfo> pages;
+        try
+        {
+            pages = PdfRenderer.ReadPages(path);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"{Path.GetFileName(path)} を開けませんでした (パスワード付きの PDF などは読めません)。\n{ex.Message}",
+                "PDF 読込", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (pages.Count == 0)
+        {
+            Log($"PDF 読込: {Path.GetFileName(path)} にページがありません。");
+            return;
+        }
+        var page = pages[0];
+        if (pages.Count > 1)
+        {
+            var dlg = new PdfPageWindow(Path.GetFileName(path), pages) { Owner = this };
+            if (dlg.ShowDialog() != true || dlg.Result is not { } chosen) return;
+            page = chosen;
+        }
+        ImageCache.Forget(path);
+        var (w, h) = PdfRenderer.PixelSize(page);
+        Log($"PDF「{Path.GetFileName(path)}」{page.Label} を読み込みます。左下の位置と幅を指定してください (Enter で原寸 = {_doc.ScaleText} で用紙の大きさ)。" +
+            "置いた後に 2 点指示 (AL) で、PDF の上の 2 点を図面の 2 点に合わせられます。");
+        StartTool(new ImagePlaceTool(path, w, h, page.Index, page.WidthMm), "IM");
+    }
+
     // ---- 路線 ----
 
     /// <summary>路線計算ダイアログ。input を渡すとその内容 (XML から読んだ路線など) で開く。</summary>
@@ -1114,6 +1223,22 @@ public partial class MainWindow : Window
     }
 
     // ---- 範囲選択の方法 (全体 / 一部) ----
+
+    private const double MessageLogMin = 18;
+
+    private void MessageLogSizer_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        // 上へドラッグすると広がる。キャンバスが残るよう、ウィンドウの 7 割までにする
+        var max = Math.Max(MessageLogMin, ActualHeight * 0.7);
+        MessageLog.Height = Math.Clamp(MessageLog.Height - e.VerticalChange, MessageLogMin, max);
+        MessageLog.ScrollToEnd();
+    }
+
+    private void MessageLogSizer_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        _settings.MessageLogHeight = MessageLog.Height;
+        SaveSettingsQuietly();
+    }
 
     private void LoadBoxSelectMode()
     {

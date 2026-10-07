@@ -24,6 +24,12 @@ public sealed class LineEntity(Layer layer, Vec2 start, Vec2 end) : Entity(layer
         End = End.RotateAround(origin, rad);
     }
 
+    public override void Scale(Vec2 origin, double k)
+    {
+        Start = ScalePoint(Start, origin, k);
+        End = ScalePoint(End, origin, k);
+    }
+
     public override IEnumerable<Curve> Curves => [new SegmentCurve(Start, End)];
 
     public override Entity Clone() => CopyPropertiesTo(new LineEntity(Layer, Start, End));

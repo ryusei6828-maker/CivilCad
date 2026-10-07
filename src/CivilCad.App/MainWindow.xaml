@@ -31,6 +31,7 @@
                 <MenuItem Header="PDF に印刷(_P)... (PDF)" Tag="PDF" Click="Tool_Click"/>
                 <Separator/>
                 <MenuItem Header="座標読込 SIMA / CSV (PI)..." Tag="PI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPoints}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="画像読込 JPG / PNG / TIFF / PDF (IM)..." Tag="IM" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconImage}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
                 <MenuItem Header="終了(_X)" Click="Exit_Click"/>
             </MenuItem>
@@ -50,6 +51,10 @@
                 <MenuItem Header="文字 (T)" Tag="T" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconText}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="ハッチング (H)" Tag="H" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconHatch}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="塗りつぶし (FI)" Tag="FI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFill}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="プリセット (方位記号など) (PS)" Tag="PS" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPreset}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="選択した図形をプリセットに登録 (PSR)" Tag="PSR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPresetAdd}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="方位記号の向き (手動) (NM)" Tag="NM" Click="Tool_Click"/>
+                <MenuItem Header="方位記号を北に合わせる (自動セット) (NA)" Tag="NA" Click="Tool_Click"/>
             </MenuItem>
             <MenuItem Header="図面(_Z)">
                 <MenuItem Header="図枠 (外枠・表題欄) (FR)..." Tag="FR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFrame}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
@@ -59,6 +64,8 @@
             </MenuItem>
             <MenuItem Header="修正(_M)">
                 <MenuItem Header="移動 (M)" Tag="M" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconMove}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="拡大縮小 (SCL)" Tag="SCL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconResize}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="2 点指示 (位置合わせ) (AL)" Tag="AL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconAlign}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="複写 (CO)" Tag="CO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCopy}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="回転 (RO)" Tag="RO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRotate}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
@@ -122,6 +129,8 @@
                         <Button Style="{StaticResource ToolButton}" Tag="T" Click="Tool_Click" ToolTip="文字 (T)"><StackPanel><Image Source="{StaticResource IconText}" Width="24" Height="24"/><TextBlock Text="文字" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="H" Click="Tool_Click" ToolTip="ハッチング (H)"><StackPanel><Image Source="{StaticResource IconHatch}" Width="24" Height="24"/><TextBlock Text="ハッチング" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="FI" Click="Tool_Click" ToolTip="塗りつぶし (FI)"><StackPanel><Image Source="{StaticResource IconFill}" Width="24" Height="24"/><TextBlock Text="塗りつぶし" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="PS" Click="Tool_Click" ToolTip="プリセット (PS): 方位記号など"><StackPanel><Image Source="{StaticResource IconPreset}" Width="24" Height="24"/><TextBlock Text="プリセット" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="PSR" Click="Tool_Click" ToolTip="プリセット登録 (PSR): 選択した図形をプリセットにする"><StackPanel><Image Source="{StaticResource IconPresetAdd}" Width="24" Height="24"/><TextBlock Text="プリセット登録" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="修正">
@@ -129,6 +138,8 @@
                         <Button Style="{StaticResource ToolButton}" Tag="M" Click="Tool_Click" ToolTip="移動 (M) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconMove}" Width="24" Height="24"/><TextBlock Text="移動" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="CO" Click="Tool_Click" ToolTip="複写 (CO) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconCopy}" Width="24" Height="24"/><TextBlock Text="複写" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="RO" Click="Tool_Click" ToolTip="回転 (RO) ※先に図形を選択。角度は度 (反時計回りが +)、C で元を残す"><StackPanel><Image Source="{StaticResource IconRotate}" Width="24" Height="24"/><TextBlock Text="回転" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="SCL" Click="Tool_Click" ToolTip="拡大縮小 (SCL) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconResize}" Width="24" Height="24"/><TextBlock Text="拡大縮小" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="AL" Click="Tool_Click" ToolTip="2 点指示 (AL): 画像などの上の 2 点を図面上の 2 点に合わせる (移動・回転・拡大縮小) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconAlign}" Width="24" Height="24"/><TextBlock Text="2点指示" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="O" Click="Tool_Click" ToolTip="オフセット (O): 距離を入力 → 図形 → ずらす側をクリック"><StackPanel><Image Source="{StaticResource IconOffset}" Width="24" Height="24"/><TextBlock Text="オフセット" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="TR" Click="Tool_Click" ToolTip="トリム (TR): 境界を選んで Enter → 切り取る部分をクリック (Shift+クリックで延長)"><StackPanel><Image Source="{StaticResource IconTrim}" Width="24" Height="24"/><TextBlock Text="トリム" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="EX" Click="Tool_Click" ToolTip="延長 (EX): 境界を選んで Enter → 伸ばす端をクリック (Shift+クリックでトリム)"><StackPanel><Image Source="{StaticResource IconExtend}" Width="24" Height="24"/><TextBlock Text="延長" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
@@ -144,6 +155,7 @@
                         <Button Style="{StaticResource ToolButton}" Tag="CS" Click="Tool_Click" ToolTip="座標設定 (CS)"><StackPanel><Image Source="{StaticResource IconCoord}" Width="24" Height="24"/><TextBlock Text="座標" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="ZN" Click="Tool_Click" ToolTip="平面直角座標系の系番号 (ZN)"><StackPanel><Image Source="{StaticResource IconCoord}" Width="24" Height="24"/><TextBlock Text="座標系" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="PI" Click="Tool_Click" ToolTip="座標読込 SIMA / CSV (PI)"><StackPanel><Image Source="{StaticResource IconPoints}" Width="24" Height="24"/><TextBlock Text="座標読込" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="IM" Click="Tool_Click" ToolTip="画像読込 JPG / PNG / TIFF / PDF (IM): オルソ画像や PDF の図面などを配置"><StackPanel><Image Source="{StaticResource IconImage}" Width="24" Height="24"/><TextBlock Text="画像読込" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="計測">
@@ -227,10 +239,20 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBox x:Name="MessageLog" Height="54" IsReadOnly="True" Background="#FF252526" Foreground="#FFCCCCCC"
+            <!-- 上端をドラッグして高さを変える -->
+            <Thumb x:Name="MessageLogSizer" Height="5" Cursor="SizeNS" Background="#FF3C3C3C" ToolTip="ドラッグで高さを変更"
+                   DragDelta="MessageLogSizer_DragDelta" DragCompleted="MessageLogSizer_DragCompleted">
+                <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="{TemplateBinding Background}"/>
+                    </ControlTemplate>
+                </Thumb.Template>
+            </Thumb>
+            <TextBox x:Name="MessageLog" Grid.Row="1" Height="54" IsReadOnly="True" Background="#FF252526" Foreground="#FFCCCCCC"
                      BorderThickness="0" FontFamily="Consolas, Yu Gothic UI" VerticalScrollBarVisibility="Auto" Padding="4,2"/>
-            <DockPanel Grid.Row="1">
+            <DockPanel Grid.Row="2">
                 <TextBlock x:Name="PromptText" DockPanel.Dock="Left" Foreground="#FF9CDCFE" VerticalAlignment="Center"
                            Margin="6,0,6,0" FontFamily="Yu Gothic UI"/>
                 <TextBox x:Name="CommandBox" Background="#FF1E1E1E" Foreground="White" CaretBrush="White"

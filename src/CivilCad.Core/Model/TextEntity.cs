@@ -85,6 +85,14 @@ public sealed class TextEntity(Layer layer, Vec2 position, string text, double h
         Rotation += rad;
     }
 
+    public override void Scale(Vec2 origin, double k)
+    {
+        Position = ScalePoint(Position, origin, k);
+        Height *= k;
+        if (ScreenHeightPx is double px) ScreenHeightPx = px * k; // 画面で一定の文字も同じ割合で
+        if (FitWidth is double fit) FitWidth = fit * k;
+    }
+
     public override Entity Clone() => CopyPropertiesTo(new TextEntity(Layer, Position, Text, Height, Rotation)
     {
         HAlign = HAlign,

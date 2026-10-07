@@ -1,4 +1,4 @@
-using System.Runtime.ExceptionServices;
+﻿using System.Runtime.ExceptionServices;
 using CivilCad.App.Settings;
 
 namespace CivilCad.Tests;
@@ -28,12 +28,12 @@ public class WindowLoadTests
                 var draw = (System.Windows.Controls.TabItem)tabs.Items[0];
                 Assert.Equal("描画", draw.Header);
                 Assert.Equal(0, tabs.SelectedIndex);
-                Assert.Equal(["L", "PL", "C", "A", "PE", "T", "H", "FI"],
+                Assert.Equal(["L", "PL", "C", "A", "PE", "T", "H", "FI", "PS", "PSR"],
                     ((System.Windows.Controls.Panel)draw.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
-                // 「修正」タブ: 移動・複写・回転・オフセット・トリム・延長・文字変更・結合・削除
+                // 「修正」タブ: 移動・複写・回転・拡大縮小・2 点指示・オフセット・トリム・延長・文字変更・結合・削除
                 var modify = (System.Windows.Controls.TabItem)tabs.Items[1];
                 Assert.Equal("修正", modify.Header);
-                Assert.Equal(["M", "CO", "RO", "O", "TR", "EX", "ED", "J", "E"],
+                Assert.Equal(["M", "CO", "RO", "SCL", "AL", "O", "TR", "EX", "ED", "J", "E"],
                     ((System.Windows.Controls.Panel)modify.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
                 Assert.NotNull(settings.Content);
                 Assert.NotNull(frame.Content);
