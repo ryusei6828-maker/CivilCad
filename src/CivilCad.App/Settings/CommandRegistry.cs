@@ -27,6 +27,7 @@ public static class CommandRegistry
         new("IM", "画像読込 (JPG / PNG / TIFF / PDF)", "IconImage", "ワールドファイル (.jgw/.tfw など) があればその位置に、無ければ位置と幅を指定して配置。PDF は Enter で原寸"),
         new("ZN","平面直角座標系の系番号", "IconCoord", "I〜XIX系。緯度経度の表示に使う"),
         new("M", "移動", "IconMove", "先に図形を選択"),
+        new("SCL", "拡大縮小", "IconResize", "先に図形を選択。基点 → 倍率 (または 参照する長さ → 新しい長さ)"),
         new("CO", "複写", "IconCopy", "先に図形を選択"),
         new("E", "削除モード", "IconErase", "クリックした図形を消す。Esc で終了"),
         new("DI", "距離・方向角", "IconDistance"),

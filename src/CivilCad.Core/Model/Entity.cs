@@ -28,6 +28,11 @@ public abstract class Entity(Layer layer)
 
     /// <summary>origin を中心に rad (反時計回り) だけ回転する。</summary>
     public abstract void Rotate(Vec2 origin, double rad);
+
+    /// <summary>origin を中心に k 倍に拡大縮小する (k &gt; 0)。</summary>
+    public abstract void Scale(Vec2 origin, double k);
+
+    protected static Vec2 ScalePoint(Vec2 p, Vec2 origin, double k) => origin + (p - origin) * k;
     public abstract Entity Clone();
     public virtual IEnumerable<SnapPoint> SnapPoints => [];
 

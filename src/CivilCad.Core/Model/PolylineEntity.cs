@@ -57,6 +57,11 @@ public sealed class PolylineEntity(Layer layer, IEnumerable<Vec2> points, bool i
         for (var i = 0; i < Points.Count; i++) Points[i] = Points[i].RotateAround(origin, rad);
     }
 
+    public override void Scale(Vec2 origin, double k)
+    {
+        for (var i = 0; i < Points.Count; i++) Points[i] = ScalePoint(Points[i], origin, k);
+    }
+
     public override IEnumerable<Curve> Curves => Segments.Select(s => (Curve)new SegmentCurve(s.A, s.B));
 
     public override Entity Clone() => CopyPropertiesTo(new PolylineEntity(Layer, Points, IsClosed) { Filled = Filled });

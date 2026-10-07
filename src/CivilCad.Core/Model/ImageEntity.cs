@@ -70,6 +70,13 @@ public sealed class ImageEntity(Layer layer, string path, int pixelWidth, int pi
         V = V.Rotate(rad);
     }
 
+    public override void Scale(Vec2 origin, double k)
+    {
+        Origin = ScalePoint(Origin, origin, k);
+        U *= k;
+        V *= k;
+    }
+
     public override IEnumerable<Curve> Curves => Edges.Select(e => (Curve)new SegmentCurve(e.A, e.B));
 
     public override Entity Clone() =>

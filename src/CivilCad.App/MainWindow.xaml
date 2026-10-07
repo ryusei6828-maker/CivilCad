@@ -62,6 +62,7 @@
             </MenuItem>
             <MenuItem Header="修正(_M)">
                 <MenuItem Header="移動 (M)" Tag="M" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconMove}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="拡大縮小 (SCL)" Tag="SCL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconResize}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="複写 (CO)" Tag="CO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCopy}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="結合 (J)" Tag="J" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconJoin}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="削除モード (E)" Tag="E" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconErase}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
@@ -126,6 +127,7 @@
                     <StackPanel Orientation="Horizontal">
                         <Button Style="{StaticResource ToolButton}" Tag="M" Click="Tool_Click" ToolTip="移動 (M) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconMove}" Width="24" Height="24"/><TextBlock Text="移動" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="CO" Click="Tool_Click" ToolTip="複写 (CO) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconCopy}" Width="24" Height="24"/><TextBlock Text="複写" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="SCL" Click="Tool_Click" ToolTip="拡大縮小 (SCL) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconResize}" Width="24" Height="24"/><TextBlock Text="拡大縮小" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="J" Click="Tool_Click" ToolTip="結合 (J)"><StackPanel><Image Source="{StaticResource IconJoin}" Width="24" Height="24"/><TextBlock Text="結合" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="E" Click="Tool_Click" ToolTip="削除モード (E): クリックした図形を消す。Esc で終了"><StackPanel><Image Source="{StaticResource IconErase}" Width="24" Height="24"/><TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>

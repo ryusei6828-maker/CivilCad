@@ -199,6 +199,13 @@
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
     <!-- 修正 -->
+    <DrawingImage x:Key="IconResize" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Pen="{StaticResource IcoInkPen}" Geometry="M3,13 L11,13 L11,21 L3,21 Z"/>
+        <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M3,3 L21,3 L21,21 L3,21 Z"/>
+        <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M12,12 L18,6 M14,6 L18,6 L18,10"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <DrawingImage x:Key="IconMove" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
         <GeometryDrawing Pen="{StaticResource IcoInkThick}"

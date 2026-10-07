@@ -164,3 +164,133 @@ public sealed class MoveCopyTool(bool copy) : CadTool
         }
     }
 }
+
+/// <summary>
+/// 拡大縮小: 選択した図形を基点を中心に拡大・縮小する。
+/// 基点 → 倍率を入力 (2 = 2 倍、0.5 = 半分)、または 参照: 元の長さを 2 点で指定 → 新しい長さを入力 / クリック。
+/// Esc を押すまで続けて同じ図形を拡大縮小できる。
+/// </summary>
+public sealed class ScaleTool : CadTool
+{
+    private const int MaxPreviewEntities = 300;
+    private static readonly RgbColor GhostColor = new(0x66, 0xCC, 0xFF);
+    private List<Entity> _targets = [];
+    private Vec2? _base;
+    private Vec2? _ref1;
+    private double? _refLength;
+    private Vec2 _cursor;
+
+    public override string Name => "拡大縮小";
+    public override bool RequiresSelection => true;
+    public override bool WantsTextInput => _base != null;
+    public override bool CanStepBack => _base != null;
+
+    /// <summary>参照の始点を決めたあとは、そこからの長さを測る。</summary>
+    public override Vec2? BasePoint => _ref1 ?? _base;
+
+    protected override void OnActivated()
+    {
+        _targets = [.. Doc.Entities.Where(Canvas.Selection.Contains)];
+        UpdatePrompt();
+    }
+
+    private void UpdatePrompt() => SetPrompt(
+        _base == null ? $"拡大縮小 ({_targets.Count} 個): 基点 (動かない点) を指定"
+        : _ref1 == null ? "倍率を入力 (2 = 2 倍、0.5 = 半分)、または 参照する長さの始点をクリック"
+        : _refLength == null ? "参照: 元の長さの終点を指定"
+        : $"参照: 新しい長さを入力 (m)、またはクリック (元の長さ {_refLength:0.###}m)");
+
+    public override void StepBack()
+    {
+        if (_refLength != null) _refLength = null;
+        else if (_ref1 != null) _ref1 = null;
+        else _base = null;
+        UpdatePrompt();
+    }
+
+    public override void OnPoint(Vec2 p)
+    {
+        if (_base == null) _base = p;
+        else if (_ref1 == null) _ref1 = p;
+        else if (_refLength is not double refLen)
+        {
+            var len = (p - _ref1.Value).Length;
+            if (len < 1e-9)
+            {
+                Canvas.ShowMessage("拡大縮小: 元の長さが 0 です。別の点を指定してください。");
+                return;
+            }
+            _refLength = len;
+        }
+        else
+        {
+            Apply((p - _ref1.Value).Length / refLen);
+            return;
+        }
+        UpdatePrompt();
+    }
+
+    public override bool OnText(string text)
+    {
+        if (_base == null || !TryParseNumber(text, out var v)) return false;
+        if (_ref1 == null) Apply(v);                                  // 倍率
+        else if (_refLength is double refLen) Apply(v / refLen);       // 新しい長さ
+        else return false;
+        return true;
+    }
+
+    private void Apply(double k)
+    {
+        if (!(k > 0) || double.IsInfinity(k))
+        {
+            Canvas.ShowMessage("拡大縮小: 倍率は 0 より大きい値にしてください。");
+            return;
+        }
+        var origin = _base!.Value;
+        var pairs = _targets.Where(Doc.Entities.Contains).Select(e =>
+        {
+            var c = e.Clone();
+            c.Scale(origin, k);
+            return (Old: e, New: c);
+        }).ToList();
+        Execute(new ReplaceEntitiesCommand(pairs, $"拡大縮小 ×{k:0.####}"));
+        _targets = [.. pairs.Select(p => p.New)];
+        Canvas.SetSelection(_targets);
+        Canvas.ShowMessage($"拡大縮小: {pairs.Count} 個を {k:0.####} 倍にしました。");
+        // 続けて同じ図形を拡大縮小できる (Esc で終了)
+        _base = null;
+        _ref1 = null;
+        _refLength = null;
+        SetPrompt($"続けて拡大縮小 ({_targets.Count} 個): 基点を指定 (Esc で終了)");
+    }
+
+    public override void OnMouseMove(Vec2 p) => _cursor = p;
+
+    public override void DrawPreview(DrawingContext dc)
+    {
+        if (_base is not Vec2 b) return;
+        if (_ref1 is not Vec2 r1)
+        {
+            Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, b, _cursor);
+            return;
+        }
+        Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, r1, _cursor);
+        if (_refLength is not double refLen) return;
+        var k = (_cursor - r1).Length / refLen;
+        if (k <= 0) return;
+        if (_targets.Count > MaxPreviewEntities)
+        {
+            var box = _targets.Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
+            Vec2 S(Vec2 p) => b + (p - b) * k;
+            Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen,
+                [S(box.Min), S(new Vec2(box.Max.X, box.Min.Y)), S(box.Max), S(new Vec2(box.Min.X, box.Max.Y))], true);
+            return;
+        }
+        foreach (var e in _targets)
+        {
+            var ghost = e.Clone();
+            ghost.Scale(b, k);
+            Canvas.DrawEntity(dc, ghost, GhostColor);
+        }
+    }
+}

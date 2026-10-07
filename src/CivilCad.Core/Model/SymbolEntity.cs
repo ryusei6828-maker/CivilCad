@@ -272,6 +272,14 @@ public sealed class SymbolEntity(Layer layer, string kind, Vec2 position, double
         Rotation += rad;
     }
 
+    /// <summary>用紙上の大きさ (mm) も同じ倍率にする (縮尺を変えても拡大縮小した大きさが保たれる)。</summary>
+    public override void Scale(Vec2 origin, double k)
+    {
+        Position = ScalePoint(Position, origin, k);
+        Size *= k;
+        SizeMm *= k;
+    }
+
     public override Entity Clone() => CopyPropertiesTo(new SymbolEntity(Layer, Kind, Position, SizeMm, Size, Rotation) { AutoNorth = AutoNorth });
 
     public override IEnumerable<SnapPoint> SnapPoints => [new(Position, SnapKind.Node)];

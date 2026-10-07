@@ -139,6 +139,7 @@ public partial class MainWindow : Window
             case "PI": ImportPoints(); break;
             case "IM": ImportImage(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
+            case "SCL": StartTool(new ScaleTool(), c); break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
             case "DI": StartTool(new DistanceTool(), c); break;
             case "AA": StartTool(new AreaTool(), c); break;
@@ -250,6 +251,7 @@ public partial class MainWindow : Window
             var hasSel = Canvas.Selection.Count > 0;
             Item("移動", () => RunCommand("M"), hasSel, "M");
             Item("複写", () => RunCommand("CO"), hasSel, "CO");
+            Item("拡大縮小", () => RunCommand("SCL"), hasSel, "SCL");
             Item("削除", DeleteSelection, hasSel, "Delete");
             Item("選択を解除", Canvas.ClearSelection, hasSel, "Esc");
             menu.Items.Add(new Separator());
