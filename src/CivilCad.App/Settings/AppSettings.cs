@@ -22,6 +22,9 @@ public sealed class AppSettings
     /// <summary>範囲選択の方法 ("Inside" = 全体選択 / "Crossing" = 一部選択)。</summary>
     public string? BoxSelectMode { get; set; }
 
+    /// <summary>下部のメッセージ欄の高さ (px)。null なら既定。</summary>
+    public double? MessageLogHeight { get; set; }
+
     /// <summary>新しい図面 (系の入っていない図面) に使う平面直角座標系の系番号。</summary>
     public int? DefaultPlaneZone { get; set; }
 

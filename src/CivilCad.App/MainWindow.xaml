@@ -215,10 +215,20 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBox x:Name="MessageLog" Height="54" IsReadOnly="True" Background="#FF252526" Foreground="#FFCCCCCC"
+            <!-- 上端をドラッグして高さを変える -->
+            <Thumb x:Name="MessageLogSizer" Height="5" Cursor="SizeNS" Background="#FF3C3C3C" ToolTip="ドラッグで高さを変更"
+                   DragDelta="MessageLogSizer_DragDelta" DragCompleted="MessageLogSizer_DragCompleted">
+                <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="{TemplateBinding Background}"/>
+                    </ControlTemplate>
+                </Thumb.Template>
+            </Thumb>
+            <TextBox x:Name="MessageLog" Grid.Row="1" Height="54" IsReadOnly="True" Background="#FF252526" Foreground="#FFCCCCCC"
                      BorderThickness="0" FontFamily="Consolas, Yu Gothic UI" VerticalScrollBarVisibility="Auto" Padding="4,2"/>
-            <DockPanel Grid.Row="1">
+            <DockPanel Grid.Row="2">
                 <TextBlock x:Name="PromptText" DockPanel.Dock="Left" Foreground="#FF9CDCFE" VerticalAlignment="Center"
                            Margin="6,0,6,0" FontFamily="Yu Gothic UI"/>
                 <TextBox x:Name="CommandBox" Background="#FF1E1E1E" Foreground="White" CaretBrush="White"

@@ -60,6 +60,7 @@ public partial class MainWindow : Window
         LoadSnapKinds();
         BuildSnapBar();
         LoadBoxSelectMode();
+        if (_settings.MessageLogHeight is double h) MessageLog.Height = Math.Clamp(h, MessageLogMin, 1000);
 
         // レイヤパネルは既定で閉じておき、現在レイヤはステータスバーに出す
         PropsPanel.Attach(Canvas);
@@ -1121,6 +1122,22 @@ public partial class MainWindow : Window
     }
 
     // ---- 範囲選択の方法 (全体 / 一部) ----
+
+    private const double MessageLogMin = 18;
+
+    private void MessageLogSizer_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        // 上へドラッグすると広がる。キャンバスが残るよう、ウィンドウの 7 割までにする
+        var max = Math.Max(MessageLogMin, ActualHeight * 0.7);
+        MessageLog.Height = Math.Clamp(MessageLog.Height - e.VerticalChange, MessageLogMin, max);
+        MessageLog.ScrollToEnd();
+    }
+
+    private void MessageLogSizer_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        _settings.MessageLogHeight = MessageLog.Height;
+        SaveSettingsQuietly();
+    }
 
     private void LoadBoxSelectMode()
     {
