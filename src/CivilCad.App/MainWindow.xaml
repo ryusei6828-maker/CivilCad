@@ -50,6 +50,7 @@
                 <MenuItem Header="ハッチング (H)" Tag="H" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconHatch}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="塗りつぶし (FI)" Tag="FI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFill}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="プリセット (方位記号など) (PS)" Tag="PS" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPreset}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="選択した図形をプリセットに登録 (PSR)" Tag="PSR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPresetAdd}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
             <MenuItem Header="図面(_Z)">
                 <MenuItem Header="図枠 (外枠・表題欄) (FR)..." Tag="FR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFrame}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
@@ -116,6 +117,7 @@
                         <Button Style="{StaticResource ToolButton}" Tag="H" Click="Tool_Click" ToolTip="ハッチング (H)"><StackPanel><Image Source="{StaticResource IconHatch}" Width="24" Height="24"/><TextBlock Text="ハッチング" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="FI" Click="Tool_Click" ToolTip="塗りつぶし (FI)"><StackPanel><Image Source="{StaticResource IconFill}" Width="24" Height="24"/><TextBlock Text="塗りつぶし" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="PS" Click="Tool_Click" ToolTip="プリセット (PS): 方位記号など"><StackPanel><Image Source="{StaticResource IconPreset}" Width="24" Height="24"/><TextBlock Text="プリセット" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="PSR" Click="Tool_Click" ToolTip="プリセット登録 (PSR): 選択した図形をプリセットにする"><StackPanel><Image Source="{StaticResource IconPresetAdd}" Width="24" Height="24"/><TextBlock Text="プリセット登録" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="修正">

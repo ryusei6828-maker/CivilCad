@@ -537,27 +537,11 @@ public sealed class CadCanvas : FrameworkElement
     /// <summary>プリセット (記号): 定義の図形を位置・大きさ・向きに合わせて描く。選択中は範囲を破線で囲む。</summary>
     private void DrawSymbol(DrawingContext dc, SymbolEntity s, RgbColor color, bool selected)
     {
-        var pen = GetPen(color, false, s.LineWeight);
-        foreach (var shape in s.Definition.Shapes)
-        {
-            switch (shape)
-            {
-                case SymbolPoly p when p.Points.Count > 1:
-                    dc.DrawGeometry(p.Filled ? GetBrush(color) : null, pen, PolylineGeometry(p.Points.Select(s.Map).ToList(), p.Closed));
-                    break;
-                case SymbolCircle c:
-                    var r = c.Radius * s.Size * Scale;
-                    dc.DrawEllipse(c.Filled ? GetBrush(color) : null, pen, WorldToScreen(s.Map(c.Center)), r, r);
-                    break;
-                case SymbolText t:
-                    DrawText(dc, new TextEntity(s.Layer, s.Map(t.Position), t.Text, t.Height * s.Size, s.Rotation)
-                    {
-                        HAlign = TextHAlign.Center,
-                        VAlign = TextVAlign.Middle,
-                    }, color, false);
-                    break;
-            }
-        }
+        // 展開した図形 (線・円・文字・ハッチなど) を描く。塗りは先に描く。
+        // 図形ごとの色 (登録したときの色) があればその色で、薄く表示する (他レイヤ) ときは薄い色で描く
+        var dimmed = color != s.EffectiveColor;
+        foreach (var part in s.Explode().OrderBy(x => IsFill(x) ? 0 : 1))
+            DrawEntity(dc, part, dimmed ? color : part.EffectiveColor);
         if (selected)
         {
             var b = s.Bounds;

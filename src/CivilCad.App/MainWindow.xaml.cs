@@ -121,6 +121,7 @@ public partial class MainWindow : Window
             case "PE": StartTool(new PerpendicularTool(), c); break;
             case "FI": StartTool(new HatchTool(fill: true), c); break;
             case "PS": StartTool(new PresetTool(), c); break;
+            case "PSR": StartTool(new PresetRegisterTool(AskPresetName), c); break;
             case "J": JoinSelection(); break;
             case "H": StartTool(new HatchTool(), c); break;
             case "PI": ImportPoints(); break;
@@ -904,6 +905,12 @@ public partial class MainWindow : Window
             (file.Lots.Count > 0 && options.DrawLots ? $"、画地 {file.Lots.Count} 区画" : "") +
             $" をレイヤ「{entities[0].Layer.Name}」に配置しました。" +
             (file.SkippedLines > 0 ? $" (読めなかった行 {file.SkippedLines})" : ""));
+    }
+
+    private PresetRegisterInput? AskPresetName(string defaultName)
+    {
+        var dlg = new PresetNameWindow(defaultName) { Owner = this };
+        return dlg.ShowDialog() == true ? dlg.Result : null;
     }
 
     // ---- 画像読込 ----

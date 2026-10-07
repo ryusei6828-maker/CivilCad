@@ -15,6 +15,7 @@ public static class CommandRegistry
         new("T", "文字", "IconText"),
         new("FI", "塗りつぶし", "IconFill", "閉じた図形を選択してから実行、または内側をクリック"),
         new("PS", "プリセット (方位記号など)", "IconPreset", "記号を選んでクリックで配置。大きさは用紙上の mm"),
+        new("PSR", "プリセット登録", "IconPresetAdd", "図形を選択してから実行。基準点と名前を指定すると、プリセット (PS) で置けるようになる"),
         new("J", "結合", "IconJoin", "つながった線を選択して実行すると 1 本の線になる"),
         new("H", "ハッチング", "IconHatch", "閉じた図形の内側をクリック、または点を指定して Enter"),
         new("FR", "図枠 (外枠・表題欄)", "IconFrame"),

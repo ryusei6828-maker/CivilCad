@@ -16,6 +16,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         DispatcherUnhandledException += OnUnhandledException;
+        Settings.UserPresetStore.Load(); // 登録したプリセット
     }
 
     /// <summary>

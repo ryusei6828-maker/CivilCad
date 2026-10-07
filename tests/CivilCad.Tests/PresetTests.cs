@@ -90,7 +90,7 @@ public class PresetTests
     public void SavedAsPlainShapes_InDxfAndSfc()
     {
         var doc = new CadDocument { ScaleDenominator = 500 };
-        foreach (var def in SymbolLibrary.All)
+        foreach (var def in SymbolLibrary.BuiltIn)
             doc.Entities.Add(new SymbolEntity(doc.CurrentLayer, def.Kind, new Vec2(doc.Entities.Count * 30, 0), def.DefaultSizeMm, doc.PaperMmToMeters(def.DefaultSizeMm)));
         foreach (var ext in new[] { ".dxf", ".sfc" })
         {

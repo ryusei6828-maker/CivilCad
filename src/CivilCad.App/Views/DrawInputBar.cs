@@ -436,9 +436,9 @@ public sealed class DrawInputBar : Border
         var defs = SymbolLibrary.All;
         var box = new ComboBox
         {
-            Width = 150,
+            Width = 170,
             Margin = new Thickness(0, 0, 12, 0),
-            ItemsSource = defs.Select(d => d.Name).ToList(),
+            ItemsSource = defs.Select(d => d.IsUser ? $"★ {d.Name}" : d.Name).ToList(),
             SelectedIndex = Math.Max(0, defs.ToList().FindIndex(d => d.Kind == PresetSettings.Kind)),
             ToolTip = "置くプリセット",
         };
@@ -452,6 +452,33 @@ public sealed class DrawInputBar : Border
             Committed?.Invoke(this, EventArgs.Empty);
         };
         _panel.Children.Add(box);
+
+        // 登録したプリセットは削除できる
+        if (SymbolLibrary.Get(PresetSettings.Kind) is { IsUser: true } user)
+        {
+            var delete = new Button
+            {
+                Content = "削除",
+                Padding = new Thickness(6, 0, 6, 0),
+                Margin = new Thickness(-8, 0, 12, 0),
+                Focusable = false,
+                ToolTip = $"登録したプリセット「{user.Name}」を一覧から削除する (図面に置いたものは残る)",
+            };
+            delete.Click += (_, _) =>
+            {
+                if (MessageBox.Show(Window.GetWindow(this), $"プリセット「{user.Name}」を削除しますか？\n(図面に置いたものはそのまま残ります)",
+                        "プリセットの削除", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+                SymbolLibrary.RemoveUser(user.Kind);
+                Settings.UserPresetStore.Save();
+                var first = SymbolLibrary.BuiltIn[0];
+                PresetSettings.Kind = first.Kind;
+                PresetSettings.SizeMm = first.DefaultSizeMm;
+                _canvas?.Tool.RefreshPrompt();
+                Dispatcher.BeginInvoke(Rebuild);
+                Committed?.Invoke(this, EventArgs.Empty);
+            };
+            _panel.Children.Add(delete);
+        }
     }
 
     private void AddHatchStyle()

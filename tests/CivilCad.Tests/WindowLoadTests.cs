@@ -28,7 +28,7 @@ public class WindowLoadTests
                 var draw = (System.Windows.Controls.TabItem)tabs.Items[0];
                 Assert.Equal("描画", draw.Header);
                 Assert.Equal(0, tabs.SelectedIndex);
-                Assert.Equal(["L", "PL", "C", "A", "PE", "T", "H", "FI", "PS"],
+                Assert.Equal(["L", "PL", "C", "A", "PE", "T", "H", "FI", "PS", "PSR"],
                     ((System.Windows.Controls.Panel)draw.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
                 Assert.NotNull(settings.Content);
                 Assert.NotNull(frame.Content);
