@@ -24,7 +24,7 @@ public static class CommandRegistry
         new("SC", "縮尺設定", "IconScale", "文字高・図枠・路線注記の換算に使う"),
         new("CS", "座標設定", "IconCoord", "基準点を測量座標に合わせて図面を移動・回転"),
         new("PI", "座標読込 (SIMA / CSV)", "IconPoints", "座標ファイルの点を、点の印と点名で図面に配置"),
-        new("IM", "画像読込 (JPG / PNG / TIFF)", "IconImage", "ワールドファイル (.jgw/.tfw など) があればその位置に、無ければ位置と幅を指定して配置"),
+        new("IM", "画像読込 (JPG / PNG / TIFF / PDF)", "IconImage", "ワールドファイル (.jgw/.tfw など) があればその位置に、無ければ位置と幅を指定して配置。PDF は Enter で原寸"),
         new("ZN","平面直角座標系の系番号", "IconCoord", "I〜XIX系。緯度経度の表示に使う"),
         new("M", "移動", "IconMove", "先に図形を選択"),
         new("CO", "複写", "IconCopy", "先に図形を選択"),

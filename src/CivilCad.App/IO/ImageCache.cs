@@ -25,11 +25,14 @@ public static class ImageCache
     /// <summary>部分読み直しの出力の上限 (画素)。</summary>
     public const int DetailMax = 4096;
 
-    public static readonly string[] Extensions = [".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"];
+    public static readonly string[] Extensions = [".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif", ".pdf"];
 
     public sealed class Entry
     {
         public string Path { get; init; } = "";
+
+        /// <summary>PDF のページ (0 から)。画像では 0。</summary>
+        public int Page { get; init; }
         public bool Loading { get; internal set; } = true;
         public string? Error { get; internal set; }
         public BitmapSource? Preview { get; internal set; }
@@ -46,31 +49,35 @@ public static class ImageCache
     /// <summary>画像の読み込み (縮小版・部分) が終わった。別スレッドから呼ばれる。</summary>
     public static event EventHandler<string>? Updated;
 
-    /// <summary>画像を取り出す。初めてなら裏で読み込みを始め、読み込み中の Entry を返す (待たない)。</summary>
-    public static Entry Get(string path)
+    /// <summary>画像を取り出す。初めてなら裏で読み込みを始め、読み込み中の Entry を返す (待たない)。page は PDF のページ。</summary>
+    public static Entry Get(string path, int page = 0)
     {
-        return _entries.GetOrAdd(path, p =>
+        return _entries.GetOrAdd($"{path}|{page}", _ =>
         {
-            var entry = new Entry { Path = p };
+            var entry = new Entry { Path = path, Page = page };
             Task.Run(() =>
             {
                 try
                 {
-                    entry.Preview = LoadPreview(p);
+                    entry.Preview = LoadPreview(path, page);
                 }
                 catch (Exception ex)
                 {
-                    entry.Error = File.Exists(p) ? $"画像を読み込めません ({ex.Message})" : "画像ファイルが見つかりません";
+                    entry.Error = File.Exists(path) ? $"{(PdfRenderer.IsPdf(path) ? "PDF" : "画像")}を読み込めません ({ex.Message})" : "ファイルが見つかりません";
                 }
                 entry.Loading = false;
-                Updated?.Invoke(null, p);
+                Updated?.Invoke(null, path);
             });
             return entry;
         });
     }
 
-    /// <summary>読み込み済みの画像を捨てる (ファイルが差し替えられたとき用)。</summary>
-    public static void Forget(string path) => _entries.TryRemove(path, out _);
+    /// <summary>読み込み済みの画像を捨てる (ファイルが差し替えられたとき用)。PDF は全ページ。</summary>
+    public static void Forget(string path)
+    {
+        foreach (var key in _entries.Keys.Where(k => k.StartsWith(path + "|", StringComparison.OrdinalIgnoreCase)).ToList())
+            _entries.TryRemove(key, out _);
+    }
 
     /// <summary>
     /// 元画像の Region の範囲を OutW × OutH 画素で読み直すよう頼む (待たない)。
@@ -101,7 +108,9 @@ public static class ImageCache
                 }
                 try
                 {
-                    var bmp = LoadRegion(entry.Path, req.Region, req.OutW, req.OutH);
+                    var bmp = PdfRenderer.IsPdf(entry.Path)
+                        ? PdfRenderer.Render(entry.Path, entry.Page, req.Region, req.OutW, req.OutH)
+                        : LoadRegion(entry.Path, req.Region, req.OutW, req.OutH);
                     entry.Detail = (req.Region, bmp, (double)req.OutW / req.Region.Width);
                     Updated?.Invoke(null, entry.Path);
                 }
@@ -153,8 +162,15 @@ public static class ImageCache
         }
     }
 
-    private static BitmapSource LoadPreview(string path)
+    private static BitmapSource LoadPreview(string path, int page)
     {
+        if (PdfRenderer.IsPdf(path))
+        {
+            var info = PdfRenderer.ReadPages(path)[page];
+            var (pw, ph) = PdfRenderer.PixelSize(info);
+            var k = Math.Min(1.0, (double)PreviewMax / Math.Max(pw, ph));
+            return PdfRenderer.Render(path, page, null, (int)Math.Round(pw * k), (int)Math.Round(ph * k));
+        }
         int w, h;
         using (var s = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
         {

@@ -246,7 +246,10 @@ public sealed class PropertiesPanel : UserControl
 
             case ImageEntity img:
                 AddReadOnly("ファイル", img.Path);
-                AddReadOnly("画素数", $"{img.PixelWidth} × {img.PixelHeight}");
+                if (IO.PdfRenderer.IsPdf(img.Path))
+                    AddReadOnly("ページ", $"{img.Page + 1} (用紙 {img.PixelWidth / IO.PdfRenderer.PixelsPerMm:0}×{img.PixelHeight / IO.PdfRenderer.PixelsPerMm:0}mm)");
+                else
+                    AddReadOnly("画素数", $"{img.PixelWidth} × {img.PixelHeight}");
                 AddEditable("幅 (m)", img.Width.ToString("0.###", CultureInfo.InvariantCulture), s =>
                     TryPositive(s, out var w) && Apply(x =>
                     {
@@ -565,6 +568,7 @@ public sealed class PropertiesPanel : UserControl
         TextEntity => "文字",
         HatchEntity => "ハッチング",
         SymbolEntity s => s.Definition.Name,
+        ImageEntity i when IO.PdfRenderer.IsPdf(i.Path) => "PDF",
         ImageEntity => "画像",
         _ => e.GetType().Name,
     };

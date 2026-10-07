@@ -438,7 +438,7 @@ public sealed class CadCanvas : FrameworkElement
     /// <summary>画像: 縮小版を全体に、細かく読み直した部分があればその上に描く。読込中・失敗は枠と文字で示す。</summary>
     private void DrawImage(DrawingContext dc, ImageEntity img, RgbColor color, bool selected)
     {
-        var entry = IO.ImageCache.Get(img.Path);
+        var entry = IO.ImageCache.Get(img.Path, img.Page);
         var frame = new StreamGeometry();
         using (var ctx = frame.Open())
         {
@@ -485,7 +485,7 @@ public sealed class CadCanvas : FrameworkElement
         foreach (var img in Document.Entities.OfType<ImageEntity>())
         {
             if (!Document.IsVisible(img) || !img.Bounds.Intersects(view) || img.PixelWidth <= 0 || img.PixelHeight <= 0) continue;
-            var entry = IO.ImageCache.Get(img.Path);
+            var entry = IO.ImageCache.Get(img.Path, img.Page);
             if (entry.Preview is not BitmapSource preview) continue;
             // 画面の細かさ (元画像 1 画素が画面の何画素か) と縮小版の細かさを比べる
             var screenPerPixel = img.Width * Scale / img.PixelWidth;

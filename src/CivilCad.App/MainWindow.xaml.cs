@@ -935,11 +935,17 @@ public partial class MainWindow : Window
     {
         var open = new OpenFileDialog
         {
-            Title = "画像ファイルを開く",
-            Filter = "画像ファイル (*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif)|*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif|すべてのファイル (*.*)|*.*",
+            Title = "画像・PDF ファイルを開く",
+            Filter = "画像・PDF (*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif;*.pdf)|*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif;*.pdf|" +
+                     "画像ファイル (*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif)|*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif|PDF (*.pdf)|*.pdf|すべてのファイル (*.*)|*.*",
         };
         if (open.ShowDialog(this) != true) return;
         var path = open.FileName;
+        if (PdfRenderer.IsPdf(path))
+        {
+            ImportPdf(path);
+            return;
+        }
 
         ImageInfo info;
         try
@@ -965,6 +971,38 @@ public partial class MainWindow : Window
             Canvas.ZoomTo(img.Bounds.Inflate(Math.Max(img.Bounds.Width, img.Bounds.Height) * 0.05));
         Log($"画像読込: {Path.GetFileName(path)} ({info.PixelWidth}×{info.PixelHeight}) を {info.PlacementSource} の位置に配置しました " +
             $"(幅 {img.Width:0.###}m × 高さ {img.Height:0.###}m、1 画素 {img.Width / info.PixelWidth:0.####}m)。");
+    }
+
+    /// <summary>PDF のページを画像として置く (ページを選び、位置と幅を指定。Enter で原寸)。</summary>
+    private void ImportPdf(string path)
+    {
+        List<PdfPageInfo> pages;
+        try
+        {
+            pages = PdfRenderer.ReadPages(path);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"{Path.GetFileName(path)} を開けませんでした (パスワード付きの PDF などは読めません)。\n{ex.Message}",
+                "PDF 読込", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (pages.Count == 0)
+        {
+            Log($"PDF 読込: {Path.GetFileName(path)} にページがありません。");
+            return;
+        }
+        var page = pages[0];
+        if (pages.Count > 1)
+        {
+            var dlg = new PdfPageWindow(Path.GetFileName(path), pages) { Owner = this };
+            if (dlg.ShowDialog() != true || dlg.Result is not { } chosen) return;
+            page = chosen;
+        }
+        ImageCache.Forget(path);
+        var (w, h) = PdfRenderer.PixelSize(page);
+        Log($"PDF「{Path.GetFileName(path)}」{page.Label} を読み込みます。左下の位置と幅を指定してください (Enter で原寸 = {_doc.ScaleText} で用紙の大きさ)。");
+        StartTool(new ImagePlaceTool(path, w, h, page.Index, page.WidthMm), "IM");
     }
 
     // ---- 路線 ----

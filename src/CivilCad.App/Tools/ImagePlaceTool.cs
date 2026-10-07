@@ -10,9 +10,9 @@ namespace CivilCad.App.Tools;
 /// <summary>
 /// 位置情報 (ワールドファイル) の無い画像の配置。
 /// 左下の点 → 下辺の向きと幅 (2 点目のクリック、または幅を数値で入力) の順に指定する。縦横比は画像のまま。
-/// Enter で既定の大きさ (画像 1 画素 = 用紙 0.1mm) にする。
+/// Enter で既定の大きさ (画像 1 画素 = 用紙 0.1mm、PDF は用紙の原寸 = 図面の縮尺でページの大きさ) にする。
 /// </summary>
-public sealed class ImagePlaceTool(string path, int pixelWidth, int pixelHeight) : CadTool
+public sealed class ImagePlaceTool(string path, int pixelWidth, int pixelHeight, int page = 0, double? paperWidthMm = null) : CadTool
 {
     /// <summary>既定の大きさ: 画像 1 画素あたりの用紙上の mm。</summary>
     public const double DefaultMmPerPixel = 0.1;
@@ -28,10 +28,12 @@ public sealed class ImagePlaceTool(string path, int pixelWidth, int pixelHeight)
     protected override void OnActivated() => UpdatePrompt();
 
     private void UpdatePrompt() => SetPrompt(_origin == null
-        ? $"画像「{Path.GetFileName(path)}」({pixelWidth}×{pixelHeight}) の左下の位置を指定"
-        : $"下辺の向きと幅を指定 (幅を m で入力も可 / Enter: 既定の大きさ {DefaultWidth():0.###}m)");
+        ? paperWidthMm != null
+            ? $"PDF「{Path.GetFileName(path)}」{page + 1} ページの左下の位置を指定"
+            : $"画像「{Path.GetFileName(path)}」({pixelWidth}×{pixelHeight}) の左下の位置を指定"
+        : $"下辺の向きと幅を指定 (幅を m で入力も可 / Enter: {(paperWidthMm != null ? $"原寸 ({Doc.ScaleText} で用紙 {paperWidthMm:0}mm)" : "既定の大きさ")} {DefaultWidth():0.###}m)");
 
-    private double DefaultWidth() => Doc.PaperMmToMeters(DefaultMmPerPixel) * pixelWidth;
+    private double DefaultWidth() => paperWidthMm is double mm ? Doc.PaperMmToMeters(mm) : Doc.PaperMmToMeters(DefaultMmPerPixel) * pixelWidth;
 
     public override void StepBack()
     {
@@ -70,14 +72,14 @@ public sealed class ImagePlaceTool(string path, int pixelWidth, int pixelHeight)
     {
         var u = bottom;
         var v = u.LeftNormal * ((double)pixelHeight / pixelWidth);
-        return new ImageEntity(Doc.CurrentLayer, path, pixelWidth, pixelHeight, _origin!.Value, u, v);
+        return new ImageEntity(Doc.CurrentLayer, path, pixelWidth, pixelHeight, _origin!.Value, u, v) { Page = page };
     }
 
     private void Place(Vec2 bottom)
     {
         var img = Make(bottom);
         Execute(new AddEntitiesCommand([img], "画像の配置"));
-        Canvas.ShowMessage($"画像「{Path.GetFileName(path)}」を配置しました (幅 {img.Width:0.###}m × 高さ {img.Height:0.###}m)。");
+        Canvas.ShowMessage($"{(paperWidthMm != null ? $"PDF {page + 1} ページ" : "画像")}「{Path.GetFileName(path)}」を配置しました (幅 {img.Width:0.###}m × 高さ {img.Height:0.###}m)。");
         Finish();
     }
 

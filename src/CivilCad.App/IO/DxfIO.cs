@@ -15,6 +15,9 @@ public static class DxfIO
     private const double Deg = 180 / Math.PI;
     private const string PlaneZoneVariable = "$USERI1";
 
+    /// <summary>CivilCad 独自の情報 (PDF のページ番号など) を図形の XData に書くときのアプリ名。</summary>
+    private const string AppId = "CIVILCAD";
+
     public static void Save(CadDocument doc, string path)
     {
         var dxf = new DxfDocument(netDxf.Header.DxfVersion.AutoCad2018);
@@ -141,11 +144,19 @@ public static class DxfIO
         }
         var u = img.U.Normalized();
         var v = img.V.Normalized();
-        return new Image(def, V(img.Origin), img.Width, img.Height)
+        var image = new Image(def, V(img.Origin), img.Width, img.Height)
         {
             Uvector = new Vector2(u.X, u.Y),
             Vvector = new Vector2(v.X, v.Y),
         };
+        if (img.Page > 0)
+        {
+            // PDF のページ番号 (0 から) は XData に入れる
+            var xd = new XData(new netDxf.Tables.ApplicationRegistry(AppId));
+            xd.XDataRecord.Add(new XDataRecord(XDataCode.Int16, (short)img.Page));
+            image.XData.Add(xd);
+        }
+        return image;
     }
 
     private static ImageEntity? FromDxfImage(Image o, Layer layer, string dxfPath)
@@ -163,7 +174,8 @@ public static class DxfIO
         }
         var u = new Vec2(o.Uvector.X, o.Uvector.Y).Normalized() * o.Width;
         var v = new Vec2(o.Vvector.X, o.Vvector.Y).Normalized() * o.Height;
-        return new ImageEntity(layer, file, def.Width, def.Height, V(o.Position), u, v);
+        var page = o.XData.TryGetValue(AppId, out var xd) && xd.XDataRecord.FirstOrDefault(r => r.Code == XDataCode.Int16)?.Value is short p ? p : 0;
+        return new ImageEntity(layer, file, def.Width, def.Height, V(o.Position), u, v) { Page = Math.Max(0, (int)page) };
     }
 
     private static Text ToDxfText(TextEntity t)

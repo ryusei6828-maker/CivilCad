@@ -18,6 +18,9 @@ public sealed class ImageEntity(Layer layer, string path, int pixelWidth, int pi
     public Vec2 U { get; set; } = u;
     public Vec2 V { get; set; } = v;
 
+    /// <summary>PDF のページ (0 から)。画像では 0。</summary>
+    public int Page { get; init; }
+
     /// <summary>透明度 (%)。0 = 不透明。</summary>
     public double TransparencyPercent { get; set; }
 
@@ -70,7 +73,7 @@ public sealed class ImageEntity(Layer layer, string path, int pixelWidth, int pi
     public override IEnumerable<Curve> Curves => Edges.Select(e => (Curve)new SegmentCurve(e.A, e.B));
 
     public override Entity Clone() =>
-        CopyPropertiesTo(new ImageEntity(Layer, Path, PixelWidth, PixelHeight, Origin, U, V) { TransparencyPercent = TransparencyPercent });
+        CopyPropertiesTo(new ImageEntity(Layer, Path, PixelWidth, PixelHeight, Origin, U, V) { TransparencyPercent = TransparencyPercent, Page = Page });
 
     public override IEnumerable<SnapPoint> SnapPoints => Corners.Select(c => new SnapPoint(c, SnapKind.Endpoint));
 
