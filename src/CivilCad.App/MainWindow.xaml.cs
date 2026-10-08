@@ -1324,6 +1324,7 @@ public partial class MainWindow : Window
                 {
                     SnapKind.Perpendicular or SnapKind.Tangent => "\n直前に指定した点 (線の始点など) が基準",
                     SnapKind.Nearest => "\n他に候補が無いときだけ使う",
+                    SnapKind.Grid => "\nグリッドの交点。グリッドを表示しているときだけ効き、図形のスナップがあればそちらが優先",
                     _ => "",
                 },
             };
@@ -1343,6 +1344,7 @@ public partial class MainWindow : Window
         SnapKind.Quadrant => "四半円",
         SnapKind.Perpendicular => "垂線",
         SnapKind.Nearest => "近接",
+        SnapKind.Grid => "グリッド点",
         _ => SnapFinder.Label(kind),
     };
 

@@ -2,7 +2,8 @@ using CivilCad.Core.Geometry;
 
 namespace CivilCad.Core.Model;
 
-public enum SnapKind { Endpoint, Vertex, Midpoint, Center, Quadrant, Node, Intersection, Perpendicular, Tangent, Nearest }
+/// <summary>スナップの種類。Grid はグリッドの交点 (図形ではなく作図領域が出す)。</summary>
+public enum SnapKind { Endpoint, Vertex, Midpoint, Center, Quadrant, Node, Intersection, Perpendicular, Tangent, Nearest, Grid }
 
 public readonly record struct SnapPoint(Vec2 Point, SnapKind Kind);
 

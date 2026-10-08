@@ -318,7 +318,8 @@ public sealed class CadCanvas : FrameworkElement
     /// <summary>表示中の図形と外形の一覧。図面が変わるたびに作り直す (マウス移動ごとに外形を計算しないため)。</summary>
     private List<(Entity Entity, Box2 Bounds)>? _snapIndex;
 
-    private SnapPoint? FindSnap(Vec2 raw)
+    /// <summary>raw (カーソルの位置) 付近のスナップ点。有効なスナップの種類 (SnapKinds) から探す。</summary>
+    public SnapPoint? FindSnap(Vec2 raw)
     {
         _snapIndex ??= Document.Entities.Where(Document.IsVisible).Select(e => (e, e.Bounds)).ToList();
         var tol = SnapTolerancePx / Scale;
@@ -326,7 +327,21 @@ public sealed class CadCanvas : FrameworkElement
         foreach (var (e, b) in _snapIndex)
             if (raw.X >= b.Min.X - tol && raw.X <= b.Max.X + tol && raw.Y >= b.Min.Y - tol && raw.Y <= b.Max.Y + tol)
                 near.Add(e);
-        return SnapFinder.FindAmong(near, raw, tol, _tool.BasePoint, SnapKinds);
+        var found = SnapFinder.FindAmong(near, raw, tol, _tool.BasePoint, SnapKinds);
+        // グリッド: 図形のスナップ (近接点を除く) が無いときに、表示中のグリッドの交点へ
+        if (found is not { Kind: not SnapKind.Nearest } && SnapKinds.Contains(SnapKind.Grid) && GridSnapPoint(raw, tol) is Vec2 g)
+            return new SnapPoint(g, SnapKind.Grid);
+        return found;
+    }
+
+    /// <summary>raw に最も近いグリッドの交点 (tol 以内、グリッド表示中のみ)。</summary>
+    public Vec2? GridSnapPoint(Vec2 raw, double tol)
+    {
+        if (!_gridVisible) return null;
+        var s = EffectiveGridSpacing;
+        if (!(s > 0) || double.IsInfinity(s)) return null;
+        var g = new Vec2(Math.Round(raw.X / s) * s, Math.Round(raw.Y / s) * s);
+        return (g - raw).Length <= tol ? g : null;
     }
 
     // ---- 描画 ----
@@ -901,6 +916,11 @@ public sealed class CadCanvas : FrameworkElement
                 // ○ に接線
                 dc.DrawEllipse(null, SnapPen, c, s * 0.8, s * 0.8);
                 dc.DrawLine(SnapPen, new Point(c.X - s, c.Y - s * 0.8), new Point(c.X + s, c.Y - s * 0.8));
+                break;
+            case SnapKind.Grid:
+                // ＋ (グリッドの交点)
+                dc.DrawLine(SnapPen, new Point(c.X - s, c.Y), new Point(c.X + s, c.Y));
+                dc.DrawLine(SnapPen, new Point(c.X, c.Y - s), new Point(c.X, c.Y + s));
                 break;
             case SnapKind.Nearest:
                 // 砂時計

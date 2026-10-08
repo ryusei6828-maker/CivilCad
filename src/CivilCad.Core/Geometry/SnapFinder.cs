@@ -92,6 +92,7 @@ public static class SnapFinder
         SnapKind.Perpendicular => "垂線の足",
         SnapKind.Tangent => "接点",
         SnapKind.Nearest => "近接点",
+        SnapKind.Grid => "グリッド",
         _ => kind.ToString(),
     };
 }
