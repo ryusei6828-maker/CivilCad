@@ -328,6 +328,22 @@ public sealed class CadCanvas : FrameworkElement
             if (raw.X >= b.Min.X - tol && raw.X <= b.Max.X + tol && raw.Y >= b.Min.Y - tol && raw.Y <= b.Max.Y + tol)
                 near.Add(e);
         var found = SnapFinder.FindAmong(near, raw, tol, _tool.BasePoint, SnapKinds);
+        // 回転コマンド: 文字の枠の点 (4 隅・辺の中点・中心) も候補にする。図形のスナップ (近接点を除く) より近ければそちら
+        if (_tool.SnapsToTextBox)
+        {
+            var bestD = found is { Kind: not SnapKind.Nearest } f ? (f.Point - raw).Length : tol;
+            foreach (var t in near.OfType<TextEntity>())
+                foreach (var sp in t.TextBoxSnapPoints)
+                {
+                    if (!SnapKinds.Contains(sp.Kind)) continue;
+                    var d = (sp.Point - raw).Length;
+                    if (d <= bestD)
+                    {
+                        bestD = d;
+                        found = sp;
+                    }
+                }
+        }
         // グリッド: 図形のスナップ (近接点を除く) が無いときに、表示中のグリッドの交点へ
         if (found is not { Kind: not SnapKind.Nearest } && SnapKinds.Contains(SnapKind.Grid) && GridSnapPoint(raw, tol) is Vec2 g)
             return new SnapPoint(g, SnapKind.Grid);

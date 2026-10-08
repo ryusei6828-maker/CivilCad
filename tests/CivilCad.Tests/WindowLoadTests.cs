@@ -34,6 +34,10 @@ public class WindowLoadTests
                     Assert.Contains(textCanvas.Document.Entities.OfType<CivilCad.Core.Model.TextEntity>(), t => t.Text == "その場で入力");
                     textCanvas.SetTool(new CivilCad.App.Tools.SelectTool());
                     textCanvas.Document.Entities.Clear();
+                    // 文字を置いたのでシートが「変更あり」になっている。閉じるときの「保存していないシートがあります」の
+                    // 確認 (見えないダイアログ) でテストが止まらないよう、保存済みの扱いに戻す
+                    var active = typeof(CivilCad.App.MainWindow).GetField("_active", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(main)!;
+                    active.GetType().GetMethod("MarkSaved")!.Invoke(active, null);
                 }
                 var settings = new SettingsWindow(new AppSettings());
                 var frame = new CivilCad.App.Drawing.FrameWindow(new CivilCad.App.Drawing.DrawingFrameOptions(), new CivilCad.Core.Geometry.Box2(new(0, 0), new(8, 4)));

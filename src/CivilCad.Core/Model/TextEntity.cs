@@ -75,6 +75,24 @@ public sealed class TextEntity(Layer layer, Vec2 position, string text, double h
 
     public override Box2 Bounds => Box2.FromPoints(Corners);
 
+    /// <summary>
+    /// 文字の枠 (テキストボックス) の点: 4 隅 (端点)・各辺の中点 (中点)・中心 (中心)。
+    /// ふだんはスナップしない (文字の位置だけ) が、回転コマンドでは回す中心・方向点に使えるようにする。
+    /// </summary>
+    public IEnumerable<SnapPoint> TextBoxSnapPoints
+    {
+        get
+        {
+            var c = Corners.ToArray();
+            for (var i = 0; i < 4; i++)
+            {
+                yield return new SnapPoint(c[i], SnapKind.Endpoint);
+                yield return new SnapPoint((c[i] + c[(i + 1) % 4]) / 2, SnapKind.Midpoint);
+            }
+            yield return new SnapPoint((c[0] + c[2]) / 2, SnapKind.Center);
+        }
+    }
+
     public override double DistanceTo(Vec2 p)
     {
         // 文字の局所座標で矩形との距離を求める

@@ -285,6 +285,9 @@ public sealed class RotateTool : CadTool
     private bool _copy;
 
     public override string Name => "回転";
+
+    /// <summary>回転では文字の枠の 4 隅・辺の中点・中心にもスナップする (文字を角や中心で回せるように)。</summary>
+    public override bool SnapsToTextBox => true;
     public override bool CanStepBack => _base.HasValue;
 
     public override IEnumerable<(string Label, Action Run)> MenuItems =>
