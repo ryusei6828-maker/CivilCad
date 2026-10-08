@@ -417,7 +417,15 @@
             </Border>
             <!-- 作図入力バー (線・円などの作図中だけ表示) -->
             <v:DrawInputBar x:Name="InputBar" DockPanel.Dock="Top"/>
-            <v:CadCanvas x:Name="Canvas"/>
+            <Grid>
+                <v:CadCanvas x:Name="Canvas"/>
+                <!-- 文字コマンドで、クリックした位置にその場で文字を打つ欄 (背景なしの Canvas なのでクリックは下の作図領域へ通る) -->
+                <Canvas x:Name="CanvasOverlay" ClipToBounds="True">
+                    <TextBox x:Name="InlineTextBox" Visibility="Collapsed" MinWidth="60" BorderThickness="1" Padding="1,0"
+                             BorderBrush="#FF66CCFF" Background="#E01E1E1E" Foreground="White" CaretBrush="White"
+                             ToolTip="文字を入力して Enter で置く / Esc でやめる / 別の場所をクリックすると、入れた文字を置いて次の位置へ"/>
+                </Canvas>
+            </Grid>
         </DockPanel>
     </DockPanel>
 </Window>

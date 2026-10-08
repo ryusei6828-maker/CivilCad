@@ -17,6 +17,24 @@ public class WindowLoadTests
                 var app = new CivilCad.App.App();
                 app.InitializeComponent(); // アイコン等のリソースを読み込む
                 var main = new CivilCad.App.MainWindow();
+                {
+                    // 文字コマンド: クリックした位置に入力欄が出て、打った文字が見本・確定に使われる
+                    var textCanvas = (CivilCad.App.Views.CadCanvas)main.FindName("Canvas");
+                    var inline = (System.Windows.Controls.TextBox)main.FindName("InlineTextBox");
+                    var textTool = new CivilCad.App.Tools.TextTool();
+                    textCanvas.SetTool(textTool);
+                    Assert.Equal(System.Windows.Visibility.Collapsed, inline.Visibility);
+                    textTool.OnPoint(new CivilCad.Core.Geometry.Vec2(5, 5));
+                    Assert.Equal(System.Windows.Visibility.Visible, inline.Visibility);
+                    inline.Text = "その場で入力";
+                    Assert.Equal("その場で入力", textTool.DraftText);
+                    textTool.SubmitText(inline.Text);
+                    Assert.Equal(System.Windows.Visibility.Collapsed, inline.Visibility);
+                    Assert.Equal("", inline.Text);
+                    Assert.Contains(textCanvas.Document.Entities.OfType<CivilCad.Core.Model.TextEntity>(), t => t.Text == "その場で入力");
+                    textCanvas.SetTool(new CivilCad.App.Tools.SelectTool());
+                    textCanvas.Document.Entities.Clear();
+                }
                 var settings = new SettingsWindow(new AppSettings());
                 var frame = new CivilCad.App.Drawing.FrameWindow(new CivilCad.App.Drawing.DrawingFrameOptions(), new CivilCad.Core.Geometry.Box2(new(0, 0), new(8, 4)));
                 Assert.NotNull(main.Content);

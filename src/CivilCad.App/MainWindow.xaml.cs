@@ -58,6 +58,15 @@ public partial class MainWindow : Window
             if (_propsDock != null && !_propsDock.IsOpen && Canvas.Selection.Any(x => x is TextEntity)) SetPanelOpen(_propsDock, true);
         };
         Canvas.PreviewMouseDown += (_, _) => CommandBox.Focus();
+        // 文字コマンド: クリックした位置に、その場で文字を打つ入力欄を出す
+        Canvas.PromptChanged += (_, _) => UpdateInlineText();
+        Canvas.ToolChanged += (_, _) => UpdateInlineText();
+        Canvas.ViewChanged += (_, _) => PlaceInlineText();
+        InlineTextBox.TextChanged += (_, _) =>
+        {
+            if (Canvas.Tool is TextTool tt) tt.DraftText = InlineTextBox.Text;
+        };
+        InlineTextBox.PreviewKeyDown += InlineTextBox_PreviewKeyDown;
         // 文字を入れるコマンドでは、入力欄を出すプロパティ (右側) を開く
         Canvas.ToolChanged += (_, _) =>
         {
@@ -761,6 +770,68 @@ public partial class MainWindow : Window
             yield return item;
             foreach (var child in AllMenuItems(item.Items)) yield return child;
         }
+    }
+
+    // ---- 文字コマンドの入力欄 (作図領域の上) ----
+
+    private bool _updatingInline;
+
+    /// <summary>文字コマンドで位置を決めたら、その位置に入力欄を出してすぐ打てるようにする。</summary>
+    private void UpdateInlineText()
+    {
+        if (_updatingInline) return;
+        if (Canvas.Tool is TextTool { IsWaitingForText: true } tt)
+        {
+            var wasHidden = InlineTextBox.Visibility != Visibility.Visible;
+            _updatingInline = true;
+            if (InlineTextBox.Text != tt.DraftText) InlineTextBox.Text = tt.DraftText;
+            _updatingInline = false;
+            InlineTextBox.Visibility = Visibility.Visible;
+            PlaceInlineText();
+            if (wasHidden || !InlineTextBox.IsKeyboardFocused)
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (InlineTextBox.Visibility != Visibility.Visible) return;
+                    InlineTextBox.Focus();
+                    InlineTextBox.CaretIndex = InlineTextBox.Text.Length;
+                }, System.Windows.Threading.DispatcherPriority.Input);
+        }
+        else if (InlineTextBox.Visibility == Visibility.Visible)
+        {
+            InlineTextBox.Visibility = Visibility.Collapsed;
+            InlineTextBox.Text = "";
+        }
+    }
+
+    /// <summary>入力欄を文字の位置 (左下) に合わせ、文字の大きさ・フォントにする。</summary>
+    private void PlaceInlineText()
+    {
+        if (InlineTextBox.Visibility != Visibility.Visible || Canvas.Tool is not TextTool { Position: Vec2 pos } tt) return;
+        var (heightPx, font) = tt.EntryLook();
+        InlineTextBox.FontSize = Math.Clamp(heightPx, 12, 120);
+        InlineTextBox.FontFamily = new FontFamily(font + ", MS Gothic");
+        var p = Canvas.WorldToScreen(pos);
+        InlineTextBox.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        System.Windows.Controls.Canvas.SetLeft(InlineTextBox, p.X);
+        System.Windows.Controls.Canvas.SetTop(InlineTextBox, p.Y - InlineTextBox.DesiredSize.Height);
+    }
+
+    private void InlineTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (Canvas.Tool is not TextTool tt) return;
+        if (e.Key == Key.Enter)
+        {
+            tt.SubmitText(InlineTextBox.Text);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            tt.CancelText();
+            e.Handled = true;
+        }
+        else return;
+        Canvas.RedrawOverlay();
+        CommandBox.Focus();
     }
 
     // ---- 表示 (背景色・グリッド) ----

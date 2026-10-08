@@ -32,48 +32,48 @@ public class TextEntryDimensionTests
     }
 
     [Fact]
-    public void TextTool_TypedInPropertiesPanel() => RunSta(() =>
+    public void TextTool_SampleFollowsCursor_ThenTypeAtClickedPosition() => RunSta(() =>
     {
         var doc = new CadDocument();
         var canvas = new CadCanvas { Document = doc };
-        var panel = new PropertiesPanel();
-        var win = new Window { Content = panel, Width = 300, Height = 400, ShowActivated = false, WindowStyle = WindowStyle.None };
-        win.Show();
-        try
-        {
-            panel.Attach(canvas);
-            var tool = new TextTool();
-            canvas.SetTool(tool);
-            panel.Refresh();
-            Assert.Null(panel.EntryBox);                  // 位置を決める前は入力欄なし
+        var tool = new TextTool();
+        canvas.SetTool(tool);
 
-            tool.OnPoint(new Vec2(5, 5));
-            panel.Refresh();
-            var box = Assert.IsType<System.Windows.Controls.TextBox>(panel.EntryBox);
-            box.Text = "右で入力";
-            Assert.Equal("右で入力", tool.DraftText);       // 入力中の文字は見本に出る
-            canvas.RedrawOverlay();
-            panel.SubmitEntry();
+        // クリック前: カーソルに文字枠の見本 (まだ入力待ちではない)
+        tool.OnMouseMove(new Vec2(3, 3));
+        canvas.RedrawOverlay();
+        Assert.False(tool.IsWaitingForText);
 
-            var t = Assert.Single(doc.Entities.OfType<TextEntity>());
-            Assert.Equal("右で入力", t.Text);
-            Assert.Equal(new Vec2(5, 5), t.Position);
-            Assert.False(tool.IsWaitingForText);           // 続けて次の位置を指定できる
-            Assert.Same(tool, canvas.Tool);
-            panel.Refresh();
-            Assert.Null(panel.EntryBox);
+        // クリックすると、その位置で入力待ち
+        tool.OnPoint(new Vec2(5, 5));
+        Assert.True(tool.IsWaitingForText);
+        Assert.Equal(new Vec2(5, 5), tool.Position);
+        tool.DraftText = "その場で入力";
+        tool.SubmitText(tool.DraftText);            // Enter と同じ
+        var t = Assert.Single(doc.Entities.OfType<TextEntity>());
+        Assert.Equal("その場で入力", t.Text);
+        Assert.Equal(new Vec2(5, 5), t.Position);
+        Assert.False(tool.IsWaitingForText);        // 次の位置を待つ
+        Assert.Same(tool, canvas.Tool);
 
-            // やめると位置の指定に戻る
-            tool.OnPoint(new Vec2(1, 1));
-            tool.DraftText = "途中";
-            tool.CancelText();
-            Assert.False(tool.IsWaitingForText);
-            Assert.Single(doc.Entities.OfType<TextEntity>());
-        }
-        finally
-        {
-            win.Close();
-        }
+        // 入力中に別の場所をクリック → 入れた文字を置いて次の位置へ
+        tool.OnPoint(new Vec2(1, 1));
+        tool.DraftText = "1つ目";
+        tool.OnPoint(new Vec2(9, 9));
+        Assert.Contains(doc.Entities.OfType<TextEntity>(), x => x.Text == "1つ目" && x.Position == new Vec2(1, 1));
+        Assert.Equal(new Vec2(9, 9), tool.Position);
+        Assert.Equal("", tool.DraftText);
+
+        // 何も入れずに別の場所をクリックすると、位置を置き直すだけ
+        tool.OnPoint(new Vec2(2, 2));
+        Assert.Equal(2, doc.Entities.OfType<TextEntity>().Count());
+
+        // Esc (やめる) で位置の指定に戻る
+        tool.CancelText();
+        Assert.False(tool.IsWaitingForText);
+
+        // 文字コマンドでは右のプロパティに入力欄は出さない (引き出し線・旗揚げだけ)
+        Assert.IsNotAssignableFrom<ITextEntryTool>(tool);
     });
 
     [Fact]

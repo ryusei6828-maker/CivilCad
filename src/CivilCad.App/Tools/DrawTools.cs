@@ -329,7 +329,7 @@ public sealed class ArcTool : CadTool, IStyledDrawTool, IRadiusInput
     }
 }
 
-public sealed class TextTool : CadTool, IStyledDrawTool, ITextEntryTool
+public sealed class TextTool : CadTool, IStyledDrawTool
 {
     /// <summary>
     /// false (既定) なら用紙上の mm (<see cref="DefaultHeightMm"/>) を図面の縮尺で m に換算する (1:500 で 3.5mm → 1.75m)。
@@ -362,17 +362,34 @@ public sealed class TextTool : CadTool, IStyledDrawTool, ITextEntryTool
 
     public override void OnPoint(Vec2 p)
     {
+        // 入力中に別の場所をクリックしたら、入れた文字を置いてから次の位置へ
+        if (_position != null && DraftText.Trim().Length > 0) OnText(DraftText);
         _position = p;
         DraftText = "";
-        SetPrompt("右のプロパティの入力欄に文字を入力して Enter (別の位置をクリックすると置き直し)");
+        SetPrompt("クリックした位置の入力欄に文字を入力して Enter (Esc でやめる)");
     }
 
-    // ---- 右のプロパティの入力欄 ----
+    public override void OnMouseMove(Vec2 p) => _cursor = p;
 
+    private Vec2? _cursor;
+
+    // ---- クリックした位置の入力欄 (MainWindow が作図領域の上に出す) ----
+
+    /// <summary>位置を決めて文字の入力を待っているか。</summary>
     public bool IsWaitingForText => _position != null;
-    public string TextEntryHint => "文字を入力して Enter で置く。Esc でやめる";
-    public bool AllowsMultipleLines => false;
+
+    /// <summary>文字の位置 (左下)。</summary>
+    public Vec2? Position => _position;
+
+    /// <summary>入力中の文字。</summary>
     public string DraftText { get; set; } = "";
+
+    /// <summary>今の設定で作る文字の、画面上の高さ (px) とフォント。入力欄の大きさに使う。</summary>
+    public (double HeightPx, string Font) EntryLook()
+    {
+        var t = Create(Doc.CurrentLayer, Vec2.Zero, "字", Canvas.Scale);
+        return (t.Height * Canvas.Scale, t.EffectiveFontName);
+    }
 
     public void SubmitText(string text) => OnText(text.Replace("\r", "").Replace("\n", " "));
 
@@ -382,11 +399,18 @@ public sealed class TextTool : CadTool, IStyledDrawTool, ITextEntryTool
         StepBack();
     }
 
+    /// <summary>
+    /// 見本: 位置を決める前は、カーソルの位置 (左下) に今の大きさの文字枠と「文字」の見本を出す。
+    /// 位置を決めた後は入力欄が出るので何も描かない。
+    /// </summary>
     public override void DrawPreview(DrawingContext dc)
     {
-        if (_position is not Vec2 pos) return;
-        var text = DraftText.Length > 0 ? DraftText : "｜";
-        Canvas.DrawEntity(dc, Create(Doc.CurrentLayer, pos, text, Canvas.Scale), new RgbColor(0x66, 0xCC, 0xFF));
+        if (_position != null || _cursor is not Vec2 c) return;
+        var sample = Create(Doc.CurrentLayer, c, "文字", Canvas.Scale);
+        var h = sample.Height;
+        var w = Math.Max(sample.ApproxWidth, h * 4);
+        Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewDashPen, [c, c + new Vec2(w, 0), c + new Vec2(w, h * 1.2), c + new Vec2(0, h * 1.2)], true);
+        Canvas.DrawEntity(dc, sample, new RgbColor(0x66, 0xCC, 0xFF));
     }
 
     public override bool OnText(string text)

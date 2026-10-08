@@ -494,7 +494,11 @@ public sealed class CadCanvas : FrameworkElement
         SyncScreenTexts();
         RedrawScene();
         RedrawOverlay();
+        ViewChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>表示を描き直した (拡大・移動など)。作図領域の上に重ねた入力欄の位置合わせに使う。</summary>
+    public event EventHandler? ViewChanged;
 
     /// <summary>画面で一定の大きさの文字 (<see cref="TextEntity.ScreenHeightPx"/>) の高さを、いまの拡大率に合わせる。</summary>
     public void SyncScreenTexts()
