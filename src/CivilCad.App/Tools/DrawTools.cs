@@ -24,7 +24,7 @@ public sealed class LineTool : CadTool, ILengthAngleInput, IStyledDrawTool
         SetPrompt(_steps.Count == 0 ? "始点を指定 (Esc で終了)" : "次の点を指定 (Enter でこの線を終えて次の線へ / Esc で終了)");
 
     public override Vec2 ConstrainCursor(Vec2 p) =>
-        BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg) : p;
+        BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg, Canvas.CurrentSnap == null ? DrawInputMemory.AngleStepDeg : null) : p;
 
     public override void OnPoint(Vec2 p)
     {
@@ -93,7 +93,7 @@ public sealed class PolylineTool : CadTool, ILengthAngleInput, IStyledDrawTool
         SetPrompt(_points.Count == 0 ? "始点を指定" : "次の点を指定 (C = 閉じる / Enter で確定 / 右クリックで一つ戻す・やり直し)");
 
     public override Vec2 ConstrainCursor(Vec2 p) =>
-        BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg) : p;
+        BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg, Canvas.CurrentSnap == null ? DrawInputMemory.AngleStepDeg : null) : p;
 
     public override void OnPoint(Vec2 p)
     {

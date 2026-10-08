@@ -38,7 +38,7 @@ public static class CommandRegistry
         new("SCL", "拡大縮小", "IconResize", "先に図形を選択。基点 → 倍率 (または 参照する長さ → 新しい長さ)"),
         new("AL", "2 点指示 (位置合わせ)", "IconAlign", "先に図形 (画像など) を選択。元の点 → 合わせ先 を 2 組指定して、移動・回転 (・拡大縮小) で合わせる"),
         new("CO", "複写", "IconCopy", "先に図形を選択"),
-        new("RO", "回転", "IconRotate", "先に図形を選択。角度は度 (反時計回りが +)、C で元を残す"),
+        new("RO", "回転", "IconRotate", "先に図形を選択。中心点 → 基準の方向点 → 回転先の方向点 (角度の入力も可、反時計回りが +)。C で元を残す"),
         new("O", "オフセット", "IconOffset", "距離を入力 → 図形 → ずらす側をクリック"),
         new("TR", "トリム", "IconTrim", "境界を選んで Enter → 切り取る部分をクリック。Shift+クリックで延長"),
         new("EX", "延長", "IconExtend", "境界を選んで Enter → 伸ばす端をクリック。Shift+クリックでトリム"),

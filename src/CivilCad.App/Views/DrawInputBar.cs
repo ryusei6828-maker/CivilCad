@@ -120,6 +120,7 @@ public sealed class DrawInputBar : Border
             case ILengthAngleInput la:
                 AddNumber("長さ", () => la.FixedLength, v => la.FixedLength = v, "次の点までの長さ。入れておくとクリックした方向にこの長さで線を引く", isLength: true);
                 AddNumber("角度 (°)", () => la.FixedAngleDeg, v => la.FixedAngleDeg = v, "線の向き。東 = 0°、反時計回り (北 = 90°)", allowNegative: true);
+                AddAngleStep();
                 break;
             case ArcTool arcTool:
                 AddNumber("半径", () => arcTool.FixedRadius, v => arcTool.FixedRadius = v,
@@ -536,6 +537,29 @@ public sealed class DrawInputBar : Border
             });
         else if (doc.UseTrueNorth)
             _panel.Children.Add(new TextBlock { Text = $"{doc.PlaneZone}系", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) });
+    }
+
+    /// <summary>線の向きの刻み (なし / 90° / 45° / 15°)。角度を入れているときはその角度が優先。</summary>
+    private void AddAngleStep()
+    {
+        var box = new ComboBox
+        {
+            Width = 86,
+            Margin = new Thickness(0, 0, 12, 0),
+            Focusable = false,
+            ItemsSource = LengthAngle.Steps.Select(LengthAngle.StepName).ToList(),
+            SelectedIndex = LengthAngle.Steps.ToList().IndexOf(DrawInputMemory.AngleStepDeg),
+            ToolTip = "線の向きを東 (0°) から 90° / 45° / 15° ごとの一番近い向きにそろえる\n" +
+                      "角度の欄に数値を入れているときはその角度、端点などにスナップしているときはスナップした点が優先",
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0) return;
+            DrawInputMemory.AngleStepDeg = LengthAngle.Steps[box.SelectedIndex];
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
     }
 
     private void AddLeaderTip()
