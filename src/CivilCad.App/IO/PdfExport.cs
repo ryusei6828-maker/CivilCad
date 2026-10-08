@@ -255,15 +255,27 @@ public static class PdfExport
             return new SKColor(y, y, y);
         }
 
-        private SKPaint Stroke(Entity e) => new()
+        private SKPaint Stroke(Entity e)
         {
-            IsAntialias = true,
-            Style = SKPaintStyle.Stroke,
-            Color = Color(e),
-            StrokeWidth = (float)Math.Max((e.LineWeight ?? o.DefaultLineWeightMm) * PtPerMm, 0.1),
-            StrokeCap = SKStrokeCap.Round,
-            StrokeJoin = SKStrokeJoin.Round,
-        };
+            var paint = new SKPaint
+            {
+                IsAntialias = true,
+                Style = SKPaintStyle.Stroke,
+                Color = Color(e),
+                StrokeWidth = (float)Math.Max((e.LineWeight ?? o.DefaultLineWeightMm) * PtPerMm, 0.1),
+                StrokeCap = SKStrokeCap.Round,
+                StrokeJoin = SKStrokeJoin.Round,
+            };
+            // 線種: 模様は用紙上の mm (端を丸めるので、線の部分は太さの分だけ短く、空ける部分は長く)
+            var pattern = LineTypes.PatternMm(e.LineType);
+            if (pattern.Count > 0 && e is LineEntity or PolylineEntity or CircleEntity or ArcEntity)
+            {
+                var w = paint.StrokeWidth;
+                var intervals = pattern.Select(mm => mm >= 0 ? Math.Max(0.01f, (float)(mm * PtPerMm) - w) : (float)(-mm * PtPerMm) + w).ToArray();
+                paint.PathEffect = SKPathEffect.CreateDash(intervals, 0);
+            }
+            return paint;
+        }
 
         private void DrawFill(Entity e)
         {

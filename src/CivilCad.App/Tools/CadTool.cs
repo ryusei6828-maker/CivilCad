@@ -107,6 +107,7 @@ public abstract class CadTool
     {
         e.LineWeight = Doc.CurrentLineWeight;
         e.Color = Doc.CurrentColor;
+        e.LineType = Doc.CurrentLineType;
         return e;
     }
 

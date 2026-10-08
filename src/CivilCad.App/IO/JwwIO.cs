@@ -67,6 +67,28 @@ public static partial class JwwIO
     }
 
     /// <summary>読み込んだ図形 (JWW の値のまま)。</summary>
+    /// <summary>
+    /// 線種 → Jw_cad の線種番号 (1 実線, 2〜4 点線1〜3, 5・6 一点鎖1・2, 7・8 二点鎖1・2)。
+    /// Jw_cad の「点線」は短い線の繰り返しなので破線は点線1、点線は点線3 にする。
+    /// </summary>
+    public static int PenStyle(LineType t) => t switch
+    {
+        LineType.Dashed => 2,
+        LineType.Dotted => 4,
+        LineType.DashDot => 5,
+        LineType.DashDotDot => 7,
+        _ => 1,
+    };
+
+    public static LineType LineTypeOf(int style) => style switch
+    {
+        2 or 3 => LineType.Dashed,
+        4 => LineType.Dotted,
+        5 or 6 => LineType.DashDot,
+        7 or 8 => LineType.DashDotDot,
+        _ => LineType.Continuous,
+    };
+
     private abstract record Figure(uint Group, byte Style, ushort Color, ushort Width, ushort Layer, ushort GLayer, ushort Flag);
 
     private sealed record Sen(uint Group, byte Style, ushort Color, ushort Width, ushort Layer, ushort GLayer, ushort Flag, Vec2 A, Vec2 B)
@@ -653,6 +675,7 @@ public static partial class JwwIO
         private Entity Styled(Figure f, Entity e, bool colorFromPen)
         {
             if (colorFromPen) e.Color = ColorOf(f.Color);
+            if (f is Sen or Enko) e.LineType = LineTypeOf(f.Style);
             // 1/100 mm 単位の線幅 (文字のこの欄は寸法値設定のフラグなので使わない)
             if (f is not Moji && f.Width > 0 && d.H.Version >= 351 && d.H.MaxDrawWid == -101) e.LineWeight = f.Width / 100.0;
             if ((f.Flag & 0x0020) != 0 && e is LineEntity) e.Tag ??= HatchTag;

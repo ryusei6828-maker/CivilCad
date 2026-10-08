@@ -179,6 +179,7 @@ public static class DwgIO
             {
                 m.Color = e.Color.IsByLayer || e.Color.IsByBlock ? null : ToRgb(e.Color);
                 m.LineWeight = (short)e.LineWeight > 0 ? (short)e.LineWeight / 100.0 : null;
+                m.LineType = DxfIO.LineTypeFromName(e.LineType?.Name is "ByLayer" or "BYLAYER" or null ? e.Layer?.LineType?.Name : e.LineType.Name);
                 _out.Add(m);
             }
         }

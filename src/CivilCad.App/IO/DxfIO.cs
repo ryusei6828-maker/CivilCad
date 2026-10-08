@@ -56,6 +56,8 @@ public static class DxfIO
             de.Layer = layers[e.Layer];
             de.Color = e.Color is RgbColor c2 ? ToAci(c2) : AciColor.ByLayer;
             de.Lineweight = e.LineWeight is double w ? ToDxfWeight(w) : Lineweight.ByLayer;
+            if (e.LineType != LineType.Continuous && e is LineEntity or PolylineEntity or CircleEntity or ArcEntity)
+                de.Linetype = DxfLinetype(dxf, doc, e.LineType);
             // 透明度 (DXF は 0〜90%)
             if (e is HatchEntity { TransparencyPercent: > 0 } th) de.Transparency = new Transparency((short)Math.Clamp(Math.Round(th.TransparencyPercent), 0, 90));
             if (e is ImageEntity { TransparencyPercent: > 0 } ti) de.Transparency = new Transparency((short)Math.Clamp(Math.Round(ti.TransparencyPercent), 0, 90));
@@ -121,6 +123,7 @@ public static class DxfIO
             {
                 e.Color = o.Color.IsByLayer || o.Color.IsByBlock ? null : ToRgb(o.Color);
                 e.LineWeight = (short)o.Lineweight > 0 ? (short)o.Lineweight / 100.0 : null;
+                e.LineType = LineTypeFromName(o.Linetype is { IsByLayer: true } || o.Linetype is null ? o.Layer?.Linetype?.Name : o.Linetype.Name);
                 list.Add(e);
             }
             converted++;
@@ -163,6 +166,41 @@ public static class DxfIO
     {
         try { return v == null ? null : Convert.ToDouble(v, System.Globalization.CultureInfo.InvariantCulture) is var d && double.IsFinite(d) ? d : null; }
         catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException) { return null; }
+    }
+
+    /// <summary>線種の名前 (AutoCAD の標準の名前にそろえる)。</summary>
+    private static string LinetypeName(LineType t) => t switch
+    {
+        LineType.Dashed => "DASHED",
+        LineType.Dotted => "DOT",
+        LineType.DashDot => "DASHDOT",
+        LineType.DashDotDot => "DIVIDE",
+        _ => "Continuous",
+    };
+
+    /// <summary>
+    /// 線種を DXF の線種表に入れる。模様は用紙上の mm を図面の縮尺で m にした長さで書く
+    /// (LTSCALE = 1 のまま、他の CAD でも印刷したとき同じ見た目になるように)。
+    /// </summary>
+    private static netDxf.Tables.Linetype DxfLinetype(DxfDocument dxf, CadDocument doc, LineType t)
+    {
+        var name = LinetypeName(t);
+        if (dxf.Linetypes.Contains(name)) return dxf.Linetypes[name];
+        var segments = LineTypes.PatternMm(t).Select(mm => (netDxf.Tables.LinetypeSegment)new netDxf.Tables.LinetypeSimpleSegment(doc.PaperMmToMeters(mm)));
+        return dxf.Linetypes.Add(new netDxf.Tables.Linetype(name, segments, LineTypes.Name(t)));
+    }
+
+    /// <summary>DXF / DWG の線種の名前から CivilCad の線種を推定する (AutoCAD・Jw_cad などの名前)。</summary>
+    public static LineType LineTypeFromName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return LineType.Continuous;
+        var n = name.ToUpperInvariant();
+        if (n is "CONTINUOUS" or "BYLAYER" or "BYBLOCK" || n.Contains("実線")) return LineType.Continuous;
+        if (n.Contains("DIVIDE") || n.Contains("PHANTOM") || n.Contains("二点") || n.Contains("DASHDOTDOT") || n.Contains("TWODOT")) return LineType.DashDotDot;
+        if (n.Contains("DASHDOT") || n.Contains("CENTER") || n.Contains("CHAIN") || n.Contains("一点")) return LineType.DashDot;
+        if (n.Contains("DOT") || n.Contains("点線")) return LineType.Dotted;
+        if (n.Contains("DASH") || n.Contains("HIDDEN") || n.Contains("破線")) return LineType.Dashed;
+        return LineType.Continuous;
     }
 
     /// <summary>画像は埋め込まず、画像ファイルの場所 (絶対パス) を書く。同じ画像は 1 つの定義を共有する。</summary>

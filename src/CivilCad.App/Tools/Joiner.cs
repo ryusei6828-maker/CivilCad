@@ -69,6 +69,7 @@ public static class Joiner
             {
                 Color = first.Color,
                 LineWeight = first.LineWeight,
+                LineType = first.LineType,
                 Tag = first.Tag,
             };
             joined.Add(pl);

@@ -20,6 +20,9 @@ public abstract class Entity(Layer layer)
     /// <summary>線幅 (印刷時の mm)。null なら既定 (細線)。</summary>
     public double? LineWeight { get; set; }
 
+    /// <summary>線種 (実線・破線・点線・一点鎖線・二点鎖線)。線・ポリライン・円・円弧に効く。</summary>
+    public LineType LineType { get; set; }
+
     public RgbColor EffectiveColor => Color ?? Layer.Color;
 
     public abstract Box2 Bounds { get; }
@@ -53,6 +56,7 @@ public abstract class Entity(Layer layer)
         e.Color = Color;
         e.Tag = Tag;
         e.LineWeight = LineWeight;
+        e.LineType = LineType;
         return e;
     }
 }

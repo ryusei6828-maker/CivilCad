@@ -29,7 +29,7 @@ public sealed class CadCanvas : FrameworkElement
     private readonly DrawingVisual _scene = new();
     private readonly DrawingVisual _overlay = new();
     private readonly VisualCollection _visuals;
-    private readonly Dictionary<(RgbColor, bool, int), Pen> _pens = [];
+    private readonly Dictionary<(RgbColor, bool, int, LineType, int), Pen> _pens = [];
     private readonly Dictionary<RgbColor, Brush> _brushes = [];
     /// <summary>CAD の文字幅 (全角=高さ, 半角=高さ/2) に合う等幅フォント。</summary>
     private readonly Typeface _typeface = new("MS Gothic");
@@ -405,7 +405,7 @@ public sealed class CadCanvas : FrameworkElement
 
     public void DrawEntity(DrawingContext dc, Entity e, RgbColor color, bool selected = false)
     {
-        var pen = GetPen(color, selected, e.LineWeight);
+        var pen = GetPen(color, selected, e.LineWeight, e.LineType);
         switch (e)
         {
             case LineEntity l:
@@ -809,20 +809,42 @@ public sealed class CadCanvas : FrameworkElement
     public static int WeightQuarterPixels(double? weightMm) =>
         (int)Math.Round(Math.Clamp((weightMm ?? 0) * 3.0, 1.0, 8.0) * 4);
 
-    private Pen GetPen(RgbColor color, bool selected, double? weightMm = null)
+    private Pen GetPen(RgbColor color, bool selected, double? weightMm = null, LineType lineType = LineType.Continuous)
     {
         var q = WeightQuarterPixels(weightMm);
-        if (_pens.TryGetValue((color, selected, q), out var pen)) return pen;
         var px = q / 4.0;
+        // 線種の模様は用紙上の mm なので、今の拡大率での 1mm の画素数で決まる (細かくなりすぎたら実線で描く)
+        var pxPerMm = Scale * Document.PaperMmToMeters(1);
+        if (selected || lineType == LineType.Continuous || LineTypes.PeriodMm(lineType) * pxPerMm < 3) lineType = LineType.Continuous;
+        var mmKey = lineType == LineType.Continuous ? 0 : (int)Math.Round(Math.Log(pxPerMm) * 40);
+        var key = (color, selected, q, lineType, mmKey);
+        if (_pens.TryGetValue(key, out var pen)) return pen;
         pen = new Pen(GetBrush(color), selected ? Math.Max(2, px) : px)
         {
             StartLineCap = PenLineCap.Round,
             EndLineCap = PenLineCap.Round,
+            DashCap = PenLineCap.Round,
             LineJoin = PenLineJoin.Round,
         };
         if (selected) pen.DashStyle = DashStyles.Dash;
+        else if (lineType != LineType.Continuous) pen.DashStyle = LineTypeDash(lineType, Math.Exp(mmKey / 40.0), pen.Thickness);
         pen.Freeze();
-        return _pens[(color, selected, q)] = pen;
+        if (_pens.Count > 2000) _pens.Clear();
+        return _pens[key] = pen;
+    }
+
+    /// <summary>
+    /// 線種の模様を WPF の破線にする。長さは線の太さを 1 とした単位で、端は丸めるので
+    /// 線の部分は太さの分だけ短く、空ける部分は長くする (点 = 長さ 0 で丸い点になる)。
+    /// </summary>
+    private static DashStyle LineTypeDash(LineType lineType, double pxPerMm, double thickness)
+    {
+        var dashes = LineTypes.PatternMm(lineType)
+            .Select(mm => mm >= 0 ? Math.Max(0, mm * pxPerMm - thickness) / thickness : (-mm * pxPerMm + thickness) / thickness)
+            .ToList();
+        var style = new DashStyle(dashes, 0);
+        style.Freeze();
+        return style;
     }
 
     private Brush GetBrush(RgbColor color)

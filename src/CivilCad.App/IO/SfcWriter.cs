@@ -117,7 +117,8 @@ public static class SfcWriter
 
             foreach (var name in PredefinedColorNames) Feature($"pre_defined_colour_feature({Str(name)})");
             foreach (var c in _userColors) Feature($"user_defined_colour_feature({Q(c.R)},{Q(c.G)},{Q(c.B)})");
-            Feature($"pre_defined_font_feature({Str("continuous")})");
+            // 線種の表: 書いた順に線種コード 1〜5 (実線・破線・点線・一点鎖線・二点鎖線)
+            foreach (var t in LineTypes.All) Feature($"pre_defined_font_feature({Str(SxfLineTypeName(t))})");
             foreach (var width in _userWidths) Feature($"width_feature({Q(width)})");
             Feature($"text_font_feature({Str("ＭＳ ゴシック")})");
 
@@ -209,6 +210,19 @@ public static class SfcWriter
             }
         }
 
+        /// <summary>SXF の既定義線種名。</summary>
+        public static string SxfLineTypeName(LineType t) => t switch
+        {
+            LineType.Dashed => "dashed",
+            LineType.Dotted => "dotted",
+            LineType.DashDot => "long dashed dotted",
+            LineType.DashDotDot => "long dashed double-dotted",
+            _ => "continuous",
+        };
+
+        /// <summary>線種コード (表に書いた順、1 から)。</summary>
+        private static int LineTypeCode(LineType t) => LineTypes.All.ToList().IndexOf(t) + 1;
+
         private static bool IsSheetLevel(Entity e) => e.Layer.Name.StartsWith("D-TTL", StringComparison.OrdinalIgnoreCase);
 
         private void WriteEntity(Entity e, Func<Vec2, Vec2> map, double lengthScale)
@@ -216,7 +230,7 @@ public static class SfcWriter
             var layer = _layerCodes.TryGetValue(e.Layer, out var lc) ? lc : 1;
             var color = ColorCode(e.EffectiveColor);
             var width = WidthCode(e.LineWeight);
-            var head = $"{Q(layer)},{Q(color)},{Q(1)},{Q(width)}";
+            var head = $"{Q(layer)},{Q(color)},{Q(LineTypeCode(e.LineType))},{Q(width)}";
 
             switch (e)
             {

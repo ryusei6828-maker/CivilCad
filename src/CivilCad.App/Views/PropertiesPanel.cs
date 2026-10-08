@@ -117,7 +117,7 @@ public sealed class PropertiesPanel : UserControl
 
     private void OnWatchedPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(CadDocument.CurrentLineWeight) or nameof(CadDocument.CurrentColor)) QueueRefresh();
+        if (e.PropertyName is nameof(CadDocument.CurrentLineWeight) or nameof(CadDocument.CurrentColor) or nameof(CadDocument.CurrentLineType)) QueueRefresh();
     }
 
     /// <summary>変更が続けて起きても 1 回だけ作り直す。</summary>
@@ -152,6 +152,12 @@ public sealed class PropertiesPanel : UserControl
         AddLayerRow(sel);
         AddColorRow("色", sel.Select(e => e.Color).ToList(), c => Apply(x => x.Color = c, "色変更"));
         AddWeightRow("線幅 (mm)", sel.Select(e => e.LineWeight).ToList(), w => Apply(x => x.LineWeight = w, "線幅変更"));
+        var types = sel.Select(e => e.LineType).Distinct().ToList();
+        AddRow("線種", LineTypeCombo.Create(types.Count == 1 ? types[0] : null, t =>
+        {
+            if (sel.All(e => e.LineType == t)) return;
+            Apply(x => x.LineType = t, $"線種変更 → {LineTypes.Name(t)}");
+        }, Brushes.Black));
         AddTextSizeRows(sel.OfType<TextEntity>().ToList());
         AddTransparencyRow([.. sel.Where(e => e is HatchEntity or ImageEntity)]);
         var lengths = sel.Select(LengthOf).Where(l => l != null).Select(l => l!.Value).ToList();
@@ -510,6 +516,11 @@ public sealed class PropertiesPanel : UserControl
             Doc.CurrentLineWeight = w;
             Committed?.Invoke(this, EventArgs.Empty);
         });
+        AddRow("線種", LineTypeCombo.Create(Doc.CurrentLineType, t =>
+        {
+            Doc.CurrentLineType = t;
+            Committed?.Invoke(this, EventArgs.Empty);
+        }, Brushes.Black));
         if (Tools.TextTool.ScreenFixed)
             AddEditable("文字の大きさ (画面 px)", Tools.TextTool.DefaultScreenPx.ToString("0.#"), s =>
             {

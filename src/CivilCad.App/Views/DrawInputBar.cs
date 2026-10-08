@@ -89,7 +89,8 @@ public sealed class DrawInputBar : Border
 
     private void Doc_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(CadDocument.CurrentLineWeight) or nameof(CadDocument.CurrentColor) or nameof(CadDocument.ScaleDenominator))
+        if (e.PropertyName is nameof(CadDocument.CurrentLineWeight) or nameof(CadDocument.CurrentColor) or nameof(CadDocument.CurrentLineType)
+            or nameof(CadDocument.ScaleDenominator))
             Rebuild();
     }
 
@@ -190,6 +191,16 @@ public sealed class DrawInputBar : Border
 
         AddSeparator();
         AddWeight(doc);
+        AddLabel("線種");
+        var lineType = LineTypeCombo.Create(doc.CurrentLineType, t =>
+        {
+            doc.CurrentLineType = t;
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        }, Brushes.Black, 110);
+        lineType.Margin = new Thickness(0, 0, 12, 0);
+        lineType.Focusable = false;
+        _panel.Children.Add(lineType);
         AddColor(doc);
         _panel.Children.Add(_live);
         UpdateLive();
