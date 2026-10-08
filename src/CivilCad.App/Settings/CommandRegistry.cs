@@ -15,6 +15,7 @@ public static class CommandRegistry
         new("PO", "点", "IconPoint", "クリックか座標の入力 (x,y / @dx,dy / s X,Y) で点を置く。続けて置ける"),
         new("PE", "垂線", "IconPerpendicular", "基準の線 → 線上の点 → 終点 の順に指定"),
         new("T", "文字", "IconText"),
+        new("DIM", "寸法", "IconDimension", "1 点目 → 2 点目 → 寸法線の位置。続けてクリックで直列寸法。向き (平行・水平・垂直)・端末・単位は入力バー"),
         new("LD", "引き出し線", "IconLeader", "先端 → 折れ点 (いくつでも) → Enter → 文字 (行ごとに Enter、空の Enter で確定。文字なしも可)"),
         new("HA", "旗揚げ", "IconFlag", "先端 → 旗竿の始まり → 文字 (行ごとに Enter、空の Enter で確定)。旗竿は文字の幅で自動"),
         new("FI", "塗りつぶし", "IconFill", "閉じた図形を選択してから実行、または内側をクリック"),

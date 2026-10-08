@@ -20,7 +20,7 @@ public static class LeaderSettings
 /// ・旗揚げ: 先端 → 旗竿の始まり をクリック → 文字を入力 (行ごとに Enter、空の Enter で確定)。旗竿は文字の幅で自動
 /// 1 行に「|」で区切って複数行を一度に入れることもできる。Esc を押すまで続けて描ける。
 /// </summary>
-public sealed class LeaderTool(bool flag) : CadTool, IStyledDrawTool
+public sealed class LeaderTool(bool flag) : CadTool, IStyledDrawTool, ITextEntryTool
 {
     private static readonly RgbColor PreviewColor = new(0x66, 0xCC, 0xFF);
     private readonly List<Vec2> _points = [];
@@ -40,8 +40,7 @@ public sealed class LeaderTool(bool flag) : CadTool, IStyledDrawTool
     private void UpdatePrompt() => SetPrompt(
         _points.Count == 0 ? $"{Name}: 先端 ({TipName(LeaderSettings.Tip)}の付く点) を指定"
         : !_texting ? flag ? "旗竿の始まり (折れ点) を指定" : $"次の折れ点を指定 (Enter で点の指定を終えて文字の入力へ)"
-        : _lines.Count == 0 ? $"文字を入力して Enter (「|」で区切ると複数行{(flag ? "" : " / 空のまま Enter で文字なし")})"
-        : $"{_lines.Count + 1} 行目を入力 (空のまま Enter で確定)");
+        : "右のプロパティの入力欄に文字を入力して Enter (Shift+Enter で改行)");
 
     public override void StepBack()
     {
@@ -56,7 +55,11 @@ public sealed class LeaderTool(bool flag) : CadTool, IStyledDrawTool
     {
         if (_texting)
         {
-            Place(); // 文字の入力中のクリックは確定
+            // 文字の入力中のクリックは確定 (入力欄に入れかけの文字も入れる)
+            _lines.AddRange(DraftText.Replace("\r", "").Split('\n').Where(l => l.Length > 0));
+            DraftText = ""; // 行に入れたので、入力中の分としては数えない
+            Place();
+            UpdatePrompt();
             return;
         }
         if (_points.Count > 0 && (p - _points[^1]).Length < 1e-9) return;
@@ -85,8 +88,38 @@ public sealed class LeaderTool(bool flag) : CadTool, IStyledDrawTool
         return true;
     }
 
+    // ---- 右のプロパティの入力欄 ----
+
+    public bool IsWaitingForText => _texting;
+    public string TextEntryHint => flag
+        ? "旗の文字を入力して Enter で置く。Shift+Enter で改行 (1 行目が一番上)。Esc で点の指定に戻る"
+        : "文字を入力して Enter で置く (空のままなら線だけ)。Shift+Enter で改行。Esc で点の指定に戻る";
+    public bool AllowsMultipleLines => true;
+    public string DraftText { get; set; } = "";
+
+    public void SubmitText(string text)
+    {
+        if (!_texting) return;
+        _lines.AddRange(text.Replace("\r", "").Split('\n').SelectMany(l => ParseLines(l).Split('\n')).Where(l => l.Length > 0));
+        DraftText = ""; // 行に入れたので、入力中の分としては数えない
+        Place();
+        UpdatePrompt();
+    }
+
+    public void CancelText()
+    {
+        DraftText = "";
+        _lines.Clear();
+        _texting = false;
+        if (flag && _points.Count >= 2) _points.RemoveAt(_points.Count - 1); // 旗竿の始まりを選び直す
+        UpdatePrompt();
+    }
+
+    /// <summary>確定した行と入力中の行。</summary>
+    private IEnumerable<string> AllLines => _lines.Concat(DraftText.Replace("\r", "").Split('\n').Where(l => l.Length > 0));
+
     private LeaderEntity Make(IReadOnlyList<Vec2> points) =>
-        new(Doc.CurrentLayer, points, flag, string.Join("\n", _lines),
+        new(Doc.CurrentLayer, points, flag, string.Join("\n", _texting ? AllLines : _lines),
             Doc.PaperMmToMeters(LeaderSettings.TextHeightMm), Doc.PaperMmToMeters(LeaderSettings.TipSizeMm), LeaderSettings.Tip);
 
     private void Place()
@@ -96,6 +129,7 @@ public sealed class LeaderTool(bool flag) : CadTool, IStyledDrawTool
         _points.Clear();
         _lines.Clear();
         _texting = false;
+        DraftText = "";
     }
 
     public override void OnMouseMove(Vec2 p) => _cursor = p;

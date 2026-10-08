@@ -578,6 +578,11 @@ public sealed class CadCanvas : FrameworkElement
             case SymbolEntity s:
                 DrawSymbol(dc, s, color, selected);
                 break;
+            case DimensionEntity dim:
+                // 寸法: 補助線・寸法線・端末・寸法値に分けて描く
+                foreach (var part in dim.Explode().OrderBy(x => IsFill(x) ? 0 : 1))
+                    DrawEntity(dc, part, color, selected);
+                break;
             case LeaderEntity ld:
                 // 引き出し線・旗揚げ: 線・先端・文字に分けて描く (先端の塗りを先に)
                 foreach (var part in ld.Explode().OrderBy(x => IsFill(x) ? 0 : 1))

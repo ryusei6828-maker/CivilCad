@@ -329,7 +329,7 @@ public sealed class ArcTool : CadTool, IStyledDrawTool, IRadiusInput
     }
 }
 
-public sealed class TextTool : CadTool, IStyledDrawTool
+public sealed class TextTool : CadTool, IStyledDrawTool, ITextEntryTool
 {
     /// <summary>
     /// false (既定) なら用紙上の mm (<see cref="DefaultHeightMm"/>) を図面の縮尺で m に換算する (1:500 で 3.5mm → 1.75m)。
@@ -363,7 +363,30 @@ public sealed class TextTool : CadTool, IStyledDrawTool
     public override void OnPoint(Vec2 p)
     {
         _position = p;
-        SetPrompt("文字を入力して Enter");
+        DraftText = "";
+        SetPrompt("右のプロパティの入力欄に文字を入力して Enter (別の位置をクリックすると置き直し)");
+    }
+
+    // ---- 右のプロパティの入力欄 ----
+
+    public bool IsWaitingForText => _position != null;
+    public string TextEntryHint => "文字を入力して Enter で置く。Esc でやめる";
+    public bool AllowsMultipleLines => false;
+    public string DraftText { get; set; } = "";
+
+    public void SubmitText(string text) => OnText(text.Replace("\r", "").Replace("\n", " "));
+
+    public void CancelText()
+    {
+        DraftText = "";
+        StepBack();
+    }
+
+    public override void DrawPreview(DrawingContext dc)
+    {
+        if (_position is not Vec2 pos) return;
+        var text = DraftText.Length > 0 ? DraftText : "｜";
+        Canvas.DrawEntity(dc, Create(Doc.CurrentLayer, pos, text, Canvas.Scale), new RgbColor(0x66, 0xCC, 0xFF));
     }
 
     public override bool OnText(string text)
@@ -380,6 +403,7 @@ public sealed class TextTool : CadTool, IStyledDrawTool
         if (text.Length > 0) Execute(new AddEntitiesCommand([Styled(Create(Doc.CurrentLayer, pos, text, Canvas.Scale))], "文字"));
         // 続けて次の文字を置ける (Esc で終了)
         _position = null;
+        DraftText = "";
         OnActivated();
         return true;
     }

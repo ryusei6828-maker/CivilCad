@@ -5,6 +5,30 @@ namespace CivilCad.App.Tools;
 /// <summary>作図入力バーに線幅・色の欄を出す作図ツール。</summary>
 public interface IStyledDrawTool;
 
+/// <summary>
+/// 文字の入力を待つツール (文字・引き出し線・旗揚げ)。入力を待っている間、右のプロパティに入力欄が出る。
+/// </summary>
+public interface ITextEntryTool
+{
+    /// <summary>今、文字の入力を待っているか (位置を指定した後など)。</summary>
+    bool IsWaitingForText { get; }
+
+    /// <summary>入力欄の説明。</summary>
+    string TextEntryHint { get; }
+
+    /// <summary>複数行を入れられるか (Shift+Enter で改行)。</summary>
+    bool AllowsMultipleLines { get; }
+
+    /// <summary>入力中の文字 (作図領域に見本を出すのに使う)。</summary>
+    string DraftText { get; set; }
+
+    /// <summary>入力を確定する (改行で複数行)。</summary>
+    void SubmitText(string text);
+
+    /// <summary>入力をやめる (位置の指定に戻る)。</summary>
+    void CancelText();
+}
+
 /// <summary>次の点までの長さ・角度を固定できるツール (線・ポリライン)。null は固定しない。</summary>
 public interface ILengthAngleInput
 {

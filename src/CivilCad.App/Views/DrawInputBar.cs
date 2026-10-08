@@ -129,6 +129,20 @@ public sealed class DrawInputBar : Border
             case IRadiusInput ri:
                 AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
                 break;
+            case DimensionTool:
+                AddChoice("向き", Enum.GetValues<DimMode>(), DimSettings.Mode, DimSettings.ModeName, v => DimSettings.Mode = v,
+                    "平行 = 2 点を結ぶ向き / 水平 / 垂直 の長さを計る");
+                AddChoice("端末", Enum.GetValues<DimTerminator>(), DimSettings.Terminator, DimSettings.TerminatorName, v => DimSettings.Terminator = v,
+                    "寸法線の両端の記号");
+                AddChoice("単位", Enum.GetValues<DimUnit>(), DimSettings.Unit, DimSettings.UnitName, v => DimSettings.Unit = v,
+                    "寸法値の単位 (m / mm)");
+                AddNumber("小数桁", () => DimSettings.Decimals, v => { if (v is double d) { DimSettings.Decimals = (int)Math.Clamp(Math.Round(d), 0, 6); _canvas?.RedrawOverlay(); } },
+                    "寸法値の小数点以下の桁数 (0〜6)", allowEmpty: false);
+                AddNumber($"文字高 (mm, {doc.ScaleText})", () => DimSettings.TextHeightMm,
+                    v => { if (v is double h) { DimSettings.TextHeightMm = h; _canvas?.RedrawOverlay(); } }, "用紙上の寸法値の高さ", allowEmpty: false);
+                AddNumber("端末 (mm)", () => DimSettings.TerminatorSizeMm,
+                    v => { if (v is double s) { DimSettings.TerminatorSizeMm = s; _canvas?.RedrawOverlay(); } }, "用紙上の矢印の長さ", allowEmpty: false);
+                break;
             case LeaderTool:
                 AddLeaderTip();
                 AddNumber($"文字高 (mm, {doc.ScaleText})", () => LeaderSettings.TextHeightMm,
@@ -564,6 +578,30 @@ public sealed class DrawInputBar : Border
         {
             if (box.SelectedIndex < 0) return;
             DrawInputMemory.AngleStepDeg = LengthAngle.Steps[box.SelectedIndex];
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
+    }
+
+    /// <summary>一覧から選ぶ欄 (列挙値)。</summary>
+    private void AddChoice<T>(string label, IReadOnlyList<T> values, T current, Func<T, string> name, Action<T> set, string tip) where T : struct, Enum
+    {
+        AddLabel(label);
+        var box = new ComboBox
+        {
+            Width = 64,
+            Margin = new Thickness(0, 0, 12, 0),
+            Focusable = false,
+            ItemsSource = values.Select(name).ToList(),
+            SelectedIndex = values.ToList().IndexOf(current),
+            ToolTip = tip,
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0) return;
+            set(values[box.SelectedIndex]);
+            _canvas?.Tool.RefreshPrompt();
             _canvas?.RedrawOverlay();
             Committed?.Invoke(this, EventArgs.Empty);
         };

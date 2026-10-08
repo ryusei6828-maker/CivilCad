@@ -58,6 +58,11 @@ public partial class MainWindow : Window
             if (_propsDock != null && !_propsDock.IsOpen && Canvas.Selection.Any(x => x is TextEntity)) SetPanelOpen(_propsDock, true);
         };
         Canvas.PreviewMouseDown += (_, _) => CommandBox.Focus();
+        // 文字を入れるコマンドでは、入力欄を出すプロパティ (右側) を開く
+        Canvas.ToolChanged += (_, _) =>
+        {
+            if (Canvas.Tool is ITextEntryTool && _propsDock != null && !_propsDock.IsOpen) SetPanelOpen(_propsDock, true);
+        };
         Canvas.ContextRequested += (_, _) => ShowCanvasMenu();
         PreviewKeyDown += Window_PreviewKeyDown;
         Loaded += (_, _) =>
@@ -133,6 +138,7 @@ public partial class MainWindow : Window
             case "C": StartTool(new CircleTool(), c); break;
             case "A": StartTool(new ArcTool(), c); break;
             case "T": StartTool(new TextTool(), c); break;
+            case "DIM" or "DLI": StartTool(new DimensionTool(), "DIM"); break;
             case "LD": StartTool(new LeaderTool(flag: false), c); break;
             case "HA": StartTool(new LeaderTool(flag: true), c); break;
             case "REC" or "RECT": StartTool(new RectangleTool(), "REC"); break;
