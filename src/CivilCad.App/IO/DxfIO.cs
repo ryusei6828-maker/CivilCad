@@ -37,8 +37,8 @@ public static class DxfIO
         }
 
         var images = new Dictionary<string, netDxf.Objects.ImageDefinition>(StringComparer.OrdinalIgnoreCase);
-        // プリセット (記号) は線・塗り・円・文字に展開して書く (他の CAD でも表示できるように)
-        foreach (var e in doc.Entities.SelectMany(x => x is SymbolEntity s ? s.Explode() : [x]))
+        // プリセット (記号)・引き出し線は線・塗り・円・文字に展開して書く (他の CAD でも表示できるように)
+        foreach (var e in doc.Entities.SelectMany(x => x.ExplodeForOutput()))
         {
             EntityObject? de = e switch
             {

@@ -127,6 +127,15 @@ public sealed class DrawInputBar : Border
             case IRadiusInput ri:
                 AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
                 break;
+            case LeaderTool:
+                AddLeaderTip();
+                AddNumber($"文字高 (mm, {doc.ScaleText})", () => LeaderSettings.TextHeightMm,
+                    v => { if (v is double h) { LeaderSettings.TextHeightMm = h; _canvas?.RedrawOverlay(); } },
+                    "用紙上の文字の高さ。図面の縮尺で m に換算", allowEmpty: false);
+                AddNumber("先端の大きさ (mm)", () => LeaderSettings.TipSizeMm,
+                    v => { if (v is double s) { LeaderSettings.TipSizeMm = s; _canvas?.RedrawOverlay(); } },
+                    "用紙上の矢印の長さ (黒丸は直径がこの半分)", allowEmpty: false);
+                break;
             case PresetTool:
                 AddPresetKind();
                 AddNumber($"大きさ (mm, {doc.ScaleText})", () => PresetSettings.SizeMm,
@@ -516,6 +525,29 @@ public sealed class DrawInputBar : Border
             });
         else if (doc.UseTrueNorth)
             _panel.Children.Add(new TextBlock { Text = $"{doc.PlaneZone}系", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) });
+    }
+
+    private void AddLeaderTip()
+    {
+        AddLabel("先端");
+        var tips = Enum.GetValues<LeaderTip>();
+        var box = new ComboBox
+        {
+            Width = 70,
+            Margin = new Thickness(0, 0, 12, 0),
+            ItemsSource = tips.Select(LeaderTool.TipName).ToList(),
+            SelectedIndex = Array.IndexOf(tips, LeaderSettings.Tip),
+            ToolTip = "引き出し線の先端の形",
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0) return;
+            LeaderSettings.Tip = tips[box.SelectedIndex];
+            _canvas?.Tool.RefreshPrompt();
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
     }
 
     private void AddHatchStyle()

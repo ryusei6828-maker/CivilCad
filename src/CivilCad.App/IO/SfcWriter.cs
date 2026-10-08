@@ -94,7 +94,7 @@ public static class SfcWriter
 
         /// <summary>書き出す図形。プリセット (記号) は線・塗り・円・文字に展開する (他の CAD でも表示できるように)。</summary>
         // 画像は SFC (SXF レベル 2) には書けないので除く
-        private List<Entity> Entities => _entities ??= [.. doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e])];
+        private List<Entity> Entities => _entities ??= [.. doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e.ExplodeForOutput())];
         private List<Entity>? _entities;
 
         public string Build(string fileName)

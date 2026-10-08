@@ -206,7 +206,7 @@ public static class PdfExport
                 canvas.ClipRect(new SKRect(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y), Math.Max(a.X, b.X), Math.Max(a.Y, b.Y)));
             }
             // プリセット (記号) は線・塗り・円・文字に展開する
-            var visible = (o.Only ?? doc.Entities).Where(doc.IsVisible).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e]).ToList();
+            var visible = (o.Only ?? doc.Entities).Where(doc.IsVisible).SelectMany(e => e.ExplodeForOutput()).ToList();
             // 画像は一番下
             foreach (var img in visible.OfType<ImageEntity>().Where(i => !i.InFront)) DrawImage(img);
             // 塗りは線の下に描く (画面と同じ)

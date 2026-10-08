@@ -28,7 +28,7 @@ public class WindowLoadTests
                 var draw = (System.Windows.Controls.TabItem)tabs.Items[0];
                 Assert.Equal("描画", draw.Header);
                 Assert.Equal(0, tabs.SelectedIndex);
-                Assert.Equal(["L", "PL", "C", "A", "REC", "PO", "PE", "T", "H", "FI", "PS", "PSR"],
+                Assert.Equal(["L", "PL", "C", "A", "REC", "PO", "PE", "T", "LD", "HA", "H", "FI", "PS", "PSR"],
                     ((System.Windows.Controls.Panel)draw.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
                 // 「修正」タブ: 移動・複写・回転・拡大縮小・2 点指示・オフセット・トリム・延長・文字変更・結合・削除
                 var modify = (System.Windows.Controls.TabItem)tabs.Items[1];

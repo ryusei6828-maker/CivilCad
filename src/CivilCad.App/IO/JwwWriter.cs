@@ -100,7 +100,7 @@ public static partial class JwwIO
             _center = origin + new Vec2(pw, ph) / 2 * _k;
             AssignLayers();
             // プリセット (記号) は線・塗り・円・文字に展開する。画像は書かない
-            foreach (var e in doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e])) AddEntity(e);
+            foreach (var e in doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e.ExplodeForOutput())) AddEntity(e);
 
             _a.Raw(Encoding.ASCII.GetBytes("JwwData."));
             WriteHeader(PaperCode(paper, pw, ph));

@@ -33,6 +33,12 @@ public abstract class Entity(Layer layer)
     public abstract void Scale(Vec2 origin, double k);
 
     protected static Vec2 ScalePoint(Vec2 p, Vec2 origin, double k) => origin + (p - origin) * k;
+
+    /// <summary>
+    /// 保存 (DXF / SFC / JWW など) や PDF 印刷で書く図形。
+    /// プリセット・引き出し線のようにいくつかの図形をまとめたものは、線・塗り・円・文字に展開する。
+    /// </summary>
+    public virtual IEnumerable<Entity> ExplodeForOutput() => [this];
     public abstract Entity Clone();
     public virtual IEnumerable<SnapPoint> SnapPoints => [];
 

@@ -214,6 +214,25 @@ public sealed class PropertiesPanel : UserControl
                 AddReadOnly("弦長", $"{a.StartPoint.DistanceTo(a.EndPoint):F3} m");
                 break;
 
+            case LeaderEntity ld:
+                AddEditable("文字", string.Join(" | ", ld.Lines), s =>
+                    Apply(x => ((LeaderEntity)x).Text = Tools.LeaderTool.ParseLines(s), "引き出し線の文字変更"),
+                    "複数行は | で区切る (旗揚げは 1 行目が一番上)。空にすると線だけ");
+                AddEditable($"文字高 (mm, {Doc.ScaleText})", (ld.TextHeight / Doc.PaperMmToMeters(1)).ToString("0.###", CultureInfo.InvariantCulture), s =>
+                    TryPositive(s, out var mm) && Apply(x =>
+                    {
+                        var lx = (LeaderEntity)x;
+                        var k = Doc.PaperMmToMeters(mm) / lx.TextHeight;
+                        lx.TextHeight *= k;
+                        lx.TipSize *= k;
+                    }, "引き出し線の文字高変更"), "用紙上の文字の高さ。先端 (矢印・黒丸) の大きさも同じ割合で変わる");
+                AddEditable("先端", Tools.LeaderTool.TipName(ld.Tip), s =>
+                    Tools.LeaderTool.TryParseTip(s, out var tip) && Apply(x => ((LeaderEntity)x).Tip = tip, "引き出し線の先端変更"),
+                    "矢印 / 黒丸 / なし");
+                AddReadOnly("先端の位置", Xy(ld.Points[0]));
+                AddReadOnly("折れ点", $"{ld.Points.Count - 1} 個");
+                break;
+
             case SymbolEntity sym:
                 AddReadOnly("位置", Xy(sym.Position));
                 AddEditable($"大きさ (mm, {Doc.ScaleText})", sym.SizeMm.ToString("0.###", CultureInfo.InvariantCulture), s =>
@@ -606,6 +625,8 @@ public sealed class PropertiesPanel : UserControl
         TextEntity => "文字",
         HatchEntity => "ハッチング",
         SymbolEntity s => s.Definition.Name,
+        LeaderEntity { IsFlag: true } => "旗揚げ",
+        LeaderEntity => "引き出し線",
         ImageEntity i when IO.PdfRenderer.IsPdf(i.Path) => "PDF",
         ImageEntity => "画像",
         _ => e.GetType().Name,
