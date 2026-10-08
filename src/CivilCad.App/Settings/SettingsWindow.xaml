@@ -66,6 +66,34 @@
                     </DataGrid>
                 </DockPanel>
             </TabItem>
+            <TabItem Header="表示">
+                <StackPanel Margin="10">
+                    <TextBlock Text="背景色" FontWeight="Bold" Margin="0,0,0,6"/>
+                    <ItemsControl x:Name="BackgroundChoices">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock Text="色コード (#RRGGBB)" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox x:Name="BackgroundBox" Width="90" VerticalContentAlignment="Center" FontFamily="Consolas"
+                                 TextChanged="BackgroundBox_TextChanged" ToolTip="例: #1E1E1E (既定)、#FFFFFF (白)"/>
+                        <Border x:Name="BackgroundPreview" Width="60" Height="22" Margin="8,0,0,0" BorderBrush="Gray" BorderThickness="1"/>
+                    </StackPanel>
+                    <TextBlock Foreground="Gray" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Text="明るい背景では白い線・文字を黒で、暗い背景では黒い線を白で表示します (図形の色は変わりません)。"/>
+
+                    <TextBlock Text="グリッド" FontWeight="Bold" Margin="0,18,0,6"/>
+                    <CheckBox x:Name="GridVisibleCheck" Content="グリッドを表示する (F7 / コマンド GR でも切り替え)"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock Text="間隔 (m)" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="GridSpacingBox" Width="100" IsEditable="True"
+                                  ToolTip="図面上の m。「自動」は拡大率に合わせて 1・2・5・10… m から選ぶ"/>
+                        <TextBlock Foreground="Gray" VerticalAlignment="Center" Margin="8,0,0,0" TextWrapping="Wrap" Width="330"
+                                   Text="「自動」は拡大率に合わせて変わります。指定した間隔が画面で細かすぎるときは 10 倍ずつ間引きます。5 本ごとに少し濃い線。"/>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>

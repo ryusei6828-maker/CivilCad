@@ -232,6 +232,15 @@
                                          ToolTip="一部選択: ドラッグした範囲に少しでもかかった図形を選ぶ (削除モードも同じ)"/>
                         </StackPanel>
                     </Border>
+                    <Border BorderBrush="#FFB8BCC4" BorderThickness="1" CornerRadius="2" Padding="3,1" Margin="0,0,10,0">
+                        <StackPanel Orientation="Horizontal">
+                            <ToggleButton x:Name="GridToggle" Content="グリッド [F7]" IsChecked="True" Focusable="False" Click="GridToggle_Click" Padding="6,0"
+                                          ToolTip="背景のグリッド線の表示 / 非表示"/>
+                            <ComboBox x:Name="GridSpacingBox" Width="70" IsEditable="True" Margin="4,0,0,0"
+                                      SelectionChanged="GridSpacingBox_SelectionChanged" KeyDown="GridSpacingBox_KeyDown" LostFocus="GridSpacingBox_LostFocus"/>
+                            <TextBlock Text="m" VerticalAlignment="Center" Margin="3,0,2,0" Foreground="#FF505560"/>
+                        </StackPanel>
+                    </Border>
                     <Border BorderBrush="#FFB8BCC4" BorderThickness="1" CornerRadius="2" Padding="3,1">
                         <StackPanel Orientation="Horizontal">
                             <ToggleButton x:Name="SnapToggle" Content="スナップ [F3]" IsChecked="True" Focusable="False" Click="Toggle_Click" Padding="6,0"

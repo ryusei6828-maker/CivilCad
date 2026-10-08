@@ -20,7 +20,7 @@ public sealed class CadCanvas : FrameworkElement
     private const double PickTolerancePx = 6;
     private const double SnapTolerancePx = 12;
 
-    private static readonly Brush Background = Frozen(new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E)));
+    public static readonly RgbColor DefaultBackground = new(0x1E, 0x1E, 0x1E);
     private static readonly RgbColor DimColor = new(90, 90, 90);
     private static readonly Pen SnapPen = Freeze(new Pen(Brushes.Lime, 2));
     public static readonly Pen PreviewPen = Freeze(new Pen(new SolidColorBrush(Color.FromRgb(0x66, 0xCC, 0xFF)), 1));
@@ -342,7 +342,137 @@ public sealed class CadCanvas : FrameworkElement
         RedrawScene();
     }
 
-    protected override void OnRender(DrawingContext dc) => dc.DrawRectangle(Background, null, new Rect(RenderSize));
+    protected override void OnRender(DrawingContext dc) => dc.DrawRectangle(_background, null, new Rect(RenderSize));
+
+    // ---- 背景・グリッド ----
+
+    private RgbColor _backgroundColor = DefaultBackground;
+    private Brush _background = Frozen(new SolidColorBrush(Color.FromRgb(DefaultBackground.R, DefaultBackground.G, DefaultBackground.B)));
+    private Pen? _gridMinorPen, _gridMajorPen;
+    private bool _gridVisible = true;
+    private double? _gridSpacing;
+
+    /// <summary>作図領域の背景色。明るい色なら白い線は黒で表示する (白い背景で見えなくならないように)。</summary>
+    public RgbColor BackgroundColor
+    {
+        get => _backgroundColor;
+        set
+        {
+            if (_backgroundColor == value) return;
+            _backgroundColor = value;
+            _background = Frozen(new SolidColorBrush(Color.FromRgb(value.R, value.G, value.B)));
+            _gridMinorPen = _gridMajorPen = null;
+            InvalidateVisual();
+            RedrawAll();
+        }
+    }
+
+    /// <summary>背景が明るいか (白・薄い灰など)。</summary>
+    public bool IsLightBackground => Luminance(_backgroundColor) > 0.5;
+
+    private static double Luminance(RgbColor c) => (0.299 * c.R + 0.587 * c.G + 0.114 * c.B) / 255;
+
+    /// <summary>
+    /// 表示する色: 背景と同じような明るさで見えない色を見える色にする
+    /// (明るい背景では白い線を黒く、暗い背景では黒い線を白く)。図形の色そのものは変えない。
+    /// </summary>
+    public RgbColor ForDisplay(RgbColor c)
+    {
+        var l = Luminance(c);
+        if (IsLightBackground && l > 0.85) return new RgbColor(0, 0, 0);
+        if (!IsLightBackground && l < 0.1) return new RgbColor(255, 255, 255);
+        return c;
+    }
+
+    public bool GridVisible
+    {
+        get => _gridVisible;
+        set
+        {
+            if (_gridVisible == value) return;
+            _gridVisible = value;
+            RedrawScene();
+        }
+    }
+
+    /// <summary>グリッドの間隔 (図面上の m)。null なら拡大率に合わせて自動 (1・2・5 × 10ⁿ m)。</summary>
+    public double? GridSpacing
+    {
+        get => _gridSpacing;
+        set
+        {
+            if (_gridSpacing == value) return;
+            _gridSpacing = value is > 0 ? value : null;
+            RedrawScene();
+        }
+    }
+
+    /// <summary>グリッドの線が画面でこれより詰まるときは間引く (画素)。</summary>
+    private const double GridMinPx = 8;
+
+    /// <summary>今の拡大率で実際に描くグリッドの間隔 (m)。指定した間隔が細かすぎるときは 10 倍ずつ広げる。</summary>
+    public double EffectiveGridSpacing
+    {
+        get
+        {
+            if (_gridSpacing is double s)
+            {
+                while (s * Scale < GridMinPx) s *= 10;
+                return s;
+            }
+            // 自動: 画面で 25 画素以上になる 1・2・5 × 10ⁿ
+            var target = 25 / Scale;
+            var p = Math.Pow(10, Math.Floor(Math.Log10(target)));
+            foreach (var m in new[] { 1.0, 2, 5, 10 })
+                if (m * p >= target) return m * p;
+            return 10 * p;
+        }
+    }
+
+    /// <summary>グリッド: 細い線と、5 本ごとの少し濃い線。図面の原点 (0, 0) にそろえる。</summary>
+    private void DrawGrid(DrawingContext dc, Box2 view)
+    {
+        var s = EffectiveGridSpacing;
+        if (!(s > 0) || double.IsInfinity(s)) return;
+        if (_gridMinorPen == null || _gridMajorPen == null)
+        {
+            var bg = _backgroundColor;
+            int Shift(byte v, int d) => Math.Clamp(v + (IsLightBackground ? -d : d), 0, 255);
+            Color C(int d) => Color.FromRgb((byte)Shift(bg.R, d), (byte)Shift(bg.G, d), (byte)Shift(bg.B, d));
+            _gridMinorPen = new Pen(new SolidColorBrush(C(0x16)), 1);
+            _gridMajorPen = new Pen(new SolidColorBrush(C(0x2E)), 1);
+            _gridMinorPen.Freeze();
+            _gridMajorPen.Freeze();
+        }
+        var minor = new StreamGeometry();
+        var major = new StreamGeometry();
+        using (var cm = minor.Open())
+        using (var cj = major.Open())
+        {
+            var i0 = (long)Math.Floor(view.Min.X / s);
+            var i1 = (long)Math.Ceiling(view.Max.X / s);
+            for (var i = i0; i <= i1 && i - i0 < 2000; i++)
+            {
+                var x = Math.Round(WorldToScreen(new Vec2(i * s, 0)).X) + 0.5;
+                var ctx = i % 5 == 0 ? cj : cm;
+                ctx.BeginFigure(new Point(x, 0), false, false);
+                ctx.LineTo(new Point(x, ActualHeight), true, false);
+            }
+            var j0 = (long)Math.Floor(view.Min.Y / s);
+            var j1 = (long)Math.Ceiling(view.Max.Y / s);
+            for (var j = j0; j <= j1 && j - j0 < 2000; j++)
+            {
+                var y = Math.Round(WorldToScreen(new Vec2(0, j * s)).Y) + 0.5;
+                var ctx = j % 5 == 0 ? cj : cm;
+                ctx.BeginFigure(new Point(0, y), false, false);
+                ctx.LineTo(new Point(ActualWidth, y), true, false);
+            }
+        }
+        minor.Freeze();
+        major.Freeze();
+        dc.DrawGeometry(null, _gridMinorPen, minor);
+        dc.DrawGeometry(null, _gridMajorPen, major);
+    }
 
     public void RedrawAll()
     {
@@ -370,6 +500,9 @@ public sealed class CadCanvas : FrameworkElement
         using var dc = _scene.RenderOpen();
         if (ActualWidth <= 0) return;
         var view = VisibleWorldBox;
+        // 背景も図形と一緒に描く (背景色を変えたらすぐ変わるように)
+        dc.DrawRectangle(_background, null, new Rect(0, 0, ActualWidth, ActualHeight));
+        if (_gridVisible) DrawGrid(dc, view);
         // 画像 → 塗りつぶし → 線・文字 の順に描き、線や文字が画像や塗りに隠れないようにする
         foreach (var pass in new[] { 0, 1, 2, 3 })
         {
@@ -405,6 +538,7 @@ public sealed class CadCanvas : FrameworkElement
 
     public void DrawEntity(DrawingContext dc, Entity e, RgbColor color, bool selected = false)
     {
+        color = ForDisplay(color);
         var pen = GetPen(color, selected, e.LineWeight, e.LineType);
         switch (e)
         {

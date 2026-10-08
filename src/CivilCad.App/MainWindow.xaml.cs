@@ -71,6 +71,8 @@ public partial class MainWindow : Window
         LoadSnapKinds();
         BuildSnapBar();
         LoadBoxSelectMode();
+        ApplyDisplaySettings();
+        GridSpacingBox.ToolTipOpening += (_, _) => UpdateGridTip(); // 今の拡大率での間隔を出す
         if (_settings.MessageLogHeight is double h) MessageLog.Height = Math.Clamp(h, MessageLogMin, 1000);
 
         // レイヤパネルは既定で閉じておき、現在レイヤはステータスバーに出す
@@ -179,6 +181,7 @@ public partial class MainWindow : Window
             case "PRF": SetPanelFloating(_propsDock, !_propsDock.IsFloating); break;
             case "U": Undo_Executed(this, null!); break;
             case "REDO": Redo_Executed(this, null!); break;
+            case "GR": SetGridVisible(!_settings.GridVisible); break;
             case "SNAP":
                 SnapToggle.IsChecked = !SnapToggle.IsChecked;
                 Toggle_Click(this, new RoutedEventArgs());
@@ -754,15 +757,90 @@ public partial class MainWindow : Window
         }
     }
 
+    // ---- 表示 (背景色・グリッド) ----
+
+    private bool _updatingGridUi;
+
+    /// <summary>設定の背景色・グリッドを作図領域と右下のグリッド欄に反映する。</summary>
+    private void ApplyDisplaySettings()
+    {
+        Canvas.BackgroundColor = SettingsWindow.ParseHex(_settings.BackgroundColor ?? "") ?? CadCanvas.DefaultBackground;
+        Canvas.GridVisible = _settings.GridVisible;
+        Canvas.GridSpacing = _settings.GridSpacing;
+        _updatingGridUi = true;
+        GridToggle.IsChecked = _settings.GridVisible;
+        if (GridSpacingBox.ItemsSource == null) GridSpacingBox.ItemsSource = SettingsWindow.GridSpacingChoices;
+        GridSpacingBox.Text = SettingsWindow.FormatSpacing(_settings.GridSpacing);
+        _updatingGridUi = false;
+        UpdateGridTip();
+    }
+
+    private void SetGridVisible(bool visible)
+    {
+        _settings.GridVisible = visible;
+        ApplyDisplaySettings();
+        SaveSettingsQuietly();
+        Log(visible ? $"グリッド: 表示 (間隔 {SettingsWindow.FormatSpacing(_settings.GridSpacing)}{(_settings.GridSpacing != null ? " m" : "")})" : "グリッド: 非表示");
+    }
+
+    private void GridToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_updatingGridUi) SetGridVisible(GridToggle.IsChecked == true);
+    }
+
+    private void CommitGridSpacing()
+    {
+        if (_updatingGridUi) return;
+        if (!SettingsWindow.TryParseSpacing(GridSpacingBox.Text, out var spacing))
+        {
+            Log("グリッドの間隔は 0 より大きい数値 (m) か「自動」にしてください。");
+            GridSpacingBox.Text = SettingsWindow.FormatSpacing(_settings.GridSpacing);
+            return;
+        }
+        if (spacing == _settings.GridSpacing) return;
+        _settings.GridSpacing = spacing;
+        if (!_settings.GridVisible) _settings.GridVisible = true;
+        ApplyDisplaySettings();
+        SaveSettingsQuietly();
+        Log($"グリッドの間隔: {SettingsWindow.FormatSpacing(spacing)}{(spacing != null ? " m" : " (拡大率に合わせる)")}");
+    }
+
+    private void GridSpacingBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (GridSpacingBox.SelectedItem is string s)
+        {
+            GridSpacingBox.Text = s;
+            CommitGridSpacing();
+        }
+    }
+
+    private void GridSpacingBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        CommitGridSpacing();
+        CommandBox.Focus();
+        e.Handled = true;
+    }
+
+    private void GridSpacingBox_LostFocus(object sender, RoutedEventArgs e) => CommitGridSpacing();
+
+    /// <summary>グリッド欄のツールチップに、今の拡大率で描いている間隔を出す。</summary>
+    private void UpdateGridTip() =>
+        GridSpacingBox.ToolTip = $"グリッドの間隔 (m)。一覧から選ぶか数値を入れて Enter。「自動」は拡大率に合わせる\n今の表示: {Canvas.EffectiveGridSpacing:0.###} m ごと (5 本ごとに濃い線)";
+
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new SettingsWindow(_settings) { Owner = this };
         if (dlg.ShowDialog() != true || dlg.Result == null) return;
         _settings.KeyBindings = dlg.Result;
+        _settings.BackgroundColor = dlg.BackgroundResult;
+        _settings.GridVisible = dlg.GridVisibleResult;
+        _settings.GridSpacing = dlg.GridSpacingResult;
+        ApplyDisplaySettings();
         try
         {
             _settings.Save();
-            Log($"キー割り当てを保存しました ({AppSettings.DefaultPath})");
+            Log($"設定を保存しました ({AppSettings.DefaultPath})");
         }
         catch (Exception ex)
         {

@@ -57,12 +57,14 @@ public static class CommandRegistry
         new("U", "元に戻す", "IconUndo", "Ctrl+Z でも可"),
         new("REDO", "やり直し", "IconRedo", "Ctrl+Y でも可"),
         new("SNAP", "スナップ 切替", null),
+        new("GR", "グリッド 表示切替", null, "間隔は右下のグリッド欄、背景色は設定の「表示」タブ"),
         new("ORTHO", "直交モード 切替", null),
     ];
 
     public static IReadOnlyDictionary<string, string> DefaultBindings { get; } = new Dictionary<string, string>
     {
         ["SNAP"] = "F3",
+        ["GR"] = "F7",
         ["ORTHO"] = "F8",
         ["PDF"] = "Ctrl+P",
     };
