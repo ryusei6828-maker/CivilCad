@@ -168,8 +168,8 @@ public partial class MainWindow : Window
             case "DI": StartTool(new DistanceTool(), c); break;
             case "AA": StartTool(new AreaTool(), c); break;
             case "E" or "DEL":
-                // 先に選択していた図形があればそれを消してから削除モードへ
-                DeleteSelection();
+                // 選択していた図形は消さずに選択を外してから削除モードへ (消す図形は削除モードで選び、ダブルクリックで確定)
+                Canvas.ClearSelection();
                 StartTool(new EraseTool(), "E");
                 break;
             case "ZE" or "Z": ZoomExtentsWithReport(); break;

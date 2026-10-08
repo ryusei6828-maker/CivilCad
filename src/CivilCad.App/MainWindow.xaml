@@ -156,7 +156,7 @@
                         <Button Style="{StaticResource ToolButton}" Tag="EX" Click="Tool_Click" ToolTip="延長 (EX): 境界を選んで Enter → 伸ばす端をクリック (Shift+クリックでトリム)"><StackPanel><Image Source="{StaticResource IconExtend}" Width="24" Height="24"/><TextBlock Text="延長" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="ED" Click="Tool_Click" ToolTip="文字変更 (ED): 文字をクリックして中身を変える (選択中は文字のダブルクリックでも)"><StackPanel><Image Source="{StaticResource IconText}" Width="24" Height="24"/><TextBlock Text="文字変更" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="J" Click="Tool_Click" ToolTip="結合 (J) ※先に図形を選択。分かれた線を 1 本の線・ポリラインにつなぎ直す"><StackPanel><Image Source="{StaticResource IconJoin}" Width="24" Height="24"/><TextBlock Text="結合" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
-                        <Button Style="{StaticResource ToolButton}" Tag="E" Click="Tool_Click" ToolTip="削除モード (E): クリックした図形を消す。Esc で終了"><StackPanel><Image Source="{StaticResource IconErase}" Width="24" Height="24"/><TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="E" Click="Tool_Click" ToolTip="削除モード (E): クリック (ドラッグで範囲) で消す図形を選び、ダブルクリックか Enter で削除。Esc で終了"><StackPanel><Image Source="{StaticResource IconErase}" Width="24" Height="24"/><TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="図面">

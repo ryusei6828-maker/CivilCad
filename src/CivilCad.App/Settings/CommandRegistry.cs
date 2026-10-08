@@ -43,7 +43,7 @@ public static class CommandRegistry
         new("TR", "トリム", "IconTrim", "境界を選んで Enter → 切り取る部分をクリック。Shift+クリックで延長"),
         new("EX", "延長", "IconExtend", "境界を選んで Enter → 伸ばす端をクリック。Shift+クリックでトリム"),
         new("ED", "文字変更", "IconText", "文字をクリックして中身を変える (選択中は文字のダブルクリックでも)"),
-        new("E", "削除モード", "IconErase", "クリックした図形を消す。Esc で終了"),
+        new("E", "削除モード", "IconErase", "クリック (ドラッグで範囲) で消す図形を選び、ダブルクリックか Enter で削除。Esc で終了"),
         new("DI", "距離・方向角", "IconDistance"),
         new("AA", "面積", "IconArea"),
         new("RC", "路線計算 (IP法)", "IconRoute"),
