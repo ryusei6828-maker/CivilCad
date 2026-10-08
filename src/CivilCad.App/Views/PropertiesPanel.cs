@@ -446,6 +446,12 @@ public sealed class PropertiesPanel : UserControl
     private void AddTextSizeRows(List<TextEntity> texts)
     {
         if (texts.Count == 0) return;
+        var fonts = texts.Select(t => t.EffectiveFontName).Distinct().ToList();
+        AddRow("フォント", FontCombo.Create(fonts.Count == 1 ? fonts[0] : "", f =>
+        {
+            if (texts.All(t => t.FontName == f)) return;
+            Apply(x => { if (x is TextEntity t) t.FontName = f; }, $"フォント変更 → {f ?? TextEntity.DefaultFontName}");
+        }));
         // 画面で一定の文字は、保存するときの大きさ (用紙上 1px = 0.26mm) を出す
         var heights = texts.Select(t => Math.Round(t.ScreenHeightPx is double px ? px * TextEntity.MmPerPixel : t.Height / Doc.ScaleDenominator * 1000, 3)).Distinct().ToList();
         AddEditable("文字高 (mm)", heights.Count == 1 ? heights[0].ToString("0.###") : "", s =>

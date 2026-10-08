@@ -276,7 +276,7 @@ public static partial class JwwIO
                 _a.F64(sizeY);
                 _a.F64(0);       // 文字間隔
                 _a.F64(GeoMath.NormalizeAngle(t.Rotation) * 180 / Math.PI);
-                _a.Str("ＭＳ ゴシック");
+                _a.Str(t.EffectiveFontName);
                 _a.Str(t.Text);
             });
         }

@@ -186,6 +186,20 @@ public static class PdfExport
     private sealed class Painter(CadDocument doc, SKCanvas canvas, Layout layout, PdfOptions o)
     {
         private readonly SKTypeface _typeface = SKTypeface.FromFamilyName("MS Gothic") ?? SKTypeface.FromFamilyName("Yu Gothic") ?? SKTypeface.Default;
+        private readonly Dictionary<string, SKTypeface> _typefaces = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>文字のフォント (見つからなければ既定の MS ゴシック)。</summary>
+        private SKTypeface TypefaceOf(TextEntity t)
+        {
+            if (string.IsNullOrWhiteSpace(t.FontName) || t.FontName == TextEntity.DefaultFontName) return _typeface;
+            if (!_typefaces.TryGetValue(t.FontName, out var tf))
+            {
+                var found = SKTypeface.FromFamilyName(t.FontName);
+                // 見つからないと既定の書体が返るので、名前が違えば MS ゴシックにする
+                _typefaces[t.FontName] = tf = found != null && found.FamilyName != SKTypeface.Default.FamilyName ? found : _typeface;
+            }
+            return tf;
+        }
 
         /// <summary>図面 (m) → PDF (pt、左上が原点で y は下向き)。</summary>
         private SKPoint P(Vec2 w)
@@ -358,7 +372,7 @@ public static class PdfExport
             var heightM = t.ScreenHeightPx is double px ? px * TextEntity.MmPerPixel * layout.MetersPerMm : t.Height;
             var em = Len(heightM);
             if (em <= 0.01f) return;
-            using var font = new SKFont(_typeface, em) { Subpixel = true, Edging = SKFontEdging.Antialias };
+            using var font = new SKFont(TypefaceOf(t), em) { Subpixel = true, Edging = SKFontEdging.Antialias };
             using var paint = new SKPaint { IsAntialias = true, Color = Color(t), Style = SKPaintStyle.Fill };
             var natural = Math.Max(font.MeasureText(t.Text), 1e-3f);
             // 画面と同じ幅: フィット幅か、幅係数

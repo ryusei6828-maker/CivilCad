@@ -187,6 +187,14 @@ public sealed class DrawInputBar : Border
                 else
                     AddNumber($"文字高 (mm, {doc.ScaleText})", () => TextTool.DefaultHeightMm, v => { if (v is double h) { TextTool.DefaultHeightMm = h; _canvas?.Tool.RefreshPrompt(); } },
                         "用紙上の文字の高さ。図面の縮尺で m に換算", allowEmpty: false);
+                AddLabel("フォント");
+                var font = FontCombo.Create(TextTool.DefaultFontName, f =>
+                {
+                    TextTool.DefaultFontName = f;
+                    Committed?.Invoke(this, EventArgs.Empty);
+                });
+                font.Margin = new Thickness(0, 0, 12, 0);
+                _panel.Children.Add(font);
                 break;
         }
 

@@ -833,6 +833,17 @@ public sealed class CadCanvas : FrameworkElement
     /// <summary>文字を作るときの大きさの上限 (px)。これより大きい文字は拡大して描く。</summary>
     private const double MaxTextEm = 2000;
 
+    private readonly Dictionary<string, Typeface> _typefaces = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>文字のフォント (指定が無ければ既定の MS ゴシック)。</summary>
+    private Typeface TypefaceOf(TextEntity t)
+    {
+        if (string.IsNullOrWhiteSpace(t.FontName) || t.FontName == TextEntity.DefaultFontName) return _typeface;
+        if (!_typefaces.TryGetValue(t.FontName, out var tf))
+            _typefaces[t.FontName] = tf = new Typeface(new FontFamily(t.FontName + ", MS Gothic"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+        return tf;
+    }
+
     private void DrawText(DrawingContext dc, TextEntity t, RgbColor color, bool selected)
     {
         var em = t.Height * Scale;
@@ -849,7 +860,7 @@ public sealed class CadCanvas : FrameworkElement
         // 上限の大きさで作って拡大して描く (見た目は同じ)
         var drawEm = Math.Min(em, MaxTextEm);
         var k = em / drawEm;
-        var ft = new FormattedText(t.Text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, _typeface, drawEm,
+        var ft = new FormattedText(t.Text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, TypefaceOf(t), drawEm,
             GetBrush(color), VisualTreeHelper.GetDpi(this).PixelsPerDip);
         var naturalWidth = Math.Max(ft.WidthIncludingTrailingWhitespace * k, 1e-6);
         var xScale = t.FitWidth is double fit ? fit * Scale / naturalWidth : t.WidthFactor;

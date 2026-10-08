@@ -23,6 +23,14 @@ public sealed class TextEntity(Layer layer, Vec2 position, string text, double h
     public double WidthFactor { get; set; } = 1;
     public double? FitWidth { get; set; }
 
+    /// <summary>既定のフォント (CAD の図面で一般的な等幅のゴシック)。</summary>
+    public const string DefaultFontName = "ＭＳ ゴシック";
+
+    /// <summary>フォント名 (「ＭＳ 明朝」など)。null なら既定 (<see cref="DefaultFontName"/>)。</summary>
+    public string? FontName { get; set; }
+
+    public string EffectiveFontName => string.IsNullOrWhiteSpace(FontName) ? DefaultFontName : FontName;
+
     /// <summary>
     /// 画面上で一定の大きさで表示する文字の高さ (ピクセル)。null なら普通の文字 (Height が図面上の高さ)。
     /// 設定されているときの Height は、いまの表示倍率での高さ (表示側が <see cref="SyncScreenHeight"/> で合わせる)。
@@ -100,6 +108,7 @@ public sealed class TextEntity(Layer layer, Vec2 position, string text, double h
         WidthFactor = WidthFactor,
         FitWidth = FitWidth,
         ScreenHeightPx = ScreenHeightPx,
+        FontName = FontName,
     });
 
     public override IEnumerable<SnapPoint> SnapPoints => [new(Position, SnapKind.Node)];

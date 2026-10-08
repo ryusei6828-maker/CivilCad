@@ -120,7 +120,8 @@ public static class SfcWriter
             // 線種の表: 書いた順に線種コード 1〜5 (実線・破線・点線・一点鎖線・二点鎖線)
             foreach (var t in LineTypes.All) Feature($"pre_defined_font_feature({Str(SxfLineTypeName(t))})");
             foreach (var width in _userWidths) Feature($"width_feature({Q(width)})");
-            Feature($"text_font_feature({Str("ＭＳ ゴシック")})");
+            // 文字フォントの表: 書いた順にフォントコード 1〜 (1 = 既定の ＭＳ ゴシック)
+            foreach (var f in TextFonts) Feature($"text_font_feature({Str(f)})");
 
             // レイヤの番号 (1 始まり) は先に決めておき、レイヤの定義 (layer_feature) は最後に書く
             var layers = UsableLayers();
@@ -209,6 +210,14 @@ public static class SfcWriter
                 return s.Length * 8; // \X2\ 表記になる文字があるときは長めに見積もる
             }
         }
+
+        private List<string>? _textFonts;
+
+        /// <summary>使っている文字フォント (1 番目は既定のフォント)。</summary>
+        private List<string> TextFonts => _textFonts ??=
+            [TextEntity.DefaultFontName, .. Entities.OfType<TextEntity>().Select(t => t.EffectiveFontName).Where(f => f != TextEntity.DefaultFontName).Distinct()];
+
+        private int FontCode(TextEntity t) => Math.Max(0, TextFonts.IndexOf(t.EffectiveFontName)) + 1;
 
         /// <summary>SXF の既定義線種名。</summary>
         public static string SxfLineTypeName(LineType t) => t switch
@@ -307,7 +316,7 @@ public static class SfcWriter
                     var tp = map(t.Position);
                     var row = t.VAlign switch { TextVAlign.Middle => 1, TextVAlign.Top => 2, _ => 0 };
                     var col = t.HAlign switch { TextHAlign.Center => 1, TextHAlign.Right => 2, _ => 0 };
-                    Feature($"text_string_feature({Q(layer)},{Q(color)},{Q(1)},{Str(t.Text)},{Q(tp.X)},{Q(tp.Y)}," +
+                    Feature($"text_string_feature({Q(layer)},{Q(color)},{Q(FontCode(t))},{Str(t.Text)},{Q(tp.X)},{Q(tp.Y)}," +
                             $"{Q(t.Height * lengthScale)},{Q(t.ApproxWidth * lengthScale)},{Q(0.0)}," +
                             $"{Q(GeoMath.NormalizeAngle(t.Rotation) * 180 / Math.PI, 14)},{Q(0.0, 14)},{Q(row * 3 + col + 1)},{Q(1)})");
                     break;

@@ -629,7 +629,10 @@ public static partial class JwwIO
             var p = W(t.Start);
             var end = W(t.End);
             var angle = m != null ? (end - p).Angle : t.AngleDeg * Math.PI / 180;
-            var text = new TextEntity(layer, p, t.Text, t.SizeY * k, angle);
+            var text = new TextEntity(layer, p, t.Text, t.SizeY * k, angle)
+            {
+                FontName = string.IsNullOrWhiteSpace(t.Font) || t.Font == TextEntity.DefaultFontName ? null : t.Font,
+            };
             var width = (end - p).Length;
             if (width > 0) text.FitWidth = width; // Jw_cad の文字は固定ピッチ。終点までの幅に合わせる
             if ((t.Flag & 0x0020) != 0) Skip("縦書き文字 (横書きで表示)");

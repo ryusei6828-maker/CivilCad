@@ -166,6 +166,7 @@ public static partial class SfcIO
         private readonly List<RgbColor> _userColors = [];
         private readonly List<double> _userWidths = [];
         private readonly List<string> _fonts = [];
+        private readonly List<string> _textFonts = [];
         private readonly List<LineType> _userFonts = [];
         private readonly Dictionary<string, (List<Feature> Members, string Flag)> _sfigs = [];
         private readonly List<(string Color, string Width, string Flag, List<Feature> Members)> _composites = [];
@@ -198,6 +199,9 @@ public static partial class SfcIO
                         break;
                     case "pre_defined_font_feature":
                         _fonts.Add(a.ElementAtOrDefault(0) ?? "");
+                        break;
+                    case "text_font_feature":
+                        _textFonts.Add(a.ElementAtOrDefault(0) ?? "");
                         break;
                     case "user_defined_font_feature":
                         // 名前, 線分の数, 線分の長さの並び: 数で大まかに判別する
@@ -534,6 +538,9 @@ public static partial class SfcIO
             };
             var width = D(a[i + 4]) * s;
             if (width > 0) e.FitWidth = width; // SXF の幅は文字列全体の幅
+            // フォント (文字フォントの表の番号。既定の ＭＳ ゴシックは指定なし扱い)
+            var fc = i >= 1 ? I(a[i - 1]) : 0;
+            if (fc >= 1 && fc <= _textFonts.Count && _textFonts[fc - 1] is { Length: > 0 } font && font != TextEntity.DefaultFontName) e.FontName = font;
             return e;
         }
 

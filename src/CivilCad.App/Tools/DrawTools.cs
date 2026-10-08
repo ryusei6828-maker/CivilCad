@@ -384,10 +384,13 @@ public sealed class TextTool : CadTool, IStyledDrawTool
         return true;
     }
 
-    /// <summary>今の設定の大きさの文字を作る (pixelsPerMeter は画面の拡大率)。</summary>
+    /// <summary>これから書く文字のフォント。null なら既定 (ＭＳ ゴシック)。</summary>
+    public static string? DefaultFontName { get; set; }
+
+    /// <summary>今の設定の大きさ・フォントの文字を作る (pixelsPerMeter は画面の拡大率)。</summary>
     public TextEntity Create(Layer layer, Vec2 pos, string text, double pixelsPerMeter) => ScreenFixed
-        ? new TextEntity(layer, pos, text, DefaultScreenPx / pixelsPerMeter) { ScreenHeightPx = DefaultScreenPx }
-        : new TextEntity(layer, pos, text, Doc.PaperMmToMeters(DefaultHeightMm));
+        ? new TextEntity(layer, pos, text, DefaultScreenPx / pixelsPerMeter) { ScreenHeightPx = DefaultScreenPx, FontName = DefaultFontName }
+        : new TextEntity(layer, pos, text, Doc.PaperMmToMeters(DefaultHeightMm)) { FontName = DefaultFontName };
 }
 
 /// <summary>
