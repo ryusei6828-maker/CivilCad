@@ -177,6 +177,7 @@ public partial class MainWindow : Window
             case "EX": StartTool(new ExtendTool(), c); break;
             case "ED": StartTool(new TextEditTool(), c); break;
             case "DI": StartTool(new DistanceTool(), c); break;
+            case "ID": StartTool(new CoordinateMeasureTool(), c); break;
             case "AA": StartTool(new AreaTool(), c); break;
             case "E" or "DEL":
                 // 先に選択していた図形があればそれを消してから削除モードへ

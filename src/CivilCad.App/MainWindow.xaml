@@ -92,6 +92,7 @@
             </MenuItem>
             <MenuItem Header="計測(_I)">
                 <MenuItem Header="距離・方向角 (DI)" Tag="DI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconDistance}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="座標計測 (ID)" Tag="ID" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCoord}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="面積 (AA)" Tag="AA" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconArea}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
             <MenuItem Header="路線(_R)">
@@ -173,6 +174,7 @@
                     <StackPanel Orientation="Horizontal">
                         <Button Style="{StaticResource ToolButton}" Tag="DI" Click="Tool_Click" ToolTip="距離・方向角 (DI)"><StackPanel><Image Source="{StaticResource IconDistance}" Width="24" Height="24"/><TextBlock Text="距離" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="AA" Click="Tool_Click" ToolTip="面積 (AA)"><StackPanel><Image Source="{StaticResource IconArea}" Width="24" Height="24"/><TextBlock Text="面積" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="ID" Click="Tool_Click" ToolTip="座標計測 (ID): クリックした点の測量座標 X・Y を表示し、座標管理に登録 (右クリックで登録しない設定に)"><StackPanel><Image Source="{StaticResource IconCoord}" Width="24" Height="24"/><TextBlock Text="座標" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="路線">
@@ -186,6 +188,7 @@
                 <TabItem Header="座標管理" x:Name="CoordTab">
                     <StackPanel Orientation="Horizontal">
                         <Button Style="{StaticResource ToolButton}" Tag="CM" Click="Tool_Click" ToolTip="座標管理 (CM): 登録された座標 (点名・X・Y・Z) の一覧を開く / 閉じる"><StackPanel><Image Source="{StaticResource IconPoints}" Width="24" Height="24"/><TextBlock Text="座標一覧" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="ID" Click="Tool_Click" ToolTip="座標計測 (ID): クリックした点の座標を表示して登録"><StackPanel><Image Source="{StaticResource IconCoord}" Width="24" Height="24"/><TextBlock Text="座標計測" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="PO" Click="Tool_Click" ToolTip="点 (PO): 図面をクリックして座標を登録 (点名は P1, P2 …)"><StackPanel><Image Source="{StaticResource IconPoint}" Width="24" Height="24"/><TextBlock Text="点を登録" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="PI" Click="Tool_Click" ToolTip="座標読込 SIMA / CSV (PI)"><StackPanel><Image Source="{StaticResource IconPoints}" Width="24" Height="24"/><TextBlock Text="座標読込" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="CEX" Click="Tool_Click" ToolTip="座標を CSV に書き出す (CEX)。一覧で選んでいれば選んだ点だけ"><StackPanel><Image Source="{StaticResource IconSave}" Width="24" Height="24"/><TextBlock Text="CSV 出力" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>

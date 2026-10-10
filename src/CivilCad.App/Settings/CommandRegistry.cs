@@ -46,6 +46,7 @@ public static class CommandRegistry
         new("ED", "文字変更", "IconText", "文字をクリックして中身を変える (選択中は文字のダブルクリックでも)"),
         new("E", "削除モード", "IconErase", "クリックした図形を消す。Esc で終了"),
         new("DI", "距離・方向角", "IconDistance"),
+        new("ID", "座標計測", "IconCoord", "クリックした点の測量座標 X・Y を表示し、座標管理に登録 (点名を入力すると直前の点の名前を変える)"),
         new("AA", "面積", "IconArea"),
         new("RL", "路線作成 (図面で IP をクリック)", "IconRoute", "BP → IP → … → EP をクリックして Enter。路線計算の窓で R・A・幅を入れて作図"),
         new("RC", "路線計算 (IP法)", "IconRoute"),
