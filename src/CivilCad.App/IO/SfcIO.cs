@@ -149,11 +149,25 @@ public static partial class SfcIO
         public double MapAngle(double rad) => ApplyVector(Vec2.FromAngle(rad)).Angle;
     }
 
+    /// <summary>SXF の既定義線種名 (dashed, long dashed dotted など) → 線種。</summary>
+    public static LineType LineTypeFromSxfName(string name)
+    {
+        var n = name.Trim().ToLowerInvariant();
+        if (n is "" or "continuous") return LineType.Continuous;
+        if (n == "dotted") return LineType.Dotted;
+        if (n.Contains("double-dotted") || n.Contains("triplicate-dotted") || n.Contains("double dotted")) return LineType.DashDotDot;
+        if (n.Contains("dotted") || n.Contains("chain") || n.Contains("center")) return LineType.DashDot;
+        return LineType.Dashed;
+    }
+
     private sealed class Builder(CadDocument doc)
     {
         private readonly List<Layer?> _layers = [null]; // SXF のレイヤコードは 1 始まり
         private readonly List<RgbColor> _userColors = [];
         private readonly List<double> _userWidths = [];
+        private readonly List<string> _fonts = [];
+        private readonly List<string> _textFonts = [];
+        private readonly List<LineType> _userFonts = [];
         private readonly Dictionary<string, (List<Feature> Members, string Flag)> _sfigs = [];
         private readonly List<(string Color, string Width, string Flag, List<Feature> Members)> _composites = [];
         private readonly Dictionary<string, int> _skipped = [];
@@ -182,6 +196,17 @@ public static partial class SfcIO
                         break;
                     case "width_feature":
                         _userWidths.Add(D(a[0]));
+                        break;
+                    case "pre_defined_font_feature":
+                        _fonts.Add(a.ElementAtOrDefault(0) ?? "");
+                        break;
+                    case "text_font_feature":
+                        _textFonts.Add(a.ElementAtOrDefault(0) ?? "");
+                        break;
+                    case "user_defined_font_feature":
+                        // 名前, 線分の数, 線分の長さの並び: 数で大まかに判別する
+                        var segs = a.Count > 1 ? I(a[1]) : 0;
+                        _userFonts.Add(segs >= 6 ? LineType.DashDotDot : segs >= 4 ? LineType.DashDot : segs >= 2 ? LineType.Dashed : LineType.Continuous);
                         break;
                     case "sfig_org_feature":
                         _sfigs[a[0]] = (top, a.ElementAtOrDefault(1) ?? "");
@@ -287,38 +312,38 @@ public static partial class SfcIO
                     break;
 
                 case "line_feature":
-                    Add(new LineEntity(L(a[0]), t.Apply(P(a[4], a[5])), t.Apply(P(a[6], a[7]))), a[1], a[3]);
+                    Add(new LineEntity(L(a[0]), t.Apply(P(a[4], a[5])), t.Apply(P(a[6], a[7]))), a[1], a[3], a[2]);
                     break;
 
                 case "polyline_feature":
-                    Add(Polyline(L(a[0]), Points(a[5], a[6]), t), a[1], a[3]);
+                    Add(Polyline(L(a[0]), Points(a[5], a[6]), t), a[1], a[3], a[2]);
                     break;
 
                 case "spline_feature":
                     // 通過点を結ぶ折れ線で近似
                     var sp = Polyline(L(a[0]), Points(a[6], a[7]), t);
                     sp.IsClosed = a[4] == "0";
-                    Add(sp, a[1], a[3]);
+                    Add(sp, a[1], a[3], a[2]);
                     break;
 
                 case "circle_feature":
-                    Add(new CircleEntity(L(a[0]), t.Apply(P(a[4], a[5])), D(a[6]) * t.LengthScale), a[1], a[3]);
+                    Add(new CircleEntity(L(a[0]), t.Apply(P(a[4], a[5])), D(a[6]) * t.LengthScale), a[1], a[3], a[2]);
                     break;
 
                 case "arc_feature":
-                    Add(Arc(L(a[0]), P(a[4], a[5]), D(a[6]), a[7] == "1", D(a[8]), D(a[9]), t), a[1], a[3]);
+                    Add(Arc(L(a[0]), P(a[4], a[5]), D(a[6]), a[7] == "1", D(a[8]), D(a[9]), t), a[1], a[3], a[2]);
                     break;
 
                 case "ellipse_feature":
-                    Add(Ellipse(L(a[0]), P(a[4], a[5]), D(a[6]), D(a[7]), D(a[8]), 0, 360, false, t), a[1], a[3]);
+                    Add(Ellipse(L(a[0]), P(a[4], a[5]), D(a[6]), D(a[7]), D(a[8]), 0, 360, false, t), a[1], a[3], a[2]);
                     break;
 
                 case "ellipse_arc_feature":
-                    Add(Ellipse(L(a[0]), P(a[4], a[5]), D(a[6]), D(a[7]), D(a[9]), D(a[10]), D(a[11]), a[8] == "1", t), a[1], a[3]);
+                    Add(Ellipse(L(a[0]), P(a[4], a[5]), D(a[6]), D(a[7]), D(a[9]), D(a[10]), D(a[11]), a[8] == "1", t), a[1], a[3], a[2]);
                     break;
 
                 case "clothoid_feature":
-                    Add(ClothoidCurve(L(a[0]), P(a[4], a[5]), D(a[6]), a[7] == "1" ? 1 : -1, D(a[8]), D(a[9]), D(a[10]), t), a[1], a[3]);
+                    Add(ClothoidCurve(L(a[0]), P(a[4], a[5]), D(a[6]), a[7] == "1" ? 1 : -1, D(a[8]), D(a[9]), D(a[10]), t), a[1], a[3], a[2]);
                     break;
 
                 case "point_marker_feature":
@@ -333,13 +358,13 @@ public static partial class SfcIO
 
                 case "label_feature":
                     // 引出線 + 文字
-                    Add(Polyline(L(a[0]), Points(a[5], a[6]), t), a[1], a[3]);
+                    Add(Polyline(L(a[0]), Points(a[5], a[6]), t), a[1], a[3], a[2]);
                     EmitEmbeddedText(f, t);
                     break;
 
                 case "linear_dim_feature":
                     // 寸法線と寸法値だけ取り込む (補助線・矢印は省略)
-                    Add(new LineEntity(L(a[0]), t.Apply(P(a[4], a[5])), t.Apply(P(a[6], a[7]))), a[1], a[3]);
+                    Add(new LineEntity(L(a[0]), t.Apply(P(a[4], a[5])), t.Apply(P(a[6], a[7]))), a[1], a[3], a[2]);
                     EmitEmbeddedText(f, t);
                     break;
 
@@ -513,6 +538,9 @@ public static partial class SfcIO
             };
             var width = D(a[i + 4]) * s;
             if (width > 0) e.FitWidth = width; // SXF の幅は文字列全体の幅
+            // フォント (文字フォントの表の番号。既定の ＭＳ ゴシックは指定なし扱い)
+            var fc = i >= 1 ? I(a[i - 1]) : 0;
+            if (fc >= 1 && fc <= _textFonts.Count && _textFonts[fc - 1] is { Length: > 0 } font && font != TextEntity.DefaultFontName) e.FontName = font;
             return e;
         }
 
@@ -567,12 +595,23 @@ public static partial class SfcIO
             return new PolylineEntity(layer, pts);
         }
 
-        private void Add(Entity e, string colorCode, string? widthCode)
+        private void Add(Entity e, string colorCode, string? widthCode, string? typeCode = null)
         {
             e.Color = Color(colorCode);
             if (widthCode != null) e.LineWeight = Width(widthCode);
+            if (typeCode != null) e.LineType = LineTypeOf(typeCode);
             _output.Add(e);
         }
+
+        /// <summary>線種コード → 線種 (既定義線種は表に書かれた順に 1〜、ユーザ定義線種は 17〜)。</summary>
+        private LineType LineTypeOf(string code)
+        {
+            var c = I(code);
+            if (c >= 1 && c <= _fonts.Count) return LineTypeFromSxfName(_fonts[c - 1]);
+            if (c >= 17 && c - 17 < _userFonts.Count) return _userFonts[c - 17];
+            return LineType.Continuous;
+        }
+
 
         private RgbColor? Color(string code)
         {

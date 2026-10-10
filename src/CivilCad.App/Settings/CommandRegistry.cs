@@ -15,6 +15,9 @@ public static class CommandRegistry
         new("PO", "点", "IconPoint", "クリックか座標の入力 (x,y / @dx,dy / s X,Y) で点を置く。続けて置ける"),
         new("PE", "垂線", "IconPerpendicular", "基準の線 → 線上の点 → 終点 の順に指定"),
         new("T", "文字", "IconText"),
+        new("DIM", "寸法", "IconDimension", "1 点目 → 2 点目 → 寸法線の位置。続けてクリックで直列寸法。向き (平行・水平・垂直)・端末・単位は入力バー"),
+        new("LD", "引き出し線", "IconLeader", "先端 → 折れ点 (いくつでも) → Enter → 文字 (行ごとに Enter、空の Enter で確定。文字なしも可)"),
+        new("HA", "旗揚げ", "IconFlag", "先端 → 旗竿の始まり → 文字 (行ごとに Enter、空の Enter で確定)。旗竿は文字の幅で自動"),
         new("FI", "塗りつぶし", "IconFill", "閉じた図形を選択してから実行、または内側をクリック"),
         new("PS", "プリセット (方位記号など)", "IconPreset", "記号を選んでクリックで配置。大きさは用紙上の mm"),
         new("PSR", "プリセット登録", "IconPresetAdd", "図形を選択してから実行。基準点と名前を指定すると、プリセット (PS) で置けるようになる"),
@@ -39,12 +42,12 @@ public static class CommandRegistry
         new("SCL", "拡大縮小", "IconResize", "先に図形を選択。基点 → 倍率 (または 参照する長さ → 新しい長さ)"),
         new("AL", "2 点指示 (位置合わせ)", "IconAlign", "先に図形 (画像など) を選択。元の点 → 合わせ先 を 2 組指定して、移動・回転 (・拡大縮小) で合わせる"),
         new("CO", "複写", "IconCopy", "先に図形を選択"),
-        new("RO", "回転", "IconRotate", "先に図形を選択。角度は度 (反時計回りが +)、C で元を残す"),
+        new("RO", "回転", "IconRotate", "先に図形を選択。中心点 → 基準の方向点 → 回転先の方向点 (角度の入力も可、反時計回りが +)。C で元を残す"),
         new("O", "オフセット", "IconOffset", "距離を入力 → 図形 → ずらす側をクリック"),
         new("TR", "トリム", "IconTrim", "境界を選んで Enter → 切り取る部分をクリック。Shift+クリックで延長"),
         new("EX", "延長", "IconExtend", "境界を選んで Enter → 伸ばす端をクリック。Shift+クリックでトリム"),
         new("ED", "文字変更", "IconText", "文字をクリックして中身を変える (選択中は文字のダブルクリックでも)"),
-        new("E", "削除モード", "IconErase", "クリックした図形を消す。Esc で終了"),
+        new("E", "削除モード", "IconErase", "クリック (ドラッグで範囲) で消す図形を選び、ダブルクリックか Enter で削除。Esc で終了"),
         new("DI", "距離・方向角", "IconDistance"),
         new("ID", "座標計測", "IconCoord", "クリックした点の測量座標 X・Y を表示し、座標管理に登録 (点名を入力すると直前の点の名前を変える)"),
         new("AA", "面積", "IconArea"),
@@ -60,12 +63,14 @@ public static class CommandRegistry
         new("U", "元に戻す", "IconUndo", "Ctrl+Z でも可"),
         new("REDO", "やり直し", "IconRedo", "Ctrl+Y でも可"),
         new("SNAP", "スナップ 切替", null),
+        new("GR", "グリッド 表示切替", null, "間隔は右下のグリッド欄、背景色は設定の「表示」タブ"),
         new("ORTHO", "直交モード 切替", null),
     ];
 
     public static IReadOnlyDictionary<string, string> DefaultBindings { get; } = new Dictionary<string, string>
     {
         ["SNAP"] = "F3",
+        ["GR"] = "F7",
         ["ORTHO"] = "F8",
         ["PDF"] = "Ctrl+P",
     };

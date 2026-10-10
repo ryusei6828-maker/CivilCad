@@ -232,6 +232,8 @@ public sealed class SymbolEntity(Layer layer, string kind, Vec2 position, double
         }
     }
 
+    public override IEnumerable<Entity> ExplodeForOutput() => Explode();
+
     private IEnumerable<Vec2> OutlinePoints() => Definition.Shapes.SelectMany(s => s switch
     {
         SymbolPoly p => p.Points.Select(Map),

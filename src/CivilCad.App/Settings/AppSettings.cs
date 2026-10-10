@@ -25,6 +25,15 @@ public sealed class AppSettings
     /// <summary>範囲選択の方法 ("Inside" = 全体選択 / "Crossing" = 一部選択)。</summary>
     public string? BoxSelectMode { get; set; }
 
+    /// <summary>作図領域の背景色 (#RRGGBB)。null なら既定 (濃い灰色)。</summary>
+    public string? BackgroundColor { get; set; }
+
+    /// <summary>グリッドを表示するか。</summary>
+    public bool GridVisible { get; set; } = true;
+
+    /// <summary>グリッドの間隔 (m)。null なら拡大率に合わせて自動。</summary>
+    public double? GridSpacing { get; set; }
+
     /// <summary>下部のメッセージ欄の高さ (px)。null なら既定。</summary>
     public double? MessageLogHeight { get; set; }
 

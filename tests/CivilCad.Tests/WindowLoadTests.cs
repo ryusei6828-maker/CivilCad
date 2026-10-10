@@ -17,6 +17,28 @@ public class WindowLoadTests
                 var app = new CivilCad.App.App();
                 app.InitializeComponent(); // アイコン等のリソースを読み込む
                 var main = new CivilCad.App.MainWindow();
+                {
+                    // 文字コマンド: クリックした位置に入力欄が出て、打った文字が見本・確定に使われる
+                    var textCanvas = (CivilCad.App.Views.CadCanvas)main.FindName("Canvas");
+                    var inline = (System.Windows.Controls.TextBox)main.FindName("InlineTextBox");
+                    var textTool = new CivilCad.App.Tools.TextTool();
+                    textCanvas.SetTool(textTool);
+                    Assert.Equal(System.Windows.Visibility.Collapsed, inline.Visibility);
+                    textTool.OnPoint(new CivilCad.Core.Geometry.Vec2(5, 5));
+                    Assert.Equal(System.Windows.Visibility.Visible, inline.Visibility);
+                    inline.Text = "その場で入力";
+                    Assert.Equal("その場で入力", textTool.DraftText);
+                    textTool.SubmitText(inline.Text);
+                    Assert.Equal(System.Windows.Visibility.Collapsed, inline.Visibility);
+                    Assert.Equal("", inline.Text);
+                    Assert.Contains(textCanvas.Document.Entities.OfType<CivilCad.Core.Model.TextEntity>(), t => t.Text == "その場で入力");
+                    textCanvas.SetTool(new CivilCad.App.Tools.SelectTool());
+                    textCanvas.Document.Entities.Clear();
+                    // 文字を置いたのでシートが「変更あり」になっている。閉じるときの「保存していないシートがあります」の
+                    // 確認 (見えないダイアログ) でテストが止まらないよう、保存済みの扱いに戻す
+                    var active = typeof(CivilCad.App.MainWindow).GetField("_active", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(main)!;
+                    active.GetType().GetMethod("MarkSaved")!.Invoke(active, null);
+                }
                 var settings = new SettingsWindow(new AppSettings());
                 var frame = new CivilCad.App.Drawing.FrameWindow(new CivilCad.App.Drawing.DrawingFrameOptions(), new CivilCad.Core.Geometry.Box2(new(0, 0), new(8, 4)));
                 Assert.NotNull(main.Content);
@@ -28,7 +50,7 @@ public class WindowLoadTests
                 var draw = (System.Windows.Controls.TabItem)tabs.Items[0];
                 Assert.Equal("描画", draw.Header);
                 Assert.Equal(0, tabs.SelectedIndex);
-                Assert.Equal(["L", "PL", "C", "A", "REC", "PO", "PE", "T", "H", "FI", "PS", "PSR"],
+                Assert.Equal(["L", "PL", "C", "A", "REC", "PO", "PE", "T", "DIM", "LD", "HA", "H", "FI", "PS", "PSR"],
                     ((System.Windows.Controls.Panel)draw.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
                 // 「修正」タブ: 移動・複写・回転・拡大縮小・2 点指示・オフセット・トリム・延長・文字変更・結合・削除
                 var modify = (System.Windows.Controls.TabItem)tabs.Items[1];

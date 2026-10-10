@@ -94,7 +94,7 @@ public static class SfcWriter
 
         /// <summary>書き出す図形。プリセット (記号) は線・塗り・円・文字に展開する (他の CAD でも表示できるように)。</summary>
         // 画像は SFC (SXF レベル 2) には書けないので除く
-        private List<Entity> Entities => _entities ??= [.. doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e])];
+        private List<Entity> Entities => _entities ??= [.. doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e.ExplodeForOutput())];
         private List<Entity>? _entities;
 
         public string Build(string fileName)
@@ -117,9 +117,11 @@ public static class SfcWriter
 
             foreach (var name in PredefinedColorNames) Feature($"pre_defined_colour_feature({Str(name)})");
             foreach (var c in _userColors) Feature($"user_defined_colour_feature({Q(c.R)},{Q(c.G)},{Q(c.B)})");
-            Feature($"pre_defined_font_feature({Str("continuous")})");
+            // 線種の表: 書いた順に線種コード 1〜5 (実線・破線・点線・一点鎖線・二点鎖線)
+            foreach (var t in LineTypes.All) Feature($"pre_defined_font_feature({Str(SxfLineTypeName(t))})");
             foreach (var width in _userWidths) Feature($"width_feature({Q(width)})");
-            Feature($"text_font_feature({Str("ＭＳ ゴシック")})");
+            // 文字フォントの表: 書いた順にフォントコード 1〜 (1 = 既定の ＭＳ ゴシック)
+            foreach (var f in TextFonts) Feature($"text_font_feature({Str(f)})");
 
             // レイヤの番号 (1 始まり) は先に決めておき、レイヤの定義 (layer_feature) は最後に書く
             var layers = UsableLayers();
@@ -209,6 +211,27 @@ public static class SfcWriter
             }
         }
 
+        private List<string>? _textFonts;
+
+        /// <summary>使っている文字フォント (1 番目は既定のフォント)。</summary>
+        private List<string> TextFonts => _textFonts ??=
+            [TextEntity.DefaultFontName, .. Entities.OfType<TextEntity>().Select(t => t.EffectiveFontName).Where(f => f != TextEntity.DefaultFontName).Distinct()];
+
+        private int FontCode(TextEntity t) => Math.Max(0, TextFonts.IndexOf(t.EffectiveFontName)) + 1;
+
+        /// <summary>SXF の既定義線種名。</summary>
+        public static string SxfLineTypeName(LineType t) => t switch
+        {
+            LineType.Dashed => "dashed",
+            LineType.Dotted => "dotted",
+            LineType.DashDot => "long dashed dotted",
+            LineType.DashDotDot => "long dashed double-dotted",
+            _ => "continuous",
+        };
+
+        /// <summary>線種コード (表に書いた順、1 から)。</summary>
+        private static int LineTypeCode(LineType t) => LineTypes.All.ToList().IndexOf(t) + 1;
+
         private static bool IsSheetLevel(Entity e) => e.Layer.Name.StartsWith("D-TTL", StringComparison.OrdinalIgnoreCase);
 
         private void WriteEntity(Entity e, Func<Vec2, Vec2> map, double lengthScale)
@@ -216,7 +239,7 @@ public static class SfcWriter
             var layer = _layerCodes.TryGetValue(e.Layer, out var lc) ? lc : 1;
             var color = ColorCode(e.EffectiveColor);
             var width = WidthCode(e.LineWeight);
-            var head = $"{Q(layer)},{Q(color)},{Q(1)},{Q(width)}";
+            var head = $"{Q(layer)},{Q(color)},{Q(LineTypeCode(e.LineType))},{Q(width)}";
 
             switch (e)
             {
@@ -293,7 +316,7 @@ public static class SfcWriter
                     var tp = map(t.Position);
                     var row = t.VAlign switch { TextVAlign.Middle => 1, TextVAlign.Top => 2, _ => 0 };
                     var col = t.HAlign switch { TextHAlign.Center => 1, TextHAlign.Right => 2, _ => 0 };
-                    Feature($"text_string_feature({Q(layer)},{Q(color)},{Q(1)},{Str(t.Text)},{Q(tp.X)},{Q(tp.Y)}," +
+                    Feature($"text_string_feature({Q(layer)},{Q(color)},{Q(FontCode(t))},{Str(t.Text)},{Q(tp.X)},{Q(tp.Y)}," +
                             $"{Q(t.Height * lengthScale)},{Q(t.ApproxWidth * lengthScale)},{Q(0.0)}," +
                             $"{Q(GeoMath.NormalizeAngle(t.Rotation) * 180 / Math.PI, 14)},{Q(0.0, 14)},{Q(row * 3 + col + 1)},{Q(1)})");
                     break;

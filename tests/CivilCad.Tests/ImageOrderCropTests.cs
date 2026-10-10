@@ -95,11 +95,13 @@ public class ImageOrderCropTests
         Assert.Same(line, canvas.HitTest(new Vec2(2, 1)));     // 近くに線があれば線
         Assert.Same(img, canvas.HitTest(new Vec2(1, 0.4)));    // 無ければ画像の中で画像
         Assert.Null(canvas.HitTest(new Vec2(10, 10)));
-        // 削除モードで画像の中をクリックすると消える
+        // 削除モードで画像の中をダブルクリックすると消える
         var erase = new EraseTool();
         canvas.SetTool(erase);
         erase.OnPress(new Vec2(1, 0.4));
         erase.OnRelease(new Vec2(1, 0.4));
+        Assert.Contains(img, doc.Entities);   // 1 回のクリックでは消えない
+        erase.OnDoubleClick(new Vec2(1, 0.4));
         Assert.DoesNotContain(img, doc.Entities);
         Assert.Contains(line, doc.Entities);
     });

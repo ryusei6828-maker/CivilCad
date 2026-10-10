@@ -25,6 +25,9 @@ public abstract class CadTool
     public virtual Vec2? BasePoint => null;
     public virtual bool WantsSnap => true;
 
+    /// <summary>true なら文字の枠 (4 隅・辺の中点・中心) にもスナップする (回転コマンドだけ)。</summary>
+    public virtual bool SnapsToTextBox => false;
+
     /// <summary>true の間はコマンド欄に文字を入力中とみなし、英字キー単独のショートカットを無効にする。</summary>
     public virtual bool WantsTextInput => false;
 
@@ -107,6 +110,7 @@ public abstract class CadTool
     {
         e.LineWeight = Doc.CurrentLineWeight;
         e.Color = Doc.CurrentColor;
+        e.LineType = Doc.CurrentLineType;
         return e;
     }
 

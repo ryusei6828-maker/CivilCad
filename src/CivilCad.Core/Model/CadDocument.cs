@@ -88,6 +88,20 @@ public sealed class CadDocument : INotifyPropertyChanged
         }
     }
 
+    /// <summary>これから描く図形の線種。</summary>
+    public LineType CurrentLineType
+    {
+        get => _currentLineType;
+        set
+        {
+            if (_currentLineType == value) return;
+            _currentLineType = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private LineType _currentLineType;
+
     /// <summary>これから描く図形の色。null はレイヤ色。</summary>
     public RgbColor? CurrentColor
     {

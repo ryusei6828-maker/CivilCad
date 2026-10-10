@@ -20,7 +20,7 @@ public sealed class CadCanvas : FrameworkElement
     private const double PickTolerancePx = 6;
     private const double SnapTolerancePx = 12;
 
-    private static readonly Brush Background = Frozen(new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E)));
+    public static readonly RgbColor DefaultBackground = new(0x1E, 0x1E, 0x1E);
     private static readonly RgbColor DimColor = new(90, 90, 90);
     private static readonly Pen SnapPen = Freeze(new Pen(Brushes.Lime, 2));
     public static readonly Pen PreviewPen = Freeze(new Pen(new SolidColorBrush(Color.FromRgb(0x66, 0xCC, 0xFF)), 1));
@@ -29,7 +29,7 @@ public sealed class CadCanvas : FrameworkElement
     private readonly DrawingVisual _scene = new();
     private readonly DrawingVisual _overlay = new();
     private readonly VisualCollection _visuals;
-    private readonly Dictionary<(RgbColor, bool, int), Pen> _pens = [];
+    private readonly Dictionary<(RgbColor, bool, int, LineType, int), Pen> _pens = [];
     private readonly Dictionary<RgbColor, Brush> _brushes = [];
     /// <summary>CAD の文字幅 (全角=高さ, 半角=高さ/2) に合う等幅フォント。</summary>
     private readonly Typeface _typeface = new("MS Gothic");
@@ -318,7 +318,8 @@ public sealed class CadCanvas : FrameworkElement
     /// <summary>表示中の図形と外形の一覧。図面が変わるたびに作り直す (マウス移動ごとに外形を計算しないため)。</summary>
     private List<(Entity Entity, Box2 Bounds)>? _snapIndex;
 
-    private SnapPoint? FindSnap(Vec2 raw)
+    /// <summary>raw (カーソルの位置) 付近のスナップ点。有効なスナップの種類 (SnapKinds) から探す。</summary>
+    public SnapPoint? FindSnap(Vec2 raw)
     {
         _snapIndex ??= Document.Entities.Where(Document.IsVisible).Select(e => (e, e.Bounds)).ToList();
         var tol = SnapTolerancePx / Scale;
@@ -326,7 +327,37 @@ public sealed class CadCanvas : FrameworkElement
         foreach (var (e, b) in _snapIndex)
             if (raw.X >= b.Min.X - tol && raw.X <= b.Max.X + tol && raw.Y >= b.Min.Y - tol && raw.Y <= b.Max.Y + tol)
                 near.Add(e);
-        return SnapFinder.FindAmong(near, raw, tol, _tool.BasePoint, SnapKinds);
+        var found = SnapFinder.FindAmong(near, raw, tol, _tool.BasePoint, SnapKinds);
+        // 回転コマンド: 文字の枠の点 (4 隅・辺の中点・中心) も候補にする。図形のスナップ (近接点を除く) より近ければそちら
+        if (_tool.SnapsToTextBox)
+        {
+            var bestD = found is { Kind: not SnapKind.Nearest } f ? (f.Point - raw).Length : tol;
+            foreach (var t in near.OfType<TextEntity>())
+                foreach (var sp in t.TextBoxSnapPoints)
+                {
+                    if (!SnapKinds.Contains(sp.Kind)) continue;
+                    var d = (sp.Point - raw).Length;
+                    if (d <= bestD)
+                    {
+                        bestD = d;
+                        found = sp;
+                    }
+                }
+        }
+        // グリッド: 図形のスナップ (近接点を除く) が無いときに、表示中のグリッドの交点へ
+        if (found is not { Kind: not SnapKind.Nearest } && SnapKinds.Contains(SnapKind.Grid) && GridSnapPoint(raw, tol) is Vec2 g)
+            return new SnapPoint(g, SnapKind.Grid);
+        return found;
+    }
+
+    /// <summary>raw に最も近いグリッドの交点 (tol 以内、グリッド表示中のみ)。</summary>
+    public Vec2? GridSnapPoint(Vec2 raw, double tol)
+    {
+        if (!_gridVisible) return null;
+        var s = EffectiveGridSpacing;
+        if (!(s > 0) || double.IsInfinity(s)) return null;
+        var g = new Vec2(Math.Round(raw.X / s) * s, Math.Round(raw.Y / s) * s);
+        return (g - raw).Length <= tol ? g : null;
     }
 
     // ---- 描画 ----
@@ -342,14 +373,148 @@ public sealed class CadCanvas : FrameworkElement
         RedrawScene();
     }
 
-    protected override void OnRender(DrawingContext dc) => dc.DrawRectangle(Background, null, new Rect(RenderSize));
+    protected override void OnRender(DrawingContext dc) => dc.DrawRectangle(_background, null, new Rect(RenderSize));
+
+    // ---- 背景・グリッド ----
+
+    private RgbColor _backgroundColor = DefaultBackground;
+    private Brush _background = Frozen(new SolidColorBrush(Color.FromRgb(DefaultBackground.R, DefaultBackground.G, DefaultBackground.B)));
+    private Pen? _gridMinorPen, _gridMajorPen;
+    private bool _gridVisible = true;
+    private double? _gridSpacing;
+
+    /// <summary>作図領域の背景色。明るい色なら白い線は黒で表示する (白い背景で見えなくならないように)。</summary>
+    public RgbColor BackgroundColor
+    {
+        get => _backgroundColor;
+        set
+        {
+            if (_backgroundColor == value) return;
+            _backgroundColor = value;
+            _background = Frozen(new SolidColorBrush(Color.FromRgb(value.R, value.G, value.B)));
+            _gridMinorPen = _gridMajorPen = null;
+            InvalidateVisual();
+            RedrawAll();
+        }
+    }
+
+    /// <summary>背景が明るいか (白・薄い灰など)。</summary>
+    public bool IsLightBackground => Luminance(_backgroundColor) > 0.5;
+
+    private static double Luminance(RgbColor c) => (0.299 * c.R + 0.587 * c.G + 0.114 * c.B) / 255;
+
+    /// <summary>
+    /// 表示する色: 背景と同じような明るさで見えない色を見える色にする
+    /// (明るい背景では白い線を黒く、暗い背景では黒い線を白く)。図形の色そのものは変えない。
+    /// </summary>
+    public RgbColor ForDisplay(RgbColor c)
+    {
+        var l = Luminance(c);
+        if (IsLightBackground && l > 0.85) return new RgbColor(0, 0, 0);
+        if (!IsLightBackground && l < 0.1) return new RgbColor(255, 255, 255);
+        return c;
+    }
+
+    public bool GridVisible
+    {
+        get => _gridVisible;
+        set
+        {
+            if (_gridVisible == value) return;
+            _gridVisible = value;
+            RedrawScene();
+        }
+    }
+
+    /// <summary>グリッドの間隔 (図面上の m)。null なら拡大率に合わせて自動 (1・2・5 × 10ⁿ m)。</summary>
+    public double? GridSpacing
+    {
+        get => _gridSpacing;
+        set
+        {
+            if (_gridSpacing == value) return;
+            _gridSpacing = value is > 0 ? value : null;
+            RedrawScene();
+        }
+    }
+
+    /// <summary>グリッドの線が画面でこれより詰まるときは間引く (画素)。</summary>
+    private const double GridMinPx = 8;
+
+    /// <summary>今の拡大率で実際に描くグリッドの間隔 (m)。指定した間隔が細かすぎるときは 10 倍ずつ広げる。</summary>
+    public double EffectiveGridSpacing
+    {
+        get
+        {
+            if (_gridSpacing is double s)
+            {
+                while (s * Scale < GridMinPx) s *= 10;
+                return s;
+            }
+            // 自動: 画面で 25 画素以上になる 1・2・5 × 10ⁿ
+            var target = 25 / Scale;
+            var p = Math.Pow(10, Math.Floor(Math.Log10(target)));
+            foreach (var m in new[] { 1.0, 2, 5, 10 })
+                if (m * p >= target) return m * p;
+            return 10 * p;
+        }
+    }
+
+    /// <summary>グリッド: 細い線と、5 本ごとの少し濃い線。図面の原点 (0, 0) にそろえる。</summary>
+    private void DrawGrid(DrawingContext dc, Box2 view)
+    {
+        var s = EffectiveGridSpacing;
+        if (!(s > 0) || double.IsInfinity(s)) return;
+        if (_gridMinorPen == null || _gridMajorPen == null)
+        {
+            var bg = _backgroundColor;
+            int Shift(byte v, int d) => Math.Clamp(v + (IsLightBackground ? -d : d), 0, 255);
+            Color C(int d) => Color.FromRgb((byte)Shift(bg.R, d), (byte)Shift(bg.G, d), (byte)Shift(bg.B, d));
+            _gridMinorPen = new Pen(new SolidColorBrush(C(0x16)), 1);
+            _gridMajorPen = new Pen(new SolidColorBrush(C(0x2E)), 1);
+            _gridMinorPen.Freeze();
+            _gridMajorPen.Freeze();
+        }
+        var minor = new StreamGeometry();
+        var major = new StreamGeometry();
+        using (var cm = minor.Open())
+        using (var cj = major.Open())
+        {
+            var i0 = (long)Math.Floor(view.Min.X / s);
+            var i1 = (long)Math.Ceiling(view.Max.X / s);
+            for (var i = i0; i <= i1 && i - i0 < 2000; i++)
+            {
+                var x = Math.Round(WorldToScreen(new Vec2(i * s, 0)).X) + 0.5;
+                var ctx = i % 5 == 0 ? cj : cm;
+                ctx.BeginFigure(new Point(x, 0), false, false);
+                ctx.LineTo(new Point(x, ActualHeight), true, false);
+            }
+            var j0 = (long)Math.Floor(view.Min.Y / s);
+            var j1 = (long)Math.Ceiling(view.Max.Y / s);
+            for (var j = j0; j <= j1 && j - j0 < 2000; j++)
+            {
+                var y = Math.Round(WorldToScreen(new Vec2(0, j * s)).Y) + 0.5;
+                var ctx = j % 5 == 0 ? cj : cm;
+                ctx.BeginFigure(new Point(0, y), false, false);
+                ctx.LineTo(new Point(ActualWidth, y), true, false);
+            }
+        }
+        minor.Freeze();
+        major.Freeze();
+        dc.DrawGeometry(null, _gridMinorPen, minor);
+        dc.DrawGeometry(null, _gridMajorPen, major);
+    }
 
     public void RedrawAll()
     {
         SyncScreenTexts();
         RedrawScene();
         RedrawOverlay();
+        ViewChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>表示を描き直した (拡大・移動など)。作図領域の上に重ねた入力欄の位置合わせに使う。</summary>
+    public event EventHandler? ViewChanged;
 
     /// <summary>画面で一定の大きさの文字 (<see cref="TextEntity.ScreenHeightPx"/>) の高さを、いまの拡大率に合わせる。</summary>
     public void SyncScreenTexts()
@@ -370,6 +535,9 @@ public sealed class CadCanvas : FrameworkElement
         using var dc = _scene.RenderOpen();
         if (ActualWidth <= 0) return;
         var view = VisibleWorldBox;
+        // 背景も図形と一緒に描く (背景色を変えたらすぐ変わるように)
+        dc.DrawRectangle(_background, null, new Rect(0, 0, ActualWidth, ActualHeight));
+        if (_gridVisible) DrawGrid(dc, view);
         // 画像 → 塗りつぶし → 線・文字 の順に描き、線や文字が画像や塗りに隠れないようにする
         foreach (var pass in new[] { 0, 1, 2, 3 })
         {
@@ -405,7 +573,8 @@ public sealed class CadCanvas : FrameworkElement
 
     public void DrawEntity(DrawingContext dc, Entity e, RgbColor color, bool selected = false)
     {
-        var pen = GetPen(color, selected, e.LineWeight);
+        color = ForDisplay(color);
+        var pen = GetPen(color, selected, e.LineWeight, e.LineType);
         switch (e)
         {
             case LineEntity l:
@@ -428,6 +597,16 @@ public sealed class CadCanvas : FrameworkElement
                 break;
             case SymbolEntity s:
                 DrawSymbol(dc, s, color, selected);
+                break;
+            case DimensionEntity dim:
+                // 寸法: 補助線・寸法線・端末・寸法値に分けて描く
+                foreach (var part in dim.Explode().OrderBy(x => IsFill(x) ? 0 : 1))
+                    DrawEntity(dc, part, color, selected);
+                break;
+            case LeaderEntity ld:
+                // 引き出し線・旗揚げ: 線・先端・文字に分けて描く (先端の塗りを先に)
+                foreach (var part in ld.Explode().OrderBy(x => IsFill(x) ? 0 : 1))
+                    DrawEntity(dc, part, color, selected);
                 break;
             case ImageEntity img:
                 DrawImage(dc, img, color, selected);
@@ -679,6 +858,17 @@ public sealed class CadCanvas : FrameworkElement
     /// <summary>文字を作るときの大きさの上限 (px)。これより大きい文字は拡大して描く。</summary>
     private const double MaxTextEm = 2000;
 
+    private readonly Dictionary<string, Typeface> _typefaces = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>文字のフォント (指定が無ければ既定の MS ゴシック)。</summary>
+    private Typeface TypefaceOf(TextEntity t)
+    {
+        if (string.IsNullOrWhiteSpace(t.FontName) || t.FontName == TextEntity.DefaultFontName) return _typeface;
+        if (!_typefaces.TryGetValue(t.FontName, out var tf))
+            _typefaces[t.FontName] = tf = new Typeface(new FontFamily(t.FontName + ", MS Gothic"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+        return tf;
+    }
+
     private void DrawText(DrawingContext dc, TextEntity t, RgbColor color, bool selected)
     {
         var em = t.Height * Scale;
@@ -695,7 +885,7 @@ public sealed class CadCanvas : FrameworkElement
         // 上限の大きさで作って拡大して描く (見た目は同じ)
         var drawEm = Math.Min(em, MaxTextEm);
         var k = em / drawEm;
-        var ft = new FormattedText(t.Text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, _typeface, drawEm,
+        var ft = new FormattedText(t.Text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, TypefaceOf(t), drawEm,
             GetBrush(color), VisualTreeHelper.GetDpi(this).PixelsPerDip);
         var naturalWidth = Math.Max(ft.WidthIncludingTrailingWhitespace * k, 1e-6);
         var xScale = t.FitWidth is double fit ? fit * Scale / naturalWidth : t.WidthFactor;
@@ -763,6 +953,11 @@ public sealed class CadCanvas : FrameworkElement
                 dc.DrawEllipse(null, SnapPen, c, s * 0.8, s * 0.8);
                 dc.DrawLine(SnapPen, new Point(c.X - s, c.Y - s * 0.8), new Point(c.X + s, c.Y - s * 0.8));
                 break;
+            case SnapKind.Grid:
+                // ＋ (グリッドの交点)
+                dc.DrawLine(SnapPen, new Point(c.X - s, c.Y), new Point(c.X + s, c.Y));
+                dc.DrawLine(SnapPen, new Point(c.X, c.Y - s), new Point(c.X, c.Y + s));
+                break;
             case SnapKind.Nearest:
                 // 砂時計
                 var h = new StreamGeometry();
@@ -804,20 +999,42 @@ public sealed class CadCanvas : FrameworkElement
     public static int WeightQuarterPixels(double? weightMm) =>
         (int)Math.Round(Math.Clamp((weightMm ?? 0) * 3.0, 1.0, 8.0) * 4);
 
-    private Pen GetPen(RgbColor color, bool selected, double? weightMm = null)
+    private Pen GetPen(RgbColor color, bool selected, double? weightMm = null, LineType lineType = LineType.Continuous)
     {
         var q = WeightQuarterPixels(weightMm);
-        if (_pens.TryGetValue((color, selected, q), out var pen)) return pen;
         var px = q / 4.0;
+        // 線種の模様は用紙上の mm なので、今の拡大率での 1mm の画素数で決まる (細かくなりすぎたら実線で描く)
+        var pxPerMm = Scale * Document.PaperMmToMeters(1);
+        if (selected || lineType == LineType.Continuous || LineTypes.PeriodMm(lineType) * pxPerMm < 3) lineType = LineType.Continuous;
+        var mmKey = lineType == LineType.Continuous ? 0 : (int)Math.Round(Math.Log(pxPerMm) * 40);
+        var key = (color, selected, q, lineType, mmKey);
+        if (_pens.TryGetValue(key, out var pen)) return pen;
         pen = new Pen(GetBrush(color), selected ? Math.Max(2, px) : px)
         {
             StartLineCap = PenLineCap.Round,
             EndLineCap = PenLineCap.Round,
+            DashCap = PenLineCap.Round,
             LineJoin = PenLineJoin.Round,
         };
         if (selected) pen.DashStyle = DashStyles.Dash;
+        else if (lineType != LineType.Continuous) pen.DashStyle = LineTypeDash(lineType, Math.Exp(mmKey / 40.0), pen.Thickness);
         pen.Freeze();
-        return _pens[(color, selected, q)] = pen;
+        if (_pens.Count > 2000) _pens.Clear();
+        return _pens[key] = pen;
+    }
+
+    /// <summary>
+    /// 線種の模様を WPF の破線にする。長さは線の太さを 1 とした単位で、端は丸めるので
+    /// 線の部分は太さの分だけ短く、空ける部分は長くする (点 = 長さ 0 で丸い点になる)。
+    /// </summary>
+    private static DashStyle LineTypeDash(LineType lineType, double pxPerMm, double thickness)
+    {
+        var dashes = LineTypes.PatternMm(lineType)
+            .Select(mm => mm >= 0 ? Math.Max(0, mm * pxPerMm - thickness) / thickness : (-mm * pxPerMm + thickness) / thickness)
+            .ToList();
+        var style = new DashStyle(dashes, 0);
+        style.Freeze();
+        return style;
     }
 
     private Brush GetBrush(RgbColor color)

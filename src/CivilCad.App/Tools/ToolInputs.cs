@@ -5,6 +5,30 @@ namespace CivilCad.App.Tools;
 /// <summary>作図入力バーに線幅・色の欄を出す作図ツール。</summary>
 public interface IStyledDrawTool;
 
+/// <summary>
+/// 文字の入力を待つツール (文字・引き出し線・旗揚げ)。入力を待っている間、右のプロパティに入力欄が出る。
+/// </summary>
+public interface ITextEntryTool
+{
+    /// <summary>今、文字の入力を待っているか (位置を指定した後など)。</summary>
+    bool IsWaitingForText { get; }
+
+    /// <summary>入力欄の説明。</summary>
+    string TextEntryHint { get; }
+
+    /// <summary>複数行を入れられるか (Shift+Enter で改行)。</summary>
+    bool AllowsMultipleLines { get; }
+
+    /// <summary>入力中の文字 (作図領域に見本を出すのに使う)。</summary>
+    string DraftText { get; set; }
+
+    /// <summary>入力を確定する (改行で複数行)。</summary>
+    void SubmitText(string text);
+
+    /// <summary>入力をやめる (位置の指定に戻る)。</summary>
+    void CancelText();
+}
+
 /// <summary>次の点までの長さ・角度を固定できるツール (線・ポリライン)。null は固定しない。</summary>
 public interface ILengthAngleInput
 {
@@ -34,6 +58,10 @@ public static class DrawInputMemory
 {
     public static double? Length { get; set; }
     public static double? AngleDeg { get; set; }
+
+    /// <summary>線の向きの刻み (度、90 / 45 / 15)。null は刻まない (自由な角度)。角度を固定しているときは使わない。</summary>
+    public static double? AngleStepDeg { get; set; }
+
     public static double? Radius { get; set; }
 
     /// <summary>円弧の半径 (円とは別に覚える)。</summary>
@@ -58,17 +86,28 @@ public static class LengthUnits
 
 public static class LengthAngle
 {
-    /// <summary>基準点からカーソル方向へ、長さ・角度の固定を当てはめた点。</summary>
-    public static Vec2 Apply(Vec2 basePoint, Vec2 cursor, double? length, double? angleDeg)
+    /// <summary>
+    /// 基準点からカーソル方向へ、長さ・角度の固定を当てはめた点。
+    /// stepDeg があれば (角度を固定していないとき) 向きをその刻み (東 = 0° から 90° / 45° / 15° ごと) の一番近い向きにする。
+    /// </summary>
+    public static Vec2 Apply(Vec2 basePoint, Vec2 cursor, double? length, double? angleDeg, double? stepDeg = null)
     {
         var d = cursor - basePoint;
-        var angle = angleDeg is double a ? a * Math.PI / 180 : d.Angle;
+        double? fixedDeg = angleDeg;
+        if (fixedDeg == null && stepDeg is double step && step > 0 && d.Length > 0)
+            fixedDeg = Math.Round(d.Angle * 180 / Math.PI / step) * step;
+        var angle = fixedDeg is double a ? a * Math.PI / 180 : d.Angle;
         double len;
         if (length is double l) len = l;
-        else if (angleDeg != null) len = d.Dot(Vec2.FromAngle(angle)); // 角度だけ固定: カーソルを方向線に投影
+        else if (fixedDeg != null) len = d.Dot(Vec2.FromAngle(angle)); // 角度だけ決まる: カーソルを方向線に投影
         else return cursor;
         return basePoint + Vec2.FromAngle(angle) * len;
     }
+
+    /// <summary>刻みの選択肢 (null = なし)。</summary>
+    public static IReadOnlyList<double?> Steps { get; } = [null, 90, 45, 15];
+
+    public static string StepName(double? step) => step is double s ? $"{s:0}°刻み" : "刻みなし";
 
     public static (double Length, double AngleDeg) Measure(Vec2 basePoint, Vec2 p)
     {

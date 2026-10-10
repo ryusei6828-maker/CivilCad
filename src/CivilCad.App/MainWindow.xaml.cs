@@ -58,6 +58,20 @@ public partial class MainWindow : Window
             if (_propsDock != null && !_propsDock.IsOpen && Canvas.Selection.Any(x => x is TextEntity)) SetPanelOpen(_propsDock, true);
         };
         Canvas.PreviewMouseDown += (_, _) => CommandBox.Focus();
+        // 文字コマンド: クリックした位置に、その場で文字を打つ入力欄を出す
+        Canvas.PromptChanged += (_, _) => UpdateInlineText();
+        Canvas.ToolChanged += (_, _) => UpdateInlineText();
+        Canvas.ViewChanged += (_, _) => PlaceInlineText();
+        InlineTextBox.TextChanged += (_, _) =>
+        {
+            if (Canvas.Tool is TextTool tt) tt.DraftText = InlineTextBox.Text;
+        };
+        InlineTextBox.PreviewKeyDown += InlineTextBox_PreviewKeyDown;
+        // 文字を入れるコマンドでは、入力欄を出すプロパティ (右側) を開く
+        Canvas.ToolChanged += (_, _) =>
+        {
+            if (Canvas.Tool is ITextEntryTool && _propsDock != null && !_propsDock.IsOpen) SetPanelOpen(_propsDock, true);
+        };
         Canvas.ContextRequested += (_, _) => ShowCanvasMenu();
         PreviewKeyDown += Window_PreviewKeyDown;
         Loaded += (_, _) =>
@@ -71,6 +85,8 @@ public partial class MainWindow : Window
         LoadSnapKinds();
         BuildSnapBar();
         LoadBoxSelectMode();
+        ApplyDisplaySettings();
+        GridSpacingBox.ToolTipOpening += (_, _) => UpdateGridTip(); // 今の拡大率での間隔を出す
         if (_settings.MessageLogHeight is double h) MessageLog.Height = Math.Clamp(h, MessageLogMin, 1000);
 
         // レイヤパネルは既定で閉じておき、現在レイヤはステータスバーに出す
@@ -144,6 +160,9 @@ public partial class MainWindow : Window
             case "C": StartTool(new CircleTool(), c); break;
             case "A": StartTool(new ArcTool(), c); break;
             case "T": StartTool(new TextTool(), c); break;
+            case "DIM" or "DLI": StartTool(new DimensionTool(), "DIM"); break;
+            case "LD": StartTool(new LeaderTool(flag: false), c); break;
+            case "HA": StartTool(new LeaderTool(flag: true), c); break;
             case "REC" or "RECT": StartTool(new RectangleTool(), "REC"); break;
             case "PO": StartTool(new PointTool(), c); break;
             case "PE": StartTool(new PerpendicularTool(), c); break;
@@ -180,8 +199,8 @@ public partial class MainWindow : Window
             case "ID": StartTool(new CoordinateMeasureTool(), c); break;
             case "AA": StartTool(new AreaTool(), c); break;
             case "E" or "DEL":
-                // 先に選択していた図形があればそれを消してから削除モードへ
-                DeleteSelection();
+                // 選択していた図形は消さずに選択を外してから削除モードへ (消す図形は削除モードで選び、ダブルクリックで確定)
+                Canvas.ClearSelection();
                 StartTool(new EraseTool(), "E");
                 break;
             case "ZE" or "Z": ZoomExtentsWithReport(); break;
@@ -195,6 +214,7 @@ public partial class MainWindow : Window
             case "SEX": SetPanelOpen(_coordDock, true); CoordPanel.ExportSima(); break;
             case "U": Undo_Executed(this, null!); break;
             case "REDO": Redo_Executed(this, null!); break;
+            case "GR": SetGridVisible(!_settings.GridVisible); break;
             case "SNAP":
                 SnapToggle.IsChecked = !SnapToggle.IsChecked;
                 Toggle_Click(this, new RoutedEventArgs());
@@ -771,15 +791,152 @@ public partial class MainWindow : Window
         }
     }
 
+    // ---- 文字コマンドの入力欄 (作図領域の上) ----
+
+    private bool _updatingInline;
+
+    /// <summary>文字コマンドで位置を決めたら、その位置に入力欄を出してすぐ打てるようにする。</summary>
+    private void UpdateInlineText()
+    {
+        if (_updatingInline) return;
+        if (Canvas.Tool is TextTool { IsWaitingForText: true } tt)
+        {
+            var wasHidden = InlineTextBox.Visibility != Visibility.Visible;
+            _updatingInline = true;
+            if (InlineTextBox.Text != tt.DraftText) InlineTextBox.Text = tt.DraftText;
+            _updatingInline = false;
+            InlineTextBox.Visibility = Visibility.Visible;
+            PlaceInlineText();
+            if (wasHidden || !InlineTextBox.IsKeyboardFocused)
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (InlineTextBox.Visibility != Visibility.Visible) return;
+                    InlineTextBox.Focus();
+                    InlineTextBox.CaretIndex = InlineTextBox.Text.Length;
+                }, System.Windows.Threading.DispatcherPriority.Input);
+        }
+        else if (InlineTextBox.Visibility == Visibility.Visible)
+        {
+            InlineTextBox.Visibility = Visibility.Collapsed;
+            InlineTextBox.Text = "";
+        }
+    }
+
+    /// <summary>入力欄を文字の位置 (左下) に合わせ、文字の大きさ・フォントにする。</summary>
+    private void PlaceInlineText()
+    {
+        if (InlineTextBox.Visibility != Visibility.Visible || Canvas.Tool is not TextTool { Position: Vec2 pos } tt) return;
+        var (heightPx, font) = tt.EntryLook();
+        InlineTextBox.FontSize = Math.Clamp(heightPx, 12, 120);
+        InlineTextBox.FontFamily = new FontFamily(font + ", MS Gothic");
+        var p = Canvas.WorldToScreen(pos);
+        InlineTextBox.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        System.Windows.Controls.Canvas.SetLeft(InlineTextBox, p.X);
+        System.Windows.Controls.Canvas.SetTop(InlineTextBox, p.Y - InlineTextBox.DesiredSize.Height);
+    }
+
+    private void InlineTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (Canvas.Tool is not TextTool tt) return;
+        if (e.Key == Key.Enter)
+        {
+            tt.SubmitText(InlineTextBox.Text);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            tt.CancelText();
+            e.Handled = true;
+        }
+        else return;
+        Canvas.RedrawOverlay();
+        CommandBox.Focus();
+    }
+
+    // ---- 表示 (背景色・グリッド) ----
+
+    private bool _updatingGridUi;
+
+    /// <summary>設定の背景色・グリッドを作図領域と右下のグリッド欄に反映する。</summary>
+    private void ApplyDisplaySettings()
+    {
+        Canvas.BackgroundColor = SettingsWindow.ParseHex(_settings.BackgroundColor ?? "") ?? CadCanvas.DefaultBackground;
+        Canvas.GridVisible = _settings.GridVisible;
+        Canvas.GridSpacing = _settings.GridSpacing;
+        _updatingGridUi = true;
+        GridToggle.IsChecked = _settings.GridVisible;
+        if (GridSpacingBox.ItemsSource == null) GridSpacingBox.ItemsSource = SettingsWindow.GridSpacingChoices;
+        GridSpacingBox.Text = SettingsWindow.FormatSpacing(_settings.GridSpacing);
+        _updatingGridUi = false;
+        UpdateGridTip();
+    }
+
+    private void SetGridVisible(bool visible)
+    {
+        _settings.GridVisible = visible;
+        ApplyDisplaySettings();
+        SaveSettingsQuietly();
+        Log(visible ? $"グリッド: 表示 (間隔 {SettingsWindow.FormatSpacing(_settings.GridSpacing)}{(_settings.GridSpacing != null ? " m" : "")})" : "グリッド: 非表示");
+    }
+
+    private void GridToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_updatingGridUi) SetGridVisible(GridToggle.IsChecked == true);
+    }
+
+    private void CommitGridSpacing()
+    {
+        if (_updatingGridUi) return;
+        if (!SettingsWindow.TryParseSpacing(GridSpacingBox.Text, out var spacing))
+        {
+            Log("グリッドの間隔は 0 より大きい数値 (m) か「自動」にしてください。");
+            GridSpacingBox.Text = SettingsWindow.FormatSpacing(_settings.GridSpacing);
+            return;
+        }
+        if (spacing == _settings.GridSpacing) return;
+        _settings.GridSpacing = spacing;
+        if (!_settings.GridVisible) _settings.GridVisible = true;
+        ApplyDisplaySettings();
+        SaveSettingsQuietly();
+        Log($"グリッドの間隔: {SettingsWindow.FormatSpacing(spacing)}{(spacing != null ? " m" : " (拡大率に合わせる)")}");
+    }
+
+    private void GridSpacingBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (GridSpacingBox.SelectedItem is string s)
+        {
+            GridSpacingBox.Text = s;
+            CommitGridSpacing();
+        }
+    }
+
+    private void GridSpacingBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        CommitGridSpacing();
+        CommandBox.Focus();
+        e.Handled = true;
+    }
+
+    private void GridSpacingBox_LostFocus(object sender, RoutedEventArgs e) => CommitGridSpacing();
+
+    /// <summary>グリッド欄のツールチップに、今の拡大率で描いている間隔を出す。</summary>
+    private void UpdateGridTip() =>
+        GridSpacingBox.ToolTip = $"グリッドの間隔 (m)。一覧から選ぶか数値を入れて Enter。「自動」は拡大率に合わせる\n今の表示: {Canvas.EffectiveGridSpacing:0.###} m ごと (5 本ごとに濃い線)";
+
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new SettingsWindow(_settings) { Owner = this };
         if (dlg.ShowDialog() != true || dlg.Result == null) return;
         _settings.KeyBindings = dlg.Result;
+        _settings.BackgroundColor = dlg.BackgroundResult;
+        _settings.GridVisible = dlg.GridVisibleResult;
+        _settings.GridSpacing = dlg.GridSpacingResult;
+        ApplyDisplaySettings();
         try
         {
             _settings.Save();
-            Log($"キー割り当てを保存しました ({AppSettings.DefaultPath})");
+            Log($"設定を保存しました ({AppSettings.DefaultPath})");
         }
         catch (Exception ex)
         {
@@ -1291,6 +1448,7 @@ public partial class MainWindow : Window
                 {
                     SnapKind.Perpendicular or SnapKind.Tangent => "\n直前に指定した点 (線の始点など) が基準",
                     SnapKind.Nearest => "\n他に候補が無いときだけ使う",
+                    SnapKind.Grid => "\nグリッドの交点。グリッドを表示しているときだけ効き、図形のスナップがあればそちらが優先",
                     _ => "",
                 },
             };
@@ -1310,6 +1468,7 @@ public partial class MainWindow : Window
         SnapKind.Quadrant => "四半円",
         SnapKind.Perpendicular => "垂線",
         SnapKind.Nearest => "近接",
+        SnapKind.Grid => "グリッド点",
         _ => SnapFinder.Label(kind),
     };
 

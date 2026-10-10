@@ -2,7 +2,8 @@ using CivilCad.Core.Geometry;
 
 namespace CivilCad.Core.Model;
 
-public enum SnapKind { Endpoint, Vertex, Midpoint, Center, Quadrant, Node, Intersection, Perpendicular, Tangent, Nearest }
+/// <summary>スナップの種類。Grid はグリッドの交点 (図形ではなく作図領域が出す)。</summary>
+public enum SnapKind { Endpoint, Vertex, Midpoint, Center, Quadrant, Node, Intersection, Perpendicular, Tangent, Nearest, Grid }
 
 public readonly record struct SnapPoint(Vec2 Point, SnapKind Kind);
 
@@ -20,6 +21,9 @@ public abstract class Entity(Layer layer)
     /// <summary>線幅 (印刷時の mm)。null なら既定 (細線)。</summary>
     public double? LineWeight { get; set; }
 
+    /// <summary>線種 (実線・破線・点線・一点鎖線・二点鎖線)。線・ポリライン・円・円弧に効く。</summary>
+    public LineType LineType { get; set; }
+
     public RgbColor EffectiveColor => Color ?? Layer.Color;
 
     public abstract Box2 Bounds { get; }
@@ -33,6 +37,12 @@ public abstract class Entity(Layer layer)
     public abstract void Scale(Vec2 origin, double k);
 
     protected static Vec2 ScalePoint(Vec2 p, Vec2 origin, double k) => origin + (p - origin) * k;
+
+    /// <summary>
+    /// 保存 (DXF / SFC / JWW など) や PDF 印刷で書く図形。
+    /// プリセット・引き出し線のようにいくつかの図形をまとめたものは、線・塗り・円・文字に展開する。
+    /// </summary>
+    public virtual IEnumerable<Entity> ExplodeForOutput() => [this];
     public abstract Entity Clone();
     public virtual IEnumerable<SnapPoint> SnapPoints => [];
 
@@ -47,6 +57,7 @@ public abstract class Entity(Layer layer)
         e.Color = Color;
         e.Tag = Tag;
         e.LineWeight = LineWeight;
+        e.LineType = LineType;
         return e;
     }
 }

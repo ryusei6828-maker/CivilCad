@@ -92,6 +92,12 @@ public sealed class PropertiesPanel : UserControl
     {
         _canvas = canvas;
         canvas.SelectionChanged += (_, _) => QueueRefresh();
+        // 文字の入力を待つツール (文字・引き出し線・旗揚げ) では入力欄を出す
+        canvas.ToolChanged += (_, _) => QueueRefresh();
+        canvas.PromptChanged += (_, _) =>
+        {
+            if (canvas.Tool is Tools.ITextEntryTool te && te.IsWaitingForText != (_entryBox != null)) QueueRefresh();
+        };
         WatchDocument(canvas.Document);
         // シートタブで図面が替わったら、新しい図面の変更を見張る
         canvas.DocumentReplaced += (_, _) => WatchDocument(canvas.Document);
@@ -117,7 +123,7 @@ public sealed class PropertiesPanel : UserControl
 
     private void OnWatchedPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(CadDocument.CurrentLineWeight) or nameof(CadDocument.CurrentColor)) QueueRefresh();
+        if (e.PropertyName is nameof(CadDocument.CurrentLineWeight) or nameof(CadDocument.CurrentColor) or nameof(CadDocument.CurrentLineType)) QueueRefresh();
     }
 
     /// <summary>変更が続けて起きても 1 回だけ作り直す。</summary>
@@ -137,6 +143,9 @@ public sealed class PropertiesPanel : UserControl
         _body.Children.Clear();
         if (_canvas == null || !IsVisible) return;
 
+        _entryBox = null;
+        if (_canvas.Tool is Tools.ITextEntryTool { IsWaitingForText: true } entry) AddTextEntry(entry);
+
         var sel = Doc.Entities.Where(_canvas.Selection.Contains).ToList();
         if (sel.Count == 0)
         {
@@ -152,6 +161,12 @@ public sealed class PropertiesPanel : UserControl
         AddLayerRow(sel);
         AddColorRow("色", sel.Select(e => e.Color).ToList(), c => Apply(x => x.Color = c, "色変更"));
         AddWeightRow("線幅 (mm)", sel.Select(e => e.LineWeight).ToList(), w => Apply(x => x.LineWeight = w, "線幅変更"));
+        var types = sel.Select(e => e.LineType).Distinct().ToList();
+        AddRow("線種", LineTypeCombo.Create(types.Count == 1 ? types[0] : null, t =>
+        {
+            if (sel.All(e => e.LineType == t)) return;
+            Apply(x => x.LineType = t, $"線種変更 → {LineTypes.Name(t)}");
+        }, Brushes.Black));
         AddTextSizeRows(sel.OfType<TextEntity>().ToList());
         AddTransparencyRow([.. sel.Where(e => e is HatchEntity or ImageEntity)]);
         var lengths = sel.Select(LengthOf).Where(l => l != null).Select(l => l!.Value).ToList();
@@ -212,6 +227,46 @@ public sealed class PropertiesPanel : UserControl
                 AddReadOnly("中心角", Angles.ToDms(a.Sweep));
                 AddReadOnly("弧長", $"{a.Length:F3} m");
                 AddReadOnly("弦長", $"{a.StartPoint.DistanceTo(a.EndPoint):F3} m");
+                break;
+
+            case DimensionEntity dim:
+                AddReadOnly("計った長さ", $"{dim.Measured:F3} m ({dim.Measured * 1000:0.#} mm)");
+                AddReadOnly("向き", dim.Angle is double da ? Math.Abs(Math.Sin(da)) < 1e-9 ? "水平" : Math.Abs(Math.Cos(da)) < 1e-9 ? "垂直" : $"{Deg(da):0.##}°" : "平行");
+                AddEditable("寸法値", dim.TextOverride ?? "", s =>
+                    Apply(x => ((DimensionEntity)x).TextOverride = s.Length == 0 ? null : s, "寸法値の変更"),
+                    "空欄なら計った長さ。<> は計った長さに置き換わる (例: L=<>)");
+                AddEditable("単位", Tools.DimSettings.UnitName(dim.Unit), s =>
+                    s.Trim().ToLowerInvariant() is "m" or "mm" && Apply(x => ((DimensionEntity)x).Unit = s.Trim().ToLowerInvariant() == "mm" ? DimUnit.Mm : DimUnit.M, "寸法の単位変更"),
+                    "m または mm");
+                AddEditable("小数の桁数", dim.Decimals.ToString(CultureInfo.InvariantCulture), s =>
+                    int.TryParse(s, out var dec) && dec is >= 0 and <= 6 && Apply(x => ((DimensionEntity)x).Decimals = dec, "寸法の桁数変更"));
+                AddEditable($"文字高 (mm, {Doc.ScaleText})", (dim.TextHeight / Doc.PaperMmToMeters(1)).ToString("0.###", CultureInfo.InvariantCulture), s =>
+                    TryPositive(s, out var mm) && Apply(x => ((DimensionEntity)x).TextHeight = Doc.PaperMmToMeters(mm), "寸法の文字高変更"));
+                AddEditable("端末", Tools.DimSettings.TerminatorName(dim.Terminator), s =>
+                    Enum.GetValues<DimTerminator>().FirstOrDefault(t => Tools.DimSettings.TerminatorName(t) == s.Trim(), (DimTerminator)(-1)) is var t && t >= 0 &&
+                    Apply(x => ((DimensionEntity)x).Terminator = t, "寸法の端末変更"),
+                    "矢印 / 黒丸 / 斜線");
+                AddEditable($"端末の大きさ (mm)", (dim.TerminatorSize / Doc.PaperMmToMeters(1)).ToString("0.###", CultureInfo.InvariantCulture), s =>
+                    TryPositive(s, out var mm) && Apply(x => ((DimensionEntity)x).TerminatorSize = Doc.PaperMmToMeters(mm), "寸法の端末の大きさ変更"));
+                break;
+
+            case LeaderEntity ld:
+                AddEditable("文字", string.Join(" | ", ld.Lines), s =>
+                    Apply(x => ((LeaderEntity)x).Text = Tools.LeaderTool.ParseLines(s), "引き出し線の文字変更"),
+                    "複数行は | で区切る (旗揚げは 1 行目が一番上)。空にすると線だけ");
+                AddEditable($"文字高 (mm, {Doc.ScaleText})", (ld.TextHeight / Doc.PaperMmToMeters(1)).ToString("0.###", CultureInfo.InvariantCulture), s =>
+                    TryPositive(s, out var mm) && Apply(x =>
+                    {
+                        var lx = (LeaderEntity)x;
+                        var k = Doc.PaperMmToMeters(mm) / lx.TextHeight;
+                        lx.TextHeight *= k;
+                        lx.TipSize *= k;
+                    }, "引き出し線の文字高変更"), "用紙上の文字の高さ。先端 (矢印・黒丸) の大きさも同じ割合で変わる");
+                AddEditable("先端", Tools.LeaderTool.TipName(ld.Tip), s =>
+                    Tools.LeaderTool.TryParseTip(s, out var tip) && Apply(x => ((LeaderEntity)x).Tip = tip, "引き出し線の先端変更"),
+                    "矢印 / 黒丸 / なし");
+                AddReadOnly("先端の位置", Xy(ld.Points[0]));
+                AddReadOnly("折れ点", $"{ld.Points.Count - 1} 個");
                 break;
 
             case SymbolEntity sym:
@@ -421,6 +476,12 @@ public sealed class PropertiesPanel : UserControl
     private void AddTextSizeRows(List<TextEntity> texts)
     {
         if (texts.Count == 0) return;
+        var fonts = texts.Select(t => t.EffectiveFontName).Distinct().ToList();
+        AddRow("フォント", FontCombo.Create(fonts.Count == 1 ? fonts[0] : "", f =>
+        {
+            if (texts.All(t => t.FontName == f)) return;
+            Apply(x => { if (x is TextEntity t) t.FontName = f; }, $"フォント変更 → {f ?? TextEntity.DefaultFontName}");
+        }));
         // 画面で一定の文字は、保存するときの大きさ (用紙上 1px = 0.26mm) を出す
         var heights = texts.Select(t => Math.Round(t.ScreenHeightPx is double px ? px * TextEntity.MmPerPixel : t.Height / Doc.ScaleDenominator * 1000, 3)).Distinct().ToList();
         AddEditable("文字高 (mm)", heights.Count == 1 ? heights[0].ToString("0.###") : "", s =>
@@ -491,6 +552,11 @@ public sealed class PropertiesPanel : UserControl
             Doc.CurrentLineWeight = w;
             Committed?.Invoke(this, EventArgs.Empty);
         });
+        AddRow("線種", LineTypeCombo.Create(Doc.CurrentLineType, t =>
+        {
+            Doc.CurrentLineType = t;
+            Committed?.Invoke(this, EventArgs.Empty);
+        }, Brushes.Black));
         if (Tools.TextTool.ScreenFixed)
             AddEditable("文字の大きさ (画面 px)", Tools.TextTool.DefaultScreenPx.ToString("0.#"), s =>
             {
@@ -532,6 +598,88 @@ public sealed class PropertiesPanel : UserControl
     }
 
     // ---- 行の部品 ----
+
+    // ---- 文字の入力欄 ----
+
+    private TextBox? _entryBox;
+
+    /// <summary>今出している文字の入力欄 (無ければ null)。</summary>
+    public TextBox? EntryBox => _entryBox;
+
+    /// <summary>
+    /// 文字の入力欄: Enter で確定、Shift+Enter で改行 (複数行を入れられるツールのみ)、Esc でやめる。
+    /// 入力中の文字は作図領域に見本として出る。
+    /// </summary>
+    private void AddTextEntry(Tools.ITextEntryTool tool)
+    {
+        AddSection(_canvas!.Tool.Name + "の入力");
+        var box = new TextBox
+        {
+            Text = tool.DraftText,
+            AcceptsReturn = tool.AllowsMultipleLines,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = tool.AllowsMultipleLines ? 60 : 26,
+            MaxHeight = 200,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            FontSize = 14,
+            Padding = new Thickness(3),
+            Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xFB, 0xE6)),
+        };
+        box.TextChanged += (_, _) =>
+        {
+            tool.DraftText = box.Text;
+            _canvas.RedrawOverlay();
+        };
+        box.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.Enter && !System.Windows.Input.Keyboard.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Shift))
+            {
+                SubmitEntry();
+                e.Handled = true;
+            }
+            else if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                tool.CancelText();
+                _canvas.RedrawOverlay();
+                Committed?.Invoke(this, EventArgs.Empty);
+                e.Handled = true;
+            }
+        };
+        _body.Children.Add(box);
+        _entryBox = box;
+
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
+        var ok = new Button { Content = "確定 (Enter)", Padding = new Thickness(10, 2, 10, 2), Margin = new Thickness(0, 0, 6, 0) };
+        ok.Click += (_, _) => SubmitEntry();
+        var cancel = new Button { Content = "やめる (Esc)", Padding = new Thickness(10, 2, 10, 2) };
+        cancel.Click += (_, _) =>
+        {
+            tool.CancelText();
+            _canvas.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        buttons.Children.Add(ok);
+        buttons.Children.Add(cancel);
+        _body.Children.Add(buttons);
+        AddNote(tool.TextEntryHint);
+
+        // 入力欄にすぐ打てるようにする
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_entryBox != box) return;
+            box.Focus();
+            box.CaretIndex = box.Text.Length;
+        }, System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    /// <summary>入力欄の文字を確定する。</summary>
+    public void SubmitEntry()
+    {
+        if (_entryBox is not { } box || _canvas?.Tool is not Tools.ITextEntryTool tool) return;
+        tool.SubmitText(box.Text);
+        _canvas.RedrawOverlay();
+        Committed?.Invoke(this, EventArgs.Empty);
+    }
 
     private void AddSection(string title) =>
         _body.Children.Add(new TextBlock
@@ -606,6 +754,9 @@ public sealed class PropertiesPanel : UserControl
         TextEntity => "文字",
         HatchEntity => "ハッチング",
         SymbolEntity s => s.Definition.Name,
+        DimensionEntity => "寸法",
+        LeaderEntity { IsFlag: true } => "旗揚げ",
+        LeaderEntity => "引き出し線",
         ImageEntity i when IO.PdfRenderer.IsPdf(i.Path) => "PDF",
         ImageEntity => "画像",
         _ => e.GetType().Name,

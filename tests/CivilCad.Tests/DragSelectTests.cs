@@ -92,7 +92,7 @@ public class DragSelectTests
     });
 
     [Fact]
-    public void Erase_DragRemovesInsideBox_ClickRemovesHit() => RunSta(() =>
+    public void Erase_ClickAndDragOnlyMark_DoubleClickDeletes() => RunSta(() =>
     {
         var (doc, canvas, a, b) = Setup();
         var tool = new EraseTool();
@@ -100,14 +100,54 @@ public class DragSelectTests
 
         tool.OnPress(new Vec2(50, 50));       // 空きクリックは何もしない
         tool.OnRelease(new Vec2(50, 50));
+        Assert.Empty(tool.Marked);
+
+        tool.OnPress(new Vec2(-1, -5));        // 窓で a を選ぶ (まだ消えない)
+        tool.OnRelease(new Vec2(15, 5));
+        Assert.Equal([a], tool.Marked);
         Assert.Equal(2, doc.Entities.Count);
 
-        tool.OnPress(new Vec2(-1, -5));        // 窓で a を削除
-        tool.OnRelease(new Vec2(15, 5));
-        Assert.Same(b, Assert.Single(doc.Entities));
+        tool.OnPress(new Vec2(25, 0));         // クリックで b も選ぶ (まだ消えない)
+        tool.OnRelease(new Vec2(25, 0));
+        Assert.Equal(2, doc.Entities.Count);
+        tool.OnPress(new Vec2(25, 0));         // もう一度クリックで b を解除
+        tool.OnRelease(new Vec2(25, 0));
+        Assert.Equal([a], tool.Marked);
 
-        tool.OnPress(new Vec2(25, 0));         // クリックで b を削除
+        tool.OnDoubleClick(new Vec2(50, 50));  // 空きでダブルクリック → 選んだ a だけ削除
+        tool.OnRelease(new Vec2(50, 50));
+        Assert.Same(b, Assert.Single(doc.Entities));
+        Assert.Same(tool, canvas.Tool);        // 削除モードは続く
+
+        // ダブルクリック = 1 回目のクリック (選ぶ) + 2 回目 (確定) で b を削除
+        tool.OnPress(new Vec2(25, 0));
+        tool.OnRelease(new Vec2(25, 0));
+        tool.OnDoubleClick(new Vec2(25, 0));
         tool.OnRelease(new Vec2(25, 0));
         Assert.Empty(doc.Entities);
+
+        // 元に戻すで 1 回分ずつ戻る
+        doc.History.Undo();
+        Assert.Same(b, Assert.Single(doc.Entities));
+    });
+
+    [Fact]
+    public void Erase_EnterConfirms_EscClearsThenEnds() => RunSta(() =>
+    {
+        var (doc, canvas, a, b) = Setup();
+        var tool = new EraseTool();
+        canvas.SetTool(tool);
+        tool.OnPress(new Vec2(25, 0));
+        tool.OnRelease(new Vec2(25, 0));
+        tool.OnCancel();                       // Esc: 選んだものを解除 (消さない)
+        Assert.Empty(tool.Marked);
+        Assert.Equal(2, doc.Entities.Count);
+        Assert.Same(tool, canvas.Tool);
+        tool.OnPress(new Vec2(25, 0));
+        tool.OnRelease(new Vec2(25, 0));
+        tool.OnEnter();                        // Enter でも確定
+        Assert.Same(a, Assert.Single(doc.Entities));
+        tool.OnCancel();                       // 何も選んでいなければ終了
+        Assert.IsNotType<EraseTool>(canvas.Tool);
     });
 }

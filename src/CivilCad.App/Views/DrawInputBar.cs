@@ -89,7 +89,8 @@ public sealed class DrawInputBar : Border
 
     private void Doc_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(CadDocument.CurrentLineWeight) or nameof(CadDocument.CurrentColor) or nameof(CadDocument.ScaleDenominator))
+        if (e.PropertyName is nameof(CadDocument.CurrentLineWeight) or nameof(CadDocument.CurrentColor) or nameof(CadDocument.CurrentLineType)
+            or nameof(CadDocument.ScaleDenominator))
             Rebuild();
     }
 
@@ -119,6 +120,7 @@ public sealed class DrawInputBar : Border
             case ILengthAngleInput la:
                 AddNumber("長さ", () => la.FixedLength, v => la.FixedLength = v, "次の点までの長さ。入れておくとクリックした方向にこの長さで線を引く", isLength: true);
                 AddNumber("角度 (°)", () => la.FixedAngleDeg, v => la.FixedAngleDeg = v, "線の向き。東 = 0°、反時計回り (北 = 90°)", allowNegative: true);
+                AddAngleStep();
                 break;
             case ArcTool arcTool:
                 AddNumber("半径", () => arcTool.FixedRadius, v => arcTool.FixedRadius = v,
@@ -126,6 +128,29 @@ public sealed class DrawInputBar : Border
                 break;
             case IRadiusInput ri:
                 AddNumber("半径", () => ri.FixedRadius, v => ri.FixedRadius = v, "入れておくと、中心をクリックするだけでこの半径の円を作図", isLength: true);
+                break;
+            case DimensionTool:
+                AddChoice("向き", Enum.GetValues<DimMode>(), DimSettings.Mode, DimSettings.ModeName, v => DimSettings.Mode = v,
+                    "平行 = 2 点を結ぶ向き / 水平 / 垂直 の長さを計る");
+                AddChoice("端末", Enum.GetValues<DimTerminator>(), DimSettings.Terminator, DimSettings.TerminatorName, v => DimSettings.Terminator = v,
+                    "寸法線の両端の記号");
+                AddChoice("単位", Enum.GetValues<DimUnit>(), DimSettings.Unit, DimSettings.UnitName, v => DimSettings.Unit = v,
+                    "寸法値の単位 (m / mm)");
+                AddNumber("小数桁", () => DimSettings.Decimals, v => { if (v is double d) { DimSettings.Decimals = (int)Math.Clamp(Math.Round(d), 0, 6); _canvas?.RedrawOverlay(); } },
+                    "寸法値の小数点以下の桁数 (0〜6)", allowEmpty: false);
+                AddNumber($"文字高 (mm, {doc.ScaleText})", () => DimSettings.TextHeightMm,
+                    v => { if (v is double h) { DimSettings.TextHeightMm = h; _canvas?.RedrawOverlay(); } }, "用紙上の寸法値の高さ", allowEmpty: false);
+                AddNumber("端末 (mm)", () => DimSettings.TerminatorSizeMm,
+                    v => { if (v is double s) { DimSettings.TerminatorSizeMm = s; _canvas?.RedrawOverlay(); } }, "用紙上の矢印の長さ", allowEmpty: false);
+                break;
+            case LeaderTool:
+                AddLeaderTip();
+                AddNumber($"文字高 (mm, {doc.ScaleText})", () => LeaderSettings.TextHeightMm,
+                    v => { if (v is double h) { LeaderSettings.TextHeightMm = h; _canvas?.RedrawOverlay(); } },
+                    "用紙上の文字の高さ。図面の縮尺で m に換算", allowEmpty: false);
+                AddNumber("先端の大きさ (mm)", () => LeaderSettings.TipSizeMm,
+                    v => { if (v is double s) { LeaderSettings.TipSizeMm = s; _canvas?.RedrawOverlay(); } },
+                    "用紙上の矢印の長さ (黒丸は直径がこの半分)", allowEmpty: false);
                 break;
             case PresetTool:
                 AddPresetKind();
@@ -176,11 +201,29 @@ public sealed class DrawInputBar : Border
                 else
                     AddNumber($"文字高 (mm, {doc.ScaleText})", () => TextTool.DefaultHeightMm, v => { if (v is double h) { TextTool.DefaultHeightMm = h; _canvas?.Tool.RefreshPrompt(); } },
                         "用紙上の文字の高さ。図面の縮尺で m に換算", allowEmpty: false);
+                AddLabel("フォント");
+                var font = FontCombo.Create(TextTool.DefaultFontName, f =>
+                {
+                    TextTool.DefaultFontName = f;
+                    Committed?.Invoke(this, EventArgs.Empty);
+                });
+                font.Margin = new Thickness(0, 0, 12, 0);
+                _panel.Children.Add(font);
                 break;
         }
 
         AddSeparator();
         AddWeight(doc);
+        AddLabel("線種");
+        var lineType = LineTypeCombo.Create(doc.CurrentLineType, t =>
+        {
+            doc.CurrentLineType = t;
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        }, Brushes.Black, 110);
+        lineType.Margin = new Thickness(0, 0, 12, 0);
+        lineType.Focusable = false;
+        _panel.Children.Add(lineType);
         AddColor(doc);
         _panel.Children.Add(_live);
         UpdateLive();
@@ -516,6 +559,76 @@ public sealed class DrawInputBar : Border
             });
         else if (doc.UseTrueNorth)
             _panel.Children.Add(new TextBlock { Text = $"{doc.PlaneZone}系", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) });
+    }
+
+    /// <summary>線の向きの刻み (なし / 90° / 45° / 15°)。角度を入れているときはその角度が優先。</summary>
+    private void AddAngleStep()
+    {
+        var box = new ComboBox
+        {
+            Width = 86,
+            Margin = new Thickness(0, 0, 12, 0),
+            Focusable = false,
+            ItemsSource = LengthAngle.Steps.Select(LengthAngle.StepName).ToList(),
+            SelectedIndex = LengthAngle.Steps.ToList().IndexOf(DrawInputMemory.AngleStepDeg),
+            ToolTip = "線の向きを東 (0°) から 90° / 45° / 15° ごとの一番近い向きにそろえる\n" +
+                      "角度の欄に数値を入れているときはその角度、端点などにスナップしているときはスナップした点が優先",
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0) return;
+            DrawInputMemory.AngleStepDeg = LengthAngle.Steps[box.SelectedIndex];
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
+    }
+
+    /// <summary>一覧から選ぶ欄 (列挙値)。</summary>
+    private void AddChoice<T>(string label, IReadOnlyList<T> values, T current, Func<T, string> name, Action<T> set, string tip) where T : struct, Enum
+    {
+        AddLabel(label);
+        var box = new ComboBox
+        {
+            Width = 64,
+            Margin = new Thickness(0, 0, 12, 0),
+            Focusable = false,
+            ItemsSource = values.Select(name).ToList(),
+            SelectedIndex = values.ToList().IndexOf(current),
+            ToolTip = tip,
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0) return;
+            set(values[box.SelectedIndex]);
+            _canvas?.Tool.RefreshPrompt();
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
+    }
+
+    private void AddLeaderTip()
+    {
+        AddLabel("先端");
+        var tips = Enum.GetValues<LeaderTip>();
+        var box = new ComboBox
+        {
+            Width = 70,
+            Margin = new Thickness(0, 0, 12, 0),
+            ItemsSource = tips.Select(LeaderTool.TipName).ToList(),
+            SelectedIndex = Array.IndexOf(tips, LeaderSettings.Tip),
+            ToolTip = "引き出し線の先端の形",
+        };
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedIndex < 0) return;
+            LeaderSettings.Tip = tips[box.SelectedIndex];
+            _canvas?.Tool.RefreshPrompt();
+            _canvas?.RedrawOverlay();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(box);
     }
 
     private void AddHatchStyle()

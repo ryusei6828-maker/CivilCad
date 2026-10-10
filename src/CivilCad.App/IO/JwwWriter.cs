@@ -100,7 +100,7 @@ public static partial class JwwIO
             _center = origin + new Vec2(pw, ph) / 2 * _k;
             AssignLayers();
             // プリセット (記号) は線・塗り・円・文字に展開する。画像は書かない
-            foreach (var e in doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e])) AddEntity(e);
+            foreach (var e in doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e.ExplodeForOutput())) AddEntity(e);
 
             _a.Raw(Encoding.ASCII.GetBytes("JwwData."));
             WriteHeader(PaperCode(paper, pw, ph));
@@ -180,11 +180,11 @@ public static partial class JwwIO
             return u >= 0 ? 100 + u : 2;
         }
 
-        private void Base(Entity e, int style = 1, int? color = null, int flag = 0, bool text = false)
+        private void Base(Entity e, int? style = null, int? color = null, int flag = 0, bool text = false)
         {
             var (g, l) = _slots.TryGetValue(e.Layer, out var s) ? s : (0, 0);
             _a.U32(0);
-            _a.U8(style);
+            _a.U8(style ?? JwwIO.PenStyle(e.LineType));
             _a.U16(color ?? PenColor(e));
             // 線幅 (1/100 mm 単位の設定で保存する)。文字ではこの欄は寸法値設定のフラグなので 0
             _a.U16(!text && e.LineWeight is double w ? (int)Math.Round(w * 100) : 0);
@@ -276,7 +276,7 @@ public static partial class JwwIO
                 _a.F64(sizeY);
                 _a.F64(0);       // 文字間隔
                 _a.F64(GeoMath.NormalizeAngle(t.Rotation) * 180 / Math.PI);
-                _a.Str("ＭＳ ゴシック");
+                _a.Str(t.EffectiveFontName);
                 _a.Str(t.Text);
             });
         }

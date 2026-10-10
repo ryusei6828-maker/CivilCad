@@ -270,26 +270,35 @@ public sealed class OffsetTool : CadTool
     private static string Format(double d) => d.ToString("0.###", CultureInfo.InvariantCulture);
 }
 
-/// <summary>選択した図形を基点まわりに回転する。角度は数値 (度、反時計回りが +) かクリックで指定。C で元を残す。</summary>
+/// <summary>
+/// 選択した図形を回転する (2 点指示): 回転の中心点 → 基準の方向点 (今の向き) → 回転先の方向点 (新しい向き)。
+/// 中心から見た基準の方向点の向きが、回転先の方向点の向きになるように回す。
+/// 方向点の代わりに回転角 (度、反時計回りが +) を入力しても回せる。C で元を残す。
+/// </summary>
 public sealed class RotateTool : CadTool
 {
     private const int MaxPreviewEntities = 300;
     private List<Entity> _targets = [];
     private Vec2? _base;
+    private Vec2? _ref;
     private Vec2 _cursor;
     private bool _copy;
 
     public override string Name => "回転";
+
+    /// <summary>回転では文字の枠の 4 隅・辺の中点・中心にもスナップする (文字を角や中心で回せるように)。</summary>
+    public override bool SnapsToTextBox => true;
     public override bool CanStepBack => _base.HasValue;
 
     public override IEnumerable<(string Label, Action Run)> MenuItems =>
         _base.HasValue ? [(_copy ? "元を残さない (C)" : "元を残す (C)", () => OnText("C"))] : [];
 
-    /// <summary>基点を指定し直す。</summary>
+    /// <summary>一つ前の指定に戻る (方向点 → 中心点)。</summary>
     public override void StepBack()
     {
-        _base = null;
-        SetPrompt("回転の基点を指定");
+        if (_ref.HasValue) _ref = null;
+        else _base = null;
+        UpdatePrompt();
     }
 
     public override Vec2? BasePoint => _base;
@@ -298,17 +307,17 @@ public sealed class RotateTool : CadTool
 
     protected override void OnActivated()
     {
-        if (_base.HasValue)
-        {
-            PromptAngle();
-            return;
-        }
-        _targets = [.. Canvas.Selection];
-        SetPrompt("回転の基点を指定");
+        if (!_base.HasValue) _targets = [.. Canvas.Selection];
+        UpdatePrompt();
     }
 
-    private void PromptAngle() =>
-        SetPrompt("回転角 (度、反時計回りが +) を入力するか、向きをクリック" + (_copy ? " [元を残す: オン]" : "") + " (C で元を残す/残さない)");
+    private void UpdatePrompt()
+    {
+        var copy = _copy ? " [元を残す: オン]" : "";
+        SetPrompt(_base == null ? "回転の中心点を指定"
+            : _ref == null ? $"基準の方向点 (今の向きを示す点) を指定、または回転角 (度、反時計回りが +) を入力{copy} (C で元を残す/残さない)"
+            : $"回転先の方向点 (新しい向き) を指定、または回転角を入力{copy}");
+    }
 
     public override bool OnText(string text)
     {
@@ -317,7 +326,7 @@ public sealed class RotateTool : CadTool
         if (t.Equals("C", StringComparison.OrdinalIgnoreCase))
         {
             _copy = !_copy;
-            PromptAngle();
+            UpdatePrompt();
             return true;
         }
         if (!TryParseNumber(t, out var deg)) return false;
@@ -330,10 +339,26 @@ public sealed class RotateTool : CadTool
         if (_base is not Vec2 b)
         {
             _base = p;
-            PromptAngle();
+            UpdatePrompt();
             return;
         }
-        if (p.DistanceTo(b) > 0) Apply((p - b).Angle);
+        if (p.DistanceTo(b) <= 0) return;
+        if (_ref is not Vec2 r)
+        {
+            _ref = p;
+            UpdatePrompt();
+            return;
+        }
+        Apply(Angle(b, r, p));
+    }
+
+    /// <summary>中心 b から見て、r の向きを p の向きにする回転角 (-π〜π)。</summary>
+    public static double Angle(Vec2 b, Vec2 r, Vec2 p)
+    {
+        var a = (p - b).Angle - (r - b).Angle;
+        while (a > Math.PI) a -= 2 * Math.PI;
+        while (a <= -Math.PI) a += 2 * Math.PI;
+        return a;
     }
 
     private void Apply(double rad)
@@ -360,9 +385,15 @@ public sealed class RotateTool : CadTool
     public override void DrawPreview(DrawingContext dc)
     {
         if (_base is not Vec2 b || _cursor.DistanceTo(b) == 0) return;
+        if (_ref is not Vec2 r)
+        {
+            Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, b, _cursor);
+            return;
+        }
+        Canvas.DrawWorldLine(dc, CadCanvas.PreviewPen, b, r);
         Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, b, _cursor);
         if (_targets.Count > MaxPreviewEntities) return;
-        var rad = (_cursor - b).Angle;
+        var rad = Angle(b, r, _cursor);
         foreach (var e in _targets)
         {
             var ghost = e.Clone();

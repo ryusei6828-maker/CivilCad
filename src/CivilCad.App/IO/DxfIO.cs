@@ -37,8 +37,8 @@ public static class DxfIO
         }
 
         var images = new Dictionary<string, netDxf.Objects.ImageDefinition>(StringComparer.OrdinalIgnoreCase);
-        // プリセット (記号) は線・塗り・円・文字に展開して書く (他の CAD でも表示できるように)
-        foreach (var e in doc.Entities.SelectMany(x => x is SymbolEntity s ? s.Explode() : [x]))
+        // プリセット (記号)・引き出し線は線・塗り・円・文字に展開して書く (他の CAD でも表示できるように)
+        foreach (var e in doc.Entities.SelectMany(x => x.ExplodeForOutput()))
         {
             EntityObject? de = e switch
             {
@@ -47,7 +47,7 @@ public static class DxfIO
                 CircleEntity c => new Circle(V(c.Center), c.Radius),
                 PointEntity pt => ToDxfPoint(pt),
                 ArcEntity a => new Arc(V(a.Center), a.Radius, GeoMath.NormalizeAngle(a.StartAngle) * Deg, GeoMath.NormalizeAngle(a.EndAngle) * Deg),
-                TextEntity t => ToDxfText(t),
+                TextEntity t => ToDxfText(t, dxf),
                 HatchEntity h when h.Loops.Count > 0 => ToDxfHatch(h),
                 ImageEntity img => ToDxfImage(img, images),
                 _ => null,
@@ -56,6 +56,8 @@ public static class DxfIO
             de.Layer = layers[e.Layer];
             de.Color = e.Color is RgbColor c2 ? ToAci(c2) : AciColor.ByLayer;
             de.Lineweight = e.LineWeight is double w ? ToDxfWeight(w) : Lineweight.ByLayer;
+            if (e.LineType != LineType.Continuous && e is LineEntity or PolylineEntity or CircleEntity or ArcEntity)
+                de.Linetype = DxfLinetype(dxf, doc, e.LineType);
             // 透明度 (DXF は 0〜90%)
             if (e is HatchEntity { TransparencyPercent: > 0 } th) de.Transparency = new Transparency((short)Math.Clamp(Math.Round(th.TransparencyPercent), 0, 90));
             if (e is ImageEntity { TransparencyPercent: > 0 } ti) de.Transparency = new Transparency((short)Math.Clamp(Math.Round(ti.TransparencyPercent), 0, 90));
@@ -121,6 +123,7 @@ public static class DxfIO
             {
                 e.Color = o.Color.IsByLayer || o.Color.IsByBlock ? null : ToRgb(o.Color);
                 e.LineWeight = (short)o.Lineweight > 0 ? (short)o.Lineweight / 100.0 : null;
+                e.LineType = LineTypeFromName(o.Linetype is { IsByLayer: true } || o.Linetype is null ? o.Layer?.Linetype?.Name : o.Linetype.Name);
                 list.Add(e);
             }
             converted++;
@@ -194,6 +197,41 @@ public static class DxfIO
         catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException) { return null; }
     }
 
+    /// <summary>線種の名前 (AutoCAD の標準の名前にそろえる)。</summary>
+    private static string LinetypeName(LineType t) => t switch
+    {
+        LineType.Dashed => "DASHED",
+        LineType.Dotted => "DOT",
+        LineType.DashDot => "DASHDOT",
+        LineType.DashDotDot => "DIVIDE",
+        _ => "Continuous",
+    };
+
+    /// <summary>
+    /// 線種を DXF の線種表に入れる。模様は用紙上の mm を図面の縮尺で m にした長さで書く
+    /// (LTSCALE = 1 のまま、他の CAD でも印刷したとき同じ見た目になるように)。
+    /// </summary>
+    private static netDxf.Tables.Linetype DxfLinetype(DxfDocument dxf, CadDocument doc, LineType t)
+    {
+        var name = LinetypeName(t);
+        if (dxf.Linetypes.Contains(name)) return dxf.Linetypes[name];
+        var segments = LineTypes.PatternMm(t).Select(mm => (netDxf.Tables.LinetypeSegment)new netDxf.Tables.LinetypeSimpleSegment(doc.PaperMmToMeters(mm)));
+        return dxf.Linetypes.Add(new netDxf.Tables.Linetype(name, segments, LineTypes.Name(t)));
+    }
+
+    /// <summary>DXF / DWG の線種の名前から CivilCad の線種を推定する (AutoCAD・Jw_cad などの名前)。</summary>
+    public static LineType LineTypeFromName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return LineType.Continuous;
+        var n = name.ToUpperInvariant();
+        if (n is "CONTINUOUS" or "BYLAYER" or "BYBLOCK" || n.Contains("実線")) return LineType.Continuous;
+        if (n.Contains("DIVIDE") || n.Contains("PHANTOM") || n.Contains("二点") || n.Contains("DASHDOTDOT") || n.Contains("TWODOT")) return LineType.DashDotDot;
+        if (n.Contains("DASHDOT") || n.Contains("CENTER") || n.Contains("CHAIN") || n.Contains("一点")) return LineType.DashDot;
+        if (n.Contains("DOT") || n.Contains("点線")) return LineType.Dotted;
+        if (n.Contains("DASH") || n.Contains("HIDDEN") || n.Contains("破線")) return LineType.Dashed;
+        return LineType.Continuous;
+    }
+
     /// <summary>画像は埋め込まず、画像ファイルの場所 (絶対パス) を書く。同じ画像は 1 つの定義を共有する。</summary>
     private static Image ToDxfImage(ImageEntity img, Dictionary<string, netDxf.Objects.ImageDefinition> defs)
     {
@@ -255,13 +293,23 @@ public static class DxfIO
         return image;
     }
 
-    private static Text ToDxfText(TextEntity t)
+    /// <summary>フォントごとの文字スタイル (TrueType のフォント名で書く)。既定のフォントは標準スタイルのまま。</summary>
+    private static netDxf.Tables.TextStyle? DxfTextStyle(DxfDocument dxf, string? font)
+    {
+        if (string.IsNullOrWhiteSpace(font) || font == TextEntity.DefaultFontName) return null;
+        var name = new string(font.Select(c => "<>/\\\":;?*|=`".Contains(c) ? '_' : c).ToArray());
+        if (dxf.TextStyles.Contains(name)) return dxf.TextStyles[name];
+        return dxf.TextStyles.Add(new netDxf.Tables.TextStyle(name, font, netDxf.Tables.FontStyle.Regular));
+    }
+
+    private static Text ToDxfText(TextEntity t, DxfDocument dxf)
     {
         var text = new Text(t.Text, V(t.Position), t.Height)
         {
             Rotation = t.Rotation * Deg,
             WidthFactor = t.WidthFactor,
         };
+        if (DxfTextStyle(dxf, t.FontName) is { } style) text.Style = style;
         if (t.FitWidth is double fit)
         {
             text.Alignment = TextAlignment.Fit;
@@ -295,6 +343,7 @@ public static class DxfIO
         var t = new TextEntity(layer, V(o.Position), o.Value, o.Height, o.Rotation / Deg)
         {
             WidthFactor = o.WidthFactor > 0 ? o.WidthFactor : 1,
+            FontName = FontOf(o.Style),
         };
         (t.HAlign, t.VAlign) = o.Alignment switch
         {
@@ -314,6 +363,13 @@ public static class DxfIO
         // 両端揃え・フィット: 始点 (Position) から Width の範囲に収める
         if (o.Alignment is TextAlignment.Aligned or TextAlignment.Fit && o.Width > 0) t.FitWidth = o.Width;
         return t;
+    }
+
+    /// <summary>文字スタイルの TrueType フォント名 (無ければ null = 既定)。</summary>
+    private static string? FontOf(netDxf.Tables.TextStyle? style)
+    {
+        var f = style?.FontFamilyName;
+        return string.IsNullOrWhiteSpace(f) || f == TextEntity.DefaultFontName ? null : f;
     }
 
     /// <summary>MTEXT は行ごとの TEXT に分解する (基準点の位置・行間を反映)。</summary>

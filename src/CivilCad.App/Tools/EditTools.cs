@@ -7,53 +7,94 @@ using CivilCad.Core.Model;
 namespace CivilCad.App.Tools;
 
 /// <summary>
-/// 削除モード (消しゴム)。図形をクリックするとすぐ消える。ドラッグで範囲に完全に入る図形をまとめて消す
-/// (向きは問わない)。Esc で終了するまで続く。
+/// 削除モード: クリックで消す図形を選び (もう一度クリックで解除、ドラッグで範囲内をまとめて選ぶ)、
+/// ダブルクリック (または Enter) で選んだ図形を削除する。1 回のクリックでは消えない。
+/// Esc は選んだものの解除、何も選んでいなければ終了。
 /// </summary>
 public sealed class EraseTool : CadTool
 {
-    private static readonly RgbColor HighlightColor = new(255, 80, 80);
+    private static readonly RgbColor MarkColor = new(255, 80, 80);
+    private static readonly RgbColor HoverColor = new(255, 170, 170);
     private static readonly Brush WindowFill = Frozen(new SolidColorBrush(Color.FromArgb(40, 255, 80, 80)));
 
     private readonly BoxDrag _drag = new();
+    private readonly List<Entity> _marked = [];
     private Entity? _hover;
 
     public override string Name => "削除";
     public override bool WantsSnap => false;
     public override bool IsDragging => _drag.IsMouseDrag;
+    public override bool CanStepBack => _marked.Count > 0;
+    public override string? ConfirmLabel => _marked.Count > 0 ? $"{_marked.Count} 個を削除 (ダブルクリック / Enter)" : null;
 
-    protected override void OnActivated() =>
-        SetPrompt($"消す図形をクリック / ドラッグで{BoxDrag.ModeText}をまとめて削除 / Esc で終了");
+    /// <summary>削除する図形として選んでいるもの。</summary>
+    public IReadOnlyList<Entity> Marked => _marked;
+
+    protected override void OnActivated() => SetPrompt(_marked.Count == 0
+        ? $"消す図形をクリックで選ぶ (ドラッグで{BoxDrag.ModeText}をまとめて) → ダブルクリックで削除 / Esc で終了"
+        : $"{_marked.Count} 個を選択中: ダブルクリック (または Enter) で削除 / クリックで追加・解除 / Esc で選び直し");
 
     public override void OnPress(Vec2 p) => _drag.Press(p);
 
     public override void OnRelease(Vec2 p)
     {
         if (_drag.Release(Canvas, p) is not var (start, moved)) return;
-        if (moved) Remove(BoxDrag.Hits(Doc, start, p));
-        else if (Canvas.HitTest(start) is { } hit) Execute(new RemoveEntitiesCommand([hit]));
+        if (moved) Mark(BoxDrag.Hits(Doc, start, p));
+        else if (Canvas.HitTest(start) is { } hit) Toggle(hit);
         _hover = Canvas.HitTest(p);
     }
 
-    /// <summary>コマンド欄からの座標入力: 2 点で範囲削除。</summary>
+    /// <summary>ダブルクリック: その図形も含めて、選んだ図形を削除する (1 回目のクリックで解除されていても消す)。</summary>
+    public override void OnDoubleClick(Vec2 p)
+    {
+        if (Canvas.HitTest(p) is { } hit && !_marked.Contains(hit)) _marked.Add(hit);
+        Confirm();
+    }
+
+    public override void OnEnter() => Confirm();
+
+    /// <summary>コマンド欄からの座標入力: 2 点の範囲内を選ぶ。</summary>
     public override void OnPoint(Vec2 p)
     {
         if (_drag.TypedCorner is not Vec2 corner)
         {
             _drag.TypedCorner = p;
-            SetPrompt("範囲のもう一方の角を指定 (範囲内の図形を削除)");
+            SetPrompt("範囲のもう一方の角を指定 (範囲内の図形を選ぶ)");
             return;
         }
-        Remove(BoxDrag.Hits(Doc, corner, p));
+        Mark(BoxDrag.Hits(Doc, corner, p));
         _drag.TypedCorner = null;
+    }
+
+    private void Toggle(Entity e)
+    {
+        if (!_marked.Remove(e)) _marked.Add(e);
         OnActivated();
     }
 
-    private void Remove(List<Entity> hits)
+    private void Mark(List<Entity> hits)
     {
-        if (hits.Count == 0) return;
-        Execute(new RemoveEntitiesCommand(hits, $"削除 ({hits.Count} 個)"));
-        Canvas.ShowMessage($"{hits.Count} 個の図形を削除しました。");
+        foreach (var e in hits)
+            if (!_marked.Contains(e)) _marked.Add(e);
+        OnActivated();
+    }
+
+    private void Confirm()
+    {
+        var targets = _marked.Where(Doc.Entities.Contains).ToList();
+        _marked.Clear();
+        if (targets.Count > 0)
+        {
+            Execute(new RemoveEntitiesCommand(targets, $"削除 ({targets.Count} 個)"));
+            Canvas.ShowMessage($"{targets.Count} 個の図形を削除しました。");
+        }
+        OnActivated();
+    }
+
+    public override void StepBack()
+    {
+        if (_marked.Count > 0) _marked.RemoveAt(_marked.Count - 1);
+        OnActivated();
     }
 
     public override void OnMouseMove(Vec2 p)
@@ -62,25 +103,24 @@ public sealed class EraseTool : CadTool
         _hover = _drag.IsActive ? null : Canvas.HitTest(p);
     }
 
-    public override void OnEnter() { }
-
     public override void OnCancel()
     {
-        if (_drag.IsActive)
-        {
-            _drag.Reset();
-            OnActivated();
-        }
+        if (_drag.IsActive) _drag.Reset();
+        else if (_marked.Count > 0) _marked.Clear();
         else
         {
             Finish();
+            return;
         }
+        OnActivated();
     }
 
     public override void DrawPreview(DrawingContext dc)
     {
-        // カーソル下の図形を赤く強調 (クリックで消える図形)
-        if (_hover != null && Doc.Entities.Contains(_hover)) Canvas.DrawEntity(dc, _hover, HighlightColor, true);
+        // 選んだ図形は赤、カーソル下の図形は薄い赤で強調
+        foreach (var e in _marked)
+            if (Doc.Entities.Contains(e)) Canvas.DrawEntity(dc, e, MarkColor, true);
+        if (_hover != null && !_marked.Contains(_hover) && Doc.Entities.Contains(_hover)) Canvas.DrawEntity(dc, _hover, HoverColor);
         _drag.Draw(Canvas, dc, WindowFill);
     }
 

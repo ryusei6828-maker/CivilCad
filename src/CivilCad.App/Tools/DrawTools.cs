@@ -24,7 +24,7 @@ public sealed class LineTool : CadTool, ILengthAngleInput, IStyledDrawTool
         SetPrompt(_steps.Count == 0 ? "始点を指定 (Esc で終了)" : "次の点を指定 (Enter でこの線を終えて次の線へ / Esc で終了)");
 
     public override Vec2 ConstrainCursor(Vec2 p) =>
-        BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg) : p;
+        BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg, Canvas.CurrentSnap == null ? DrawInputMemory.AngleStepDeg : null) : p;
 
     public override void OnPoint(Vec2 p)
     {
@@ -93,7 +93,7 @@ public sealed class PolylineTool : CadTool, ILengthAngleInput, IStyledDrawTool
         SetPrompt(_points.Count == 0 ? "始点を指定" : "次の点を指定 (C = 閉じる / Enter で確定 / 右クリックで一つ戻す・やり直し)");
 
     public override Vec2 ConstrainCursor(Vec2 p) =>
-        BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg) : p;
+        BasePoint is Vec2 b ? LengthAngle.Apply(b, p, FixedLength, FixedAngleDeg, Canvas.CurrentSnap == null ? DrawInputMemory.AngleStepDeg : null) : p;
 
     public override void OnPoint(Vec2 p)
     {
@@ -362,8 +362,55 @@ public sealed class TextTool : CadTool, IStyledDrawTool
 
     public override void OnPoint(Vec2 p)
     {
+        // 入力中に別の場所をクリックしたら、入れた文字を置いてから次の位置へ
+        if (_position != null && DraftText.Trim().Length > 0) OnText(DraftText);
         _position = p;
-        SetPrompt("文字を入力して Enter");
+        DraftText = "";
+        SetPrompt("クリックした位置の入力欄に文字を入力して Enter (Esc でやめる)");
+    }
+
+    public override void OnMouseMove(Vec2 p) => _cursor = p;
+
+    private Vec2? _cursor;
+
+    // ---- クリックした位置の入力欄 (MainWindow が作図領域の上に出す) ----
+
+    /// <summary>位置を決めて文字の入力を待っているか。</summary>
+    public bool IsWaitingForText => _position != null;
+
+    /// <summary>文字の位置 (左下)。</summary>
+    public Vec2? Position => _position;
+
+    /// <summary>入力中の文字。</summary>
+    public string DraftText { get; set; } = "";
+
+    /// <summary>今の設定で作る文字の、画面上の高さ (px) とフォント。入力欄の大きさに使う。</summary>
+    public (double HeightPx, string Font) EntryLook()
+    {
+        var t = Create(Doc.CurrentLayer, Vec2.Zero, "字", Canvas.Scale);
+        return (t.Height * Canvas.Scale, t.EffectiveFontName);
+    }
+
+    public void SubmitText(string text) => OnText(text.Replace("\r", "").Replace("\n", " "));
+
+    public void CancelText()
+    {
+        DraftText = "";
+        StepBack();
+    }
+
+    /// <summary>
+    /// 見本: 位置を決める前は、カーソルの位置 (左下) に今の大きさの文字枠と「文字」の見本を出す。
+    /// 位置を決めた後は入力欄が出るので何も描かない。
+    /// </summary>
+    public override void DrawPreview(DrawingContext dc)
+    {
+        if (_position != null || _cursor is not Vec2 c) return;
+        var sample = Create(Doc.CurrentLayer, c, "文字", Canvas.Scale);
+        var h = sample.Height;
+        var w = Math.Max(sample.ApproxWidth, h * 4);
+        Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewDashPen, [c, c + new Vec2(w, 0), c + new Vec2(w, h * 1.2), c + new Vec2(0, h * 1.2)], true);
+        Canvas.DrawEntity(dc, sample, new RgbColor(0x66, 0xCC, 0xFF));
     }
 
     public override bool OnText(string text)
@@ -380,14 +427,18 @@ public sealed class TextTool : CadTool, IStyledDrawTool
         if (text.Length > 0) Execute(new AddEntitiesCommand([Styled(Create(Doc.CurrentLayer, pos, text, Canvas.Scale))], "文字"));
         // 続けて次の文字を置ける (Esc で終了)
         _position = null;
+        DraftText = "";
         OnActivated();
         return true;
     }
 
-    /// <summary>今の設定の大きさの文字を作る (pixelsPerMeter は画面の拡大率)。</summary>
+    /// <summary>これから書く文字のフォント。null なら既定 (ＭＳ ゴシック)。</summary>
+    public static string? DefaultFontName { get; set; }
+
+    /// <summary>今の設定の大きさ・フォントの文字を作る (pixelsPerMeter は画面の拡大率)。</summary>
     public TextEntity Create(Layer layer, Vec2 pos, string text, double pixelsPerMeter) => ScreenFixed
-        ? new TextEntity(layer, pos, text, DefaultScreenPx / pixelsPerMeter) { ScreenHeightPx = DefaultScreenPx }
-        : new TextEntity(layer, pos, text, Doc.PaperMmToMeters(DefaultHeightMm));
+        ? new TextEntity(layer, pos, text, DefaultScreenPx / pixelsPerMeter) { ScreenHeightPx = DefaultScreenPx, FontName = DefaultFontName }
+        : new TextEntity(layer, pos, text, Doc.PaperMmToMeters(DefaultHeightMm)) { FontName = DefaultFontName };
 }
 
 /// <summary>

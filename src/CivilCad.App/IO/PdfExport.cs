@@ -186,6 +186,20 @@ public static class PdfExport
     private sealed class Painter(CadDocument doc, SKCanvas canvas, Layout layout, PdfOptions o)
     {
         private readonly SKTypeface _typeface = SKTypeface.FromFamilyName("MS Gothic") ?? SKTypeface.FromFamilyName("Yu Gothic") ?? SKTypeface.Default;
+        private readonly Dictionary<string, SKTypeface> _typefaces = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>文字のフォント (見つからなければ既定の MS ゴシック)。</summary>
+        private SKTypeface TypefaceOf(TextEntity t)
+        {
+            if (string.IsNullOrWhiteSpace(t.FontName) || t.FontName == TextEntity.DefaultFontName) return _typeface;
+            if (!_typefaces.TryGetValue(t.FontName, out var tf))
+            {
+                var found = SKTypeface.FromFamilyName(t.FontName);
+                // 見つからないと既定の書体が返るので、名前が違えば MS ゴシックにする
+                _typefaces[t.FontName] = tf = found != null && found.FamilyName != SKTypeface.Default.FamilyName ? found : _typeface;
+            }
+            return tf;
+        }
 
         /// <summary>図面 (m) → PDF (pt、左上が原点で y は下向き)。</summary>
         private SKPoint P(Vec2 w)
@@ -206,7 +220,7 @@ public static class PdfExport
                 canvas.ClipRect(new SKRect(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y), Math.Max(a.X, b.X), Math.Max(a.Y, b.Y)));
             }
             // プリセット (記号) は線・塗り・円・文字に展開する
-            var visible = (o.Only ?? doc.Entities).Where(doc.IsVisible).SelectMany(e => e is SymbolEntity s ? s.Explode() : [e]).ToList();
+            var visible = (o.Only ?? doc.Entities).Where(doc.IsVisible).SelectMany(e => e.ExplodeForOutput()).ToList();
             // 画像は一番下
             foreach (var img in visible.OfType<ImageEntity>().Where(i => !i.InFront)) DrawImage(img);
             // 塗りは線の下に描く (画面と同じ)
@@ -255,15 +269,27 @@ public static class PdfExport
             return new SKColor(y, y, y);
         }
 
-        private SKPaint Stroke(Entity e) => new()
+        private SKPaint Stroke(Entity e)
         {
-            IsAntialias = true,
-            Style = SKPaintStyle.Stroke,
-            Color = Color(e),
-            StrokeWidth = (float)Math.Max((e.LineWeight ?? o.DefaultLineWeightMm) * PtPerMm, 0.1),
-            StrokeCap = SKStrokeCap.Round,
-            StrokeJoin = SKStrokeJoin.Round,
-        };
+            var paint = new SKPaint
+            {
+                IsAntialias = true,
+                Style = SKPaintStyle.Stroke,
+                Color = Color(e),
+                StrokeWidth = (float)Math.Max((e.LineWeight ?? o.DefaultLineWeightMm) * PtPerMm, 0.1),
+                StrokeCap = SKStrokeCap.Round,
+                StrokeJoin = SKStrokeJoin.Round,
+            };
+            // 線種: 模様は用紙上の mm (端を丸めるので、線の部分は太さの分だけ短く、空ける部分は長く)
+            var pattern = LineTypes.PatternMm(e.LineType);
+            if (pattern.Count > 0 && e is LineEntity or PolylineEntity or CircleEntity or ArcEntity)
+            {
+                var w = paint.StrokeWidth;
+                var intervals = pattern.Select(mm => mm >= 0 ? Math.Max(0.01f, (float)(mm * PtPerMm) - w) : (float)(-mm * PtPerMm) + w).ToArray();
+                paint.PathEffect = SKPathEffect.CreateDash(intervals, 0);
+            }
+            return paint;
+        }
 
         private void DrawFill(Entity e)
         {
@@ -346,7 +372,7 @@ public static class PdfExport
             var heightM = t.ScreenHeightPx is double px ? px * TextEntity.MmPerPixel * layout.MetersPerMm : t.Height;
             var em = Len(heightM);
             if (em <= 0.01f) return;
-            using var font = new SKFont(_typeface, em) { Subpixel = true, Edging = SKFontEdging.Antialias };
+            using var font = new SKFont(TypefaceOf(t), em) { Subpixel = true, Edging = SKFontEdging.Antialias };
             using var paint = new SKPaint { IsAntialias = true, Color = Color(t), Style = SKPaintStyle.Fill };
             var natural = Math.Max(font.MeasureText(t.Text), 1e-3f);
             // 画面と同じ幅: フィット幅か、幅係数

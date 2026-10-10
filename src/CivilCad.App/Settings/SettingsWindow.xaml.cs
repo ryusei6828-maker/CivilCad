@@ -21,10 +21,81 @@ public partial class SettingsWindow : Window
             .Select(c => new KeyBindingRow(c) { Key = settings.KeyFor(c.Code) ?? "" })
             .ToList();
         BindingGrid.ItemsSource = _rows;
+
+        // 表示タブ
+        foreach (var (name, hex) in BackgroundPresets)
+        {
+            var b = new Button
+            {
+                Margin = new Thickness(0, 0, 6, 6),
+                Padding = new Thickness(6, 2, 8, 2),
+                Tag = hex,
+                Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Children =
+                    {
+                        new Border { Width = 26, Height = 16, BorderBrush = Brushes.Gray, BorderThickness = new Thickness(1), Background = BrushOf(hex)!, Margin = new Thickness(0, 0, 6, 0) },
+                        new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center },
+                    },
+                },
+            };
+            b.Click += (_, _) => BackgroundBox.Text = hex;
+            BackgroundChoices.Items.Add(b);
+        }
+        BackgroundBox.Text = settings.BackgroundColor ?? DefaultBackgroundHex;
+        GridVisibleCheck.IsChecked = settings.GridVisible;
+        GridSpacingBox.ItemsSource = GridSpacingChoices;
+        GridSpacingBox.Text = FormatSpacing(settings.GridSpacing);
     }
+
+    public const string DefaultBackgroundHex = "#1E1E1E";
+
+    private static readonly (string Name, string Hex)[] BackgroundPresets =
+    [
+        ("濃い灰 (既定)", DefaultBackgroundHex), ("黒", "#000000"), ("紺", "#1B2533"), ("灰", "#3C3F41"),
+        ("薄い灰", "#E8E8E8"), ("白", "#FFFFFF"), ("クリーム", "#FAF6E8"),
+    ];
+
+    public static readonly string[] GridSpacingChoices = ["自動", "0.1", "0.5", "1", "5", "10", "20", "50", "100", "500", "1000"];
+
+    public static string FormatSpacing(double? m) => m is double v ? v.ToString("0.###", CultureInfo.InvariantCulture) : "自動";
+
+    /// <summary>「自動」や空欄は null。数値でなければ false。</summary>
+    public static bool TryParseSpacing(string text, out double? spacing)
+    {
+        spacing = null;
+        var t = text.Trim().TrimEnd('m', 'ｍ').Trim();
+        if (t is "" or "自動") return true;
+        if (double.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) && v > 0)
+        {
+            spacing = v;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>"#RRGGBB" → 色。読めなければ null。</summary>
+    public static CivilCad.Core.Model.RgbColor? ParseHex(string text)
+    {
+        var t = text.Trim().TrimStart('#');
+        if (t.Length != 6 || !int.TryParse(t, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var v)) return null;
+        return new CivilCad.Core.Model.RgbColor((byte)(v >> 16), (byte)(v >> 8 & 0xFF), (byte)(v & 0xFF));
+    }
+
+    private static Brush? BrushOf(string hex) =>
+        ParseHex(hex) is { } c ? new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B)) : null;
+
+    private void BackgroundBox_TextChanged(object sender, TextChangedEventArgs e) =>
+        BackgroundPreview.Background = BrushOf(BackgroundBox.Text) ?? Brushes.Transparent;
 
     /// <summary>OK で確定したキー割り当て (コマンド名 → キー、"" は割り当てなし)。</summary>
     public Dictionary<string, string>? Result { get; private set; }
+
+    /// <summary>OK で確定した背景色 (#RRGGBB)・グリッド。</summary>
+    public string? BackgroundResult { get; private set; }
+    public bool GridVisibleResult { get; private set; }
+    public double? GridSpacingResult { get; private set; }
 
     private void KeyBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -77,11 +148,27 @@ public partial class SettingsWindow : Window
     {
         foreach (var r in _rows)
             r.Key = CommandRegistry.DefaultBindings.TryGetValue(r.Code, out var k) ? k : "";
+        BackgroundBox.Text = DefaultBackgroundHex;
+        GridVisibleCheck.IsChecked = true;
+        GridSpacingBox.Text = "自動";
         StatusText.Text = "初期値に戻しました (OK で確定)。";
     }
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
+        if (ParseHex(BackgroundBox.Text) is not { } bg)
+        {
+            StatusText.Text = "背景色は #RRGGBB の形で入力してください (例: #FFFFFF)。";
+            return;
+        }
+        if (!TryParseSpacing(GridSpacingBox.Text, out var spacing))
+        {
+            StatusText.Text = "グリッドの間隔は 0 より大きい数値 (m) か「自動」にしてください。";
+            return;
+        }
+        BackgroundResult = bg.ToHex();
+        GridVisibleResult = GridVisibleCheck.IsChecked == true;
+        GridSpacingResult = spacing;
         Result = _rows.ToDictionary(r => r.Code, r => r.Key);
         DialogResult = true;
     }

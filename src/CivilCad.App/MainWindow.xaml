@@ -54,6 +54,9 @@
                 <MenuItem Header="点 (PO)" Tag="PO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPoint}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="垂線 (PE)" Tag="PE" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPerpendicular}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="文字 (T)" Tag="T" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconText}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="寸法 (DIM)" Tag="DIM" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconDimension}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="引き出し線 (LD)" Tag="LD" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconLeader}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="旗揚げ (HA)" Tag="HA" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFlag}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="ハッチング (H)" Tag="H" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconHatch}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="塗りつぶし (FI)" Tag="FI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFill}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="プリセット (方位記号など) (PS)" Tag="PS" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPreset}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
@@ -136,6 +139,9 @@
                         <Button Style="{StaticResource ToolButton}" Tag="PO" Click="Tool_Click" ToolTip="点 (PO): クリックか座標の入力で点を置く"><StackPanel><Image Source="{StaticResource IconPoint}" Width="24" Height="24"/><TextBlock Text="点" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="PE" Click="Tool_Click" ToolTip="垂線 (PE)"><StackPanel><Image Source="{StaticResource IconPerpendicular}" Width="24" Height="24"/><TextBlock Text="垂線" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="T" Click="Tool_Click" ToolTip="文字 (T)"><StackPanel><Image Source="{StaticResource IconText}" Width="24" Height="24"/><TextBlock Text="文字" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="DIM" Click="Tool_Click" ToolTip="寸法 (DIM): 1 点目 → 2 点目 → 寸法線の位置。続けてクリックで直列寸法"><StackPanel><Image Source="{StaticResource IconDimension}" Width="24" Height="24"/><TextBlock Text="寸法" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="LD" Click="Tool_Click" ToolTip="引き出し線 (LD): 先端 → 折れ点 → Enter → 文字"><StackPanel><Image Source="{StaticResource IconLeader}" Width="24" Height="24"/><TextBlock Text="引き出し線" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="HA" Click="Tool_Click" ToolTip="旗揚げ (HA): 先端 → 旗竿の始まり → 文字 (複数行可)"><StackPanel><Image Source="{StaticResource IconFlag}" Width="24" Height="24"/><TextBlock Text="旗揚げ" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="H" Click="Tool_Click" ToolTip="ハッチング (H)"><StackPanel><Image Source="{StaticResource IconHatch}" Width="24" Height="24"/><TextBlock Text="ハッチング" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="FI" Click="Tool_Click" ToolTip="塗りつぶし (FI)"><StackPanel><Image Source="{StaticResource IconFill}" Width="24" Height="24"/><TextBlock Text="塗りつぶし" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="PS" Click="Tool_Click" ToolTip="プリセット (PS): 方位記号など"><StackPanel><Image Source="{StaticResource IconPreset}" Width="24" Height="24"/><TextBlock Text="プリセット" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
@@ -146,7 +152,7 @@
                     <StackPanel Orientation="Horizontal">
                         <Button Style="{StaticResource ToolButton}" Tag="M" Click="Tool_Click" ToolTip="移動 (M) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconMove}" Width="24" Height="24"/><TextBlock Text="移動" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="CO" Click="Tool_Click" ToolTip="複写 (CO) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconCopy}" Width="24" Height="24"/><TextBlock Text="複写" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
-                        <Button Style="{StaticResource ToolButton}" Tag="RO" Click="Tool_Click" ToolTip="回転 (RO) ※先に図形を選択。角度は度 (反時計回りが +)、C で元を残す"><StackPanel><Image Source="{StaticResource IconRotate}" Width="24" Height="24"/><TextBlock Text="回転" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="RO" Click="Tool_Click" ToolTip="回転 (RO) ※先に図形を選択。中心点 → 基準の方向点 → 回転先の方向点 (角度の入力も可)。C で元を残す"><StackPanel><Image Source="{StaticResource IconRotate}" Width="24" Height="24"/><TextBlock Text="回転" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="SCL" Click="Tool_Click" ToolTip="拡大縮小 (SCL) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconResize}" Width="24" Height="24"/><TextBlock Text="拡大縮小" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="AL" Click="Tool_Click" ToolTip="2 点指示 (AL): 画像などの上の 2 点を図面上の 2 点に合わせる (移動・回転・拡大縮小) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconAlign}" Width="24" Height="24"/><TextBlock Text="2点指示" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="O" Click="Tool_Click" ToolTip="オフセット (O): 距離を入力 → 図形 → ずらす側をクリック"><StackPanel><Image Source="{StaticResource IconOffset}" Width="24" Height="24"/><TextBlock Text="オフセット" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
@@ -154,7 +160,7 @@
                         <Button Style="{StaticResource ToolButton}" Tag="EX" Click="Tool_Click" ToolTip="延長 (EX): 境界を選んで Enter → 伸ばす端をクリック (Shift+クリックでトリム)"><StackPanel><Image Source="{StaticResource IconExtend}" Width="24" Height="24"/><TextBlock Text="延長" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="ED" Click="Tool_Click" ToolTip="文字変更 (ED): 文字をクリックして中身を変える (選択中は文字のダブルクリックでも)"><StackPanel><Image Source="{StaticResource IconText}" Width="24" Height="24"/><TextBlock Text="文字変更" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="J" Click="Tool_Click" ToolTip="結合 (J) ※先に図形を選択。分かれた線を 1 本の線・ポリラインにつなぎ直す"><StackPanel><Image Source="{StaticResource IconJoin}" Width="24" Height="24"/><TextBlock Text="結合" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
-                        <Button Style="{StaticResource ToolButton}" Tag="E" Click="Tool_Click" ToolTip="削除モード (E): クリックした図形を消す。Esc で終了"><StackPanel><Image Source="{StaticResource IconErase}" Width="24" Height="24"/><TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="E" Click="Tool_Click" ToolTip="削除モード (E): クリック (ドラッグで範囲) で消す図形を選び、ダブルクリックか Enter で削除。Esc で終了"><StackPanel><Image Source="{StaticResource IconErase}" Width="24" Height="24"/><TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="図面">
@@ -240,6 +246,15 @@
                             <RadioButton x:Name="BoxCrossingButton" GroupName="BoxMode" Style="{StaticResource {x:Type ToggleButton}}" Focusable="False"
                                          Content="一部" Padding="8,0" Margin="2,0,0,0" Checked="BoxMode_Checked"
                                          ToolTip="一部選択: ドラッグした範囲に少しでもかかった図形を選ぶ (削除モードも同じ)"/>
+                        </StackPanel>
+                    </Border>
+                    <Border BorderBrush="#FFB8BCC4" BorderThickness="1" CornerRadius="2" Padding="3,1" Margin="0,0,10,0">
+                        <StackPanel Orientation="Horizontal">
+                            <ToggleButton x:Name="GridToggle" Content="グリッド [F7]" IsChecked="True" Focusable="False" Click="GridToggle_Click" Padding="6,0"
+                                          ToolTip="背景のグリッド線の表示 / 非表示"/>
+                            <ComboBox x:Name="GridSpacingBox" Width="70" IsEditable="True" Margin="4,0,0,0"
+                                      SelectionChanged="GridSpacingBox_SelectionChanged" KeyDown="GridSpacingBox_KeyDown" LostFocus="GridSpacingBox_LostFocus"/>
+                            <TextBlock Text="m" VerticalAlignment="Center" Margin="3,0,2,0" Foreground="#FF505560"/>
                         </StackPanel>
                     </Border>
                     <Border BorderBrush="#FFB8BCC4" BorderThickness="1" CornerRadius="2" Padding="3,1">
@@ -421,7 +436,15 @@
             </Border>
             <!-- 作図入力バー (線・円などの作図中だけ表示) -->
             <v:DrawInputBar x:Name="InputBar" DockPanel.Dock="Top"/>
-            <v:CadCanvas x:Name="Canvas"/>
+            <Grid>
+                <v:CadCanvas x:Name="Canvas"/>
+                <!-- 文字コマンドで、クリックした位置にその場で文字を打つ欄 (背景なしの Canvas なのでクリックは下の作図領域へ通る) -->
+                <Canvas x:Name="CanvasOverlay" ClipToBounds="True">
+                    <TextBox x:Name="InlineTextBox" Visibility="Collapsed" MinWidth="60" BorderThickness="1" Padding="1,0"
+                             BorderBrush="#FF66CCFF" Background="#E01E1E1E" Foreground="White" CaretBrush="White"
+                             ToolTip="文字を入力して Enter で置く / Esc でやめる / 別の場所をクリックすると、入れた文字を置いて次の位置へ"/>
+                </Canvas>
+            </Grid>
         </DockPanel>
     </DockPanel>
 </Window>
