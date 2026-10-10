@@ -45,7 +45,7 @@ public static class DxfIO
                 LineEntity l => new Line(V(l.Start), V(l.End)),
                 PolylineEntity pl => new Polyline2D(pl.Points.Select(p => new Polyline2DVertex(V(p))), pl.IsClosed),
                 CircleEntity c => new Circle(V(c.Center), c.Radius),
-                PointEntity pt => new netDxf.Entities.Point(V(pt.Position)),
+                PointEntity pt => ToDxfPoint(pt),
                 ArcEntity a => new Arc(V(a.Center), a.Radius, GeoMath.NormalizeAngle(a.StartAngle) * Deg, GeoMath.NormalizeAngle(a.EndAngle) * Deg),
                 TextEntity t => ToDxfText(t),
                 HatchEntity h when h.Loops.Count > 0 => ToDxfHatch(h),
@@ -131,7 +131,7 @@ public static class DxfIO
         foreach (var o in dxf.Entities.Polylines2D)
             Add(o, new PolylineEntity(LayerOf(o), ExpandBulges(o), o.IsClosed));
         foreach (var o in dxf.Entities.Points)
-            Add(o, new PointEntity(LayerOf(o), new Vec2(o.Position.X, o.Position.Y)));
+            Add(o, FromDxfPoint(o, LayerOf(o)));
         foreach (var o in dxf.Entities.Circles)
             Add(o, new CircleEntity(LayerOf(o), V(o.Center), o.Radius));
         foreach (var o in dxf.Entities.Arcs)
@@ -157,6 +157,35 @@ public static class DxfIO
         doc.Entities.AddRange(list);
         doc.NotifyChanged();
         return dxf.Entities.All.Count() - converted;
+    }
+
+    /// <summary>点: 標高は Z 座標に、点名と「標高あり」は XData に書く。</summary>
+    private static netDxf.Entities.Point ToDxfPoint(PointEntity p)
+    {
+        var o = new netDxf.Entities.Point(new Vector3(p.Position.X, p.Position.Y, p.Z ?? 0));
+        if (!string.IsNullOrEmpty(p.Name) || p.Z != null)
+        {
+            var xd = new XData(new netDxf.Tables.ApplicationRegistry(AppId));
+            xd.XDataRecord.Add(new XDataRecord(XDataCode.String, p.Name ?? ""));
+            xd.XDataRecord.Add(new XDataRecord(XDataCode.Int16, (short)(p.Z != null ? 1 : 0)));
+            o.XData.Add(xd);
+        }
+        return o;
+    }
+
+    private static PointEntity FromDxfPoint(netDxf.Entities.Point o, Layer layer)
+    {
+        var p = new PointEntity(layer, new Vec2(o.Position.X, o.Position.Y));
+        if (o.XData.TryGetValue(AppId, out var xd))
+        {
+            p.Name = xd.XDataRecord.FirstOrDefault(r => r.Code == XDataCode.String)?.Value as string ?? "";
+            if (xd.XDataRecord.FirstOrDefault(r => r.Code == XDataCode.Int16)?.Value is short hasZ && hasZ != 0) p.Z = o.Position.Z;
+        }
+        else if (Math.Abs(o.Position.Z) > 1e-12)
+        {
+            p.Z = o.Position.Z; // 他の CAD の点は Z があれば標高とみなす
+        }
+        return p;
     }
 
     private static double? Real(object? v)

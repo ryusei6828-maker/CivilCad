@@ -183,6 +183,15 @@
                         <Button Style="{StaticResource ToolButton}" Tag="ST" Click="Tool_Click" ToolTip="測点照会 (ST)"><StackPanel><Image Source="{StaticResource IconStation}" Width="24" Height="24"/><TextBlock Text="測点照会" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>
+                <TabItem Header="座標管理" x:Name="CoordTab">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource ToolButton}" Tag="CM" Click="Tool_Click" ToolTip="座標管理 (CM): 登録された座標 (点名・X・Y・Z) の一覧を開く / 閉じる"><StackPanel><Image Source="{StaticResource IconPoints}" Width="24" Height="24"/><TextBlock Text="座標一覧" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="PO" Click="Tool_Click" ToolTip="点 (PO): 図面をクリックして座標を登録 (点名は P1, P2 …)"><StackPanel><Image Source="{StaticResource IconPoint}" Width="24" Height="24"/><TextBlock Text="点を登録" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="PI" Click="Tool_Click" ToolTip="座標読込 SIMA / CSV (PI)"><StackPanel><Image Source="{StaticResource IconPoints}" Width="24" Height="24"/><TextBlock Text="座標読込" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="CEX" Click="Tool_Click" ToolTip="座標を CSV に書き出す (CEX)。一覧で選んでいれば選んだ点だけ"><StackPanel><Image Source="{StaticResource IconSave}" Width="24" Height="24"/><TextBlock Text="CSV 出力" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="SEX" Click="Tool_Click" ToolTip="座標を SIMA に書き出す (SEX)。一覧で選んでいれば選んだ点だけ"><StackPanel><Image Source="{StaticResource IconSave}" Width="24" Height="24"/><TextBlock Text="SIMA 出力" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                    </StackPanel>
+                </TabItem>
                 <TabItem Header="表示">
                     <StackPanel Orientation="Horizontal">
                         <Button Style="{StaticResource ToolButton}" Tag="ZE" Click="Tool_Click" ToolTip="全体表示 (ZE)"><StackPanel><Image Source="{StaticResource IconZoomExtents}" Width="24" Height="24"/><TextBlock Text="全体表示" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
@@ -347,6 +356,11 @@
                 </DataGrid.Columns>
             </DataGrid>
         </DockPanel>
+        </Border>
+
+        <!-- 座標管理パネル -->
+        <Border x:Name="CoordHost" DockPanel.Dock="Left" Visibility="Collapsed" BorderBrush="#FFCCCCCC" BorderThickness="0,0,1,0">
+            <v:CoordinatePanel x:Name="CoordPanel"/>
         </Border>
 
         <Border x:Name="PropsHost" DockPanel.Dock="Right" Width="290" BorderBrush="#FFCCCCCC" BorderThickness="1,0,0,0">

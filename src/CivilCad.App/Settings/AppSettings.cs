@@ -37,6 +37,9 @@ public sealed class AppSettings
     /// <summary>レイヤパネルのフロート状態と位置。</summary>
     public PanelState LayerPanel { get; set; } = new();
 
+    /// <summary>座標管理パネルのフロート状態と位置。</summary>
+    public PanelState CoordinatePanel { get; set; } = new();
+
     /// <summary>座標読込の前回の設定。</summary>
     public CivilCad.App.IO.PointImportOptions PointImport { get; set; } = new();
 
@@ -61,6 +64,7 @@ public sealed class AppSettings
         settings.PointImport ??= new();
         settings.PropertiesPanel ??= new();
         settings.LayerPanel ??= new();
+        settings.CoordinatePanel ??= new();
         // 後から増えたコマンドには初期値を入れる (ユーザーが消したものは "" で残っている)
         foreach (var (code, key) in CommandRegistry.DefaultBindings)
             settings.KeyBindings.TryAdd(code, key);

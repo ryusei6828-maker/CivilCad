@@ -84,9 +84,20 @@ public partial class MainWindow : Window
             new Size(300, 560), () => DockablePanel.OwnerPointToScreen(this, new Point(ActualWidth - 320, 90)));
         _layerDock = new DockablePanel(this, LayerHost, LayerPanel, "レイヤ", _settings.LayerPanel, open: false,
             new Size(360, 520), () => DockablePanel.OwnerPointToScreen(this, new Point(20, 90)));
+        _coordDock = new DockablePanel(this, CoordHost, CoordPanel, "座標管理", _settings.CoordinatePanel, open: false,
+            new Size(420, 560), () => DockablePanel.OwnerPointToScreen(this, new Point(40, 110)));
+        CoordPanel.Attach(Canvas);
+        CoordPanel.RunCommand = RunCommand;
+        CoordPanel.CloseRequested += (_, _) => SetPanelOpen(_coordDock, false);
+        CoordPanel.FloatToggleRequested += (_, _) => SetPanelFloating(_coordDock, !_coordDock.IsFloating);
+        // 「座標管理」タブを開いたら一覧も開く
+        RibbonTabs.SelectionChanged += (s, e) =>
+        {
+            if (e.OriginalSource == RibbonTabs && RibbonTabs.SelectedItem == CoordTab && !_coordDock.IsOpen) SetPanelOpen(_coordDock, true);
+        };
         PropsPanel.CloseRequested += (_, _) => SetPanelOpen(_propsDock, false);
         PropsPanel.FloatToggleRequested += (_, _) => SetPanelFloating(_propsDock, !_propsDock.IsFloating);
-        foreach (var d in new[] { _propsDock, _layerDock })
+        foreach (var d in new[] { _propsDock, _layerDock, _coordDock })
         {
             d.StateChanged += (_, _) => OnPanelStateChanged();
             d.FloatingKeyDown += Floating_PreviewKeyDown;
@@ -96,6 +107,7 @@ public partial class MainWindow : Window
             // フロートのウィンドウは本体が表示されてから出す
             _propsDock.Update();
             _layerDock.Update();
+            _coordDock.Update();
         };
         Closing += (_, e) =>
         {
@@ -108,7 +120,7 @@ public partial class MainWindow : Window
                 e.Cancel = true;
                 return;
             }
-            _propsDock.ShuttingDown = _layerDock.ShuttingDown = true;
+            _propsDock.ShuttingDown = _layerDock.ShuttingDown = _coordDock.ShuttingDown = true;
             SaveSettingsQuietly();
         };
         // 本体を閉じたらアプリを終える (隠れているフロートのパネルなどが残ってプロセスが終わらないことがあった)
@@ -118,6 +130,7 @@ public partial class MainWindow : Window
 
     private readonly DockablePanel _propsDock;
     private readonly DockablePanel _layerDock;
+    private readonly DockablePanel _coordDock;
 
     // ---- コマンド ----
 
@@ -175,6 +188,10 @@ public partial class MainWindow : Window
             case "LAF": SetPanelFloating(_layerDock, !_layerDock.IsFloating); break;
             case "PR": SetPanelOpen(_propsDock, !_propsDock.IsOpen); break;
             case "PRF": SetPanelFloating(_propsDock, !_propsDock.IsFloating); break;
+            case "CM": SetPanelOpen(_coordDock, !_coordDock.IsOpen); break;
+            case "CMF": SetPanelFloating(_coordDock, !_coordDock.IsFloating); break;
+            case "CEX": SetPanelOpen(_coordDock, true); CoordPanel.ExportCsv(); break;
+            case "SEX": SetPanelOpen(_coordDock, true); CoordPanel.ExportSima(); break;
             case "U": Undo_Executed(this, null!); break;
             case "REDO": Redo_Executed(this, null!); break;
             case "SNAP":
@@ -812,8 +829,8 @@ public partial class MainWindow : Window
     {
         panel.SetFloating(floating);
         SaveSettingsQuietly();
-        var name = panel == _layerDock ? "レイヤパネル" : "プロパティ";
-        var side = panel == _layerDock ? "左側" : "右側";
+        var name = panel == _layerDock ? "レイヤパネル" : panel == _coordDock ? "座標管理" : "プロパティ";
+        var side = panel == _propsDock ? "右側" : "左側";
         Log(floating ? $"{name}を別ウィンドウにしました (⇲ で{side}に戻せます)。" : $"{name}を{side}に戻しました。");
     }
 
@@ -823,6 +840,7 @@ public partial class MainWindow : Window
         "LAF" => _layerDock.IsFloating,
         "PR" => _propsDock.IsOpen,
         "PRF" => _propsDock.IsFloating,
+        "CM" => _coordDock.IsOpen,
         _ => false,
     };
 
@@ -833,6 +851,8 @@ public partial class MainWindow : Window
         LayerPanel.Width = _layerDock.IsFloating ? double.NaN : 320;
         LayerFloatButton.Content = _layerDock.IsFloating ? "⇲" : "⧉";
         LayerFloatButton.ToolTip = _layerDock.IsFloating ? "ドッキング (メイン画面の左側に戻す)" : "フロート (別ウィンドウに切り離す)";
+        CoordPanel.Width = _coordDock.IsFloating ? double.NaN : 380;
+        CoordPanel.FloatButton.Content = _coordDock.IsFloating ? "⇲" : "⧉";
         UpdatePanelIndicators();
     }
 

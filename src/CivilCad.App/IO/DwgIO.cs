@@ -138,7 +138,7 @@ public static class DwgIO
                     made.Add(new PolylineEntity(layer, ExpandBulges(pl.Vertices.Select(v => (V(v.Location), v.Bulge)).ToList(), pl.IsClosed), pl.IsClosed));
                     break;
                 case ACadSharp.Entities.Point pt:
-                    made.Add(new PointEntity(layer, V(pt.Location)));
+                    made.Add(FromPoint(pt, layer));
                     break;
                 case Arc a: // Arc は Circle を継承しているので先に判定する
                     made.Add(new ArcEntity(layer, V(a.Center), a.Radius, a.StartAngle, a.EndAngle));
@@ -316,6 +316,24 @@ public static class DwgIO
                 var n = Math.Max(4, (int)(Math.Abs(theta) / (Math.PI / 36)));
                 for (var k = 1; k < n; k++) yield return center + (a - center).Rotate(theta * k / n);
             }
+        }
+
+        /// <summary>点: CivilCad の DXF と同じく、XData (CIVILCAD) の点名と「標高あり」、標高は Z 座標。</summary>
+        private static PointEntity FromPoint(ACadSharp.Entities.Point pt, Layer layer)
+        {
+            var p = new PointEntity(layer, V(pt.Location));
+            var xd = pt.ExtendedData.GetExtendedDataByName().FirstOrDefault(kv => kv.Key == "CIVILCAD").Value;
+            if (xd != null)
+            {
+                var values = xd.Records.Select(r => r.RawValue).ToList();
+                p.Name = values.OfType<string>().FirstOrDefault() ?? "";
+                if (values.OfType<short>().FirstOrDefault() != 0) p.Z = pt.Location.Z;
+            }
+            else if (Math.Abs(pt.Location.Z) > 1e-12)
+            {
+                p.Z = pt.Location.Z;
+            }
+            return p;
         }
 
         private static Vec2 V(XYZ p) => new(p.X, p.Y);

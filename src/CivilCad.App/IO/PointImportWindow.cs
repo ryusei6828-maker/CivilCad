@@ -37,6 +37,7 @@ public sealed class PointImportOptions
         {
             var c = doc.FromSurvey(p.X, p.Y); // 座標設定の向きで図面上の点に
             list.Add(new CircleEntity(layer, c, r) { Tag = "POINT:" + p.Label });
+            list.Add(new PointEntity(layer, c) { Name = p.Label, Z = p.Z }); // 座標管理の一覧に出す
             var x = c.X + r * 1.5;
             if (ShowName && p.Label.Length > 0)
                 list.Add(new TextEntity(layer, new Vec2(x, c.Y + r * 0.5), p.Label, h));

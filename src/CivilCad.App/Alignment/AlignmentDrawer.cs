@@ -127,8 +127,18 @@ public static class AlignmentDrawer
                 var a = al.PointAt(st, outerLeft);
                 var b = al.PointAt(st, outerRight);
                 list.Add(new LineEntity(layer, a, b));
-                if (left.Count > 0) list.Add(new CircleEntity(layer, a, h * 0.3));
-                if (right.Count > 0) list.Add(new CircleEntity(layer, b, h * 0.3));
+                // 幅杭は名前を付けた点にもして、座標管理の一覧に出す (座標を書き出せる)
+                var name = $"{input.Name} {Station.Format(st, input.Pitch)}";
+                if (left.Count > 0)
+                {
+                    list.Add(new CircleEntity(layer, a, h * 0.3));
+                    list.Add(new PointEntity(layer, a) { Name = $"{name} 左{-outerLeft:0.###}" });
+                }
+                if (right.Count > 0)
+                {
+                    list.Add(new CircleEntity(layer, b, h * 0.3));
+                    list.Add(new PointEntity(layer, b) { Name = $"{name} 右{outerRight:0.###}" });
+                }
             }
         }
     }

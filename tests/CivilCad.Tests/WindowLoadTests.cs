@@ -78,6 +78,12 @@ public class WindowLoadTests
                 Assert.Equal(System.Windows.Visibility.Collapsed, propsHost.Visibility); // 線では開かない
                 canvas.SetSelection([label]);
                 Assert.Equal(System.Windows.Visibility.Visible, propsHost.Visibility);
+                // 「座標管理」タブを開くと座標の一覧も開く
+                var coordHost = (System.Windows.FrameworkElement)main.FindName("CoordHost");
+                Assert.Equal(System.Windows.Visibility.Collapsed, coordHost.Visibility);
+                tabs.SelectedItem = tabs.Items.OfType<System.Windows.Controls.TabItem>().Single(t => (string)t.Header == "座標管理");
+                Assert.Equal(System.Windows.Visibility.Visible, coordHost.Visibility);
+                tabs.SelectedIndex = 0;
                 var scale = new CivilCad.App.Drawing.ScaleWindow(500);
                 Assert.NotNull(scale.Content);
                 scale.Close();
