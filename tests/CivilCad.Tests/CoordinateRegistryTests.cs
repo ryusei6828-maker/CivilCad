@@ -292,3 +292,62 @@ public class CoordinateTagTests
         }
     }
 }
+
+/// <summary>SFC / P21: 点名・標高を点の横の文字として書き、読み込むと点に戻す。</summary>
+public class PointLabelSfcTests
+{
+    [Theory]
+    [InlineData(".sfc", 500)]
+    [InlineData(".p21", 250)]
+    public void NameAndElevation_RoundTripAsText(string ext, double scale)
+    {
+        var doc = new CadDocument { ScaleDenominator = scale };
+        var red = doc.GetOrCreateLayer("基準点", new RgbColor(255, 0, 0));
+        doc.Entities.Add(new LineEntity(doc.CurrentLayer, new Vec2(0, 0), new Vec2(50, 0)));
+        doc.Entities.Add(new PointEntity(red, new Vec2(10, 5)) { Name = "BM1", Z = 12.345 });
+        doc.Entities.Add(new PointEntity(red, new Vec2(13, 5)) { Name = "No.1 左3" });   // 標高なし (3m 隣)
+        doc.Entities.Add(new PointEntity(red, new Vec2(30, 5)));                          // 点名なし
+        doc.Entities.Add(new TextEntity(doc.CurrentLayer, new Vec2(40, 10), "ふつうの文字", 1));
+        var path = Path.Combine(Path.GetTempPath(), "civilcad-test-" + Guid.NewGuid().ToString("N") + ext);
+        try
+        {
+            DrawingFiles.Save(doc, path);
+            if (ext == ".sfc")
+            {
+                // ほかの CAD でも見えるよう、点名と標高が文字として書いてある
+                var text = File.ReadAllText(path, System.Text.Encoding.Latin1);
+                Assert.Contains("BM1", text);
+                Assert.Contains("H=12.345", text);
+            }
+            var back = new CadDocument();
+            DrawingFiles.Open(back, path);
+            var origin = back.Entities.OfType<LineEntity>().Single().Start; // SFC / P21 は用紙の左下が原点
+            var pts = back.Entities.OfType<PointEntity>().OrderBy(p => p.Position.X).ToList();
+            Assert.Equal(3, pts.Count);
+            Assert.Equal(("BM1", 12.345), (pts[0].Name, pts[0].Z!.Value));
+            Assert.True((pts[0].Position - origin).DistanceTo(new Vec2(10, 5)) < 1e-6);
+            Assert.Equal("No.1 左3", pts[1].Name);
+            Assert.Null(pts[1].Z);
+            Assert.Equal("", pts[2].Name);
+            // 点名・標高の文字は点に戻したので残らない。ほかの文字はそのまま
+            Assert.Equal(["ふつうの文字"], back.Entities.OfType<TextEntity>().Select(t => t.Text));
+            Assert.DoesNotContain(back.Layers, l => l.Name is PointLabels.NameLayer or PointLabels.ElevationLayer);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Fold_LeavesTextsThatAreNotBesideAPoint()
+    {
+        var doc = new CadDocument { ScaleDenominator = 500 };
+        var layer = doc.GetOrCreateLayer(PointLabels.NameLayer, RgbColor.White);
+        doc.Entities.Add(new PointEntity(doc.CurrentLayer, new Vec2(0, 0)));
+        doc.Entities.Add(new TextEntity(layer, new Vec2(20, 20), "はなれた文字", 1));
+        Assert.Equal(0, PointLabels.Fold(doc));
+        Assert.Single(doc.Entities.OfType<TextEntity>());
+        Assert.Equal("", doc.Entities.OfType<PointEntity>().Single().Name);
+    }
+}

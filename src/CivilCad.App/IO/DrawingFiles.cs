@@ -79,12 +79,14 @@ public static class DrawingFiles
             case ".sfc":
             {
                 var r = SfcIO.Load(doc, path);
+                PointLabels.Fold(doc); // 点の横の点名・標高の文字を点に戻す
                 var note = r.Skipped > 0 ? $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}")) : "";
                 return new OpenResult(note, r.Sheet, r.ScaleDenominator, null, true);
             }
             case ".p21" or ".p2z":
             {
                 var r = P21IO.Load(doc, path);
+                PointLabels.Fold(doc);
                 var note = r.Skipped > 0 ? $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}")) : "";
                 return new OpenResult(note, r.Sheet, r.ScaleDenominator, null, true);
             }

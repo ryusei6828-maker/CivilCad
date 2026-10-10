@@ -94,7 +94,15 @@ public static class SfcWriter
 
         /// <summary>書き出す図形。プリセット (記号) は線・塗り・円・文字に展開する (他の CAD でも表示できるように)。</summary>
         // 画像は SFC (SXF レベル 2) には書けないので除く
-        private List<Entity> Entities => _entities ??= [.. doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e.ExplodeForOutput())];
+        // 点名・標高のある点は、点の横に点名・標高の文字も書く (SFC の点には名前・標高の欄が無いため。読み込むと点に戻す)
+        private List<Entity> Entities => _entities ??= Expand();
+
+        private List<Entity> Expand()
+        {
+            var labelLayers = PointLabels.CreateLayers();
+            return [.. doc.Entities.Where(e => e is not ImageEntity).SelectMany(e => e.ExplodeForOutput())
+                .SelectMany(e => e is PointEntity p ? PointLabels.Expand(doc, p, labelLayers) : [e])];
+        }
         private List<Entity>? _entities;
 
         public string Build(string fileName)
