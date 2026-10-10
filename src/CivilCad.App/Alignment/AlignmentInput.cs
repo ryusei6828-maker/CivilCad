@@ -25,6 +25,31 @@ public sealed class AlignmentInput
     public double TextHeightMm { get; set; } = 3.5;
     public ObservableCollection<IpRow> Rows { get; set; } = [];
 
+    /// <summary>中心線から左の幅 (m)。カンマ区切りで複数 (例: "3.0, 5.5" = 路肩 3.0m・用地 5.5m)。空なら作図しない。</summary>
+    public string LeftWidths { get; set; } = "";
+
+    /// <summary>中心線から右の幅 (m)。</summary>
+    public string RightWidths { get; set; } = "";
+
+    /// <summary>幅ごとに中心線と平行な線 (路肩線など) を作図する。</summary>
+    public bool DrawShoulders { get; set; } = true;
+
+    /// <summary>測点ごとに、いちばん外の幅の点 (幅杭) と、左右の幅杭を結ぶ線を作図する。</summary>
+    public bool DrawStakes { get; set; } = true;
+
+    /// <summary>幅の文字 ("3.0, 5.5") を数の並びにする。正しくなければ AlignmentException。</summary>
+    public static List<double> ParseWidths(string text, string label)
+    {
+        var list = new List<double>();
+        foreach (var part in text.Replace('、', ',').Replace('，', ',').Split([',', ' '], StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!double.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var w) || !(w > 0))
+                throw new AlignmentException($"{label}は 0 より大きい数をカンマ区切りで入れてください (例: 3.0, 5.5)。");
+            list.Add(w);
+        }
+        return [.. list.Distinct().Order()];
+    }
+
     public string Tag => "ALIGN:" + Name;
 
     public static AlignmentInput Sample() => new()
@@ -70,6 +95,10 @@ public sealed class AlignmentInput
         StartStation = StartStation,
         Pitch = Pitch,
         TextHeightMm = TextHeightMm,
+        LeftWidths = LeftWidths,
+        RightWidths = RightWidths,
+        DrawShoulders = DrawShoulders,
+        DrawStakes = DrawStakes,
         Rows = [.. Rows.Select(r => new IpRow { Name = r.Name, X = r.X, Y = r.Y, R = r.R, A1 = r.A1, A2 = r.A2 })],
     };
 }

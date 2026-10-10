@@ -95,6 +95,7 @@
                 <MenuItem Header="面積 (AA)" Tag="AA" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconArea}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
             <MenuItem Header="路線(_R)">
+                <MenuItem Header="路線作成 (図面で IP をクリック) (RL)" Tag="RL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="路線計算 IP法 (RC)..." Tag="RC" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="路線 XML (LandXML) 読込 (RX)..." Tag="RX" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="測点照会 (ST)" Tag="ST" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconStation}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
@@ -176,6 +177,7 @@
                 </TabItem>
                 <TabItem Header="路線">
                     <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource ToolButton}" Tag="RL" Click="Tool_Click" ToolTip="路線作成 (RL): 図面上で BP → IP → … → EP をクリックして Enter。R・A・幅を入れて作図"><StackPanel><Image Source="{StaticResource IconRoute}" Width="24" Height="24"/><TextBlock Text="路線作成" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="RC" Click="Tool_Click" ToolTip="路線計算 IP法 (RC)"><StackPanel><Image Source="{StaticResource IconRoute}" Width="24" Height="24"/><TextBlock Text="路線計算" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="RX" Click="Tool_Click" ToolTip="路線 XML (LandXML) 読込 (RX)"><StackPanel><Image Source="{StaticResource IconRoute}" Width="24" Height="24"/><TextBlock Text="XML 読込" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="ST" Click="Tool_Click" ToolTip="測点照会 (ST)"><StackPanel><Image Source="{StaticResource IconStation}" Width="24" Height="24"/><TextBlock Text="測点照会" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>

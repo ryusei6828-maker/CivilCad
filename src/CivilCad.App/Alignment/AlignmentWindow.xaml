@@ -15,6 +15,15 @@
             <TextBlock x:Name="TextHeightLabel" Text="文字高 (mm)" VerticalAlignment="Center" Margin="0,0,4,0"/>
             <TextBox x:Name="TextHeightBox" Width="60"/>
         </WrapPanel>
+        <!-- 幅 (路肩線・幅杭) -->
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+            <TextBlock Text="幅 左 (m)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="LeftWidthBox" Width="110" Margin="0,0,12,0" ToolTip="中心線から左の幅。カンマ区切りで複数 (例: 3.0, 5.5)。空なら作図しない"/>
+            <TextBlock Text="右 (m)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="RightWidthBox" Width="110" Margin="0,0,12,0" ToolTip="中心線から右の幅。カンマ区切りで複数 (例: 3.0, 5.5)"/>
+            <CheckBox x:Name="ShoulderCheck" Content="路肩線 (幅ごとの平行線)" VerticalAlignment="Center" Margin="0,0,12,0"/>
+            <CheckBox x:Name="StakeCheck" Content="幅杭 (測点ごとに一番外の幅)" VerticalAlignment="Center"/>
+        </WrapPanel>
 
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
             <TextBlock x:Name="ErrorText" Foreground="Firebrick" VerticalAlignment="Center" Margin="0,0,16,0" TextWrapping="Wrap" MaxWidth="600"/>

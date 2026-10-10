@@ -12,6 +12,8 @@ public static class AlignmentDrawer
     public const string LayerCenter = "路線-中心線";
     public const string LayerStation = "路線-測点";
     public const string LayerMainPoint = "路線-主要点";
+    public const string LayerShoulder = "路線-路肩線";
+    public const string LayerStake = "路線-幅杭";
 
     /// <summary>同じ路線名で以前作図した図形を置き換えるコマンドを作る。</summary>
     public static IUndoableCommand CreateDrawCommand(CadDocument doc, HorizontalAlignment al, AlignmentInput input)
@@ -83,7 +85,65 @@ public static class AlignmentDrawer
             list.Add(PlaceText(mainLayer, m.Point + right * h * 2.5, right, $"{m.Name} {Station.Format(m.Station, input.Pitch)}", h));
         }
 
+        AddWidths(doc, al, input, h, list);
+
         foreach (var e in list) e.Tag = input.Tag;
+        return list;
+    }
+
+
+    /// <summary>
+    /// 幅: 幅ごとに中心線と平行な線 (路肩線など)、測点ごとにいちばん外の幅の点 (幅杭、小さな円) と左右の幅杭を結ぶ線。
+    /// 平行な線は中心線を細かく区切った点 (主要点を含む) を幅だけずらして結ぶ (円曲線・クロソイドにも沿う)。
+    /// </summary>
+    private static void AddWidths(CadDocument doc, HorizontalAlignment al, AlignmentInput input, double h, List<Entity> list)
+    {
+        var left = AlignmentInput.ParseWidths(input.LeftWidths, "左の幅");
+        var right = AlignmentInput.ParseWidths(input.RightWidths, "右の幅");
+        if (left.Count == 0 && right.Count == 0) return;
+        var offsets = left.Select(w => -w).Concat(right).ToList(); // 右が正
+
+        if (input.DrawShoulders)
+        {
+            var layer = doc.GetOrCreateLayer(LayerShoulder, RgbColor.Green);
+            var stations = SampleStations(al, input.Pitch);
+            foreach (var off in offsets)
+                list.Add(new PolylineEntity(layer, stations.Select(st => al.PointAt(st, off))));
+        }
+
+        if (input.DrawStakes)
+        {
+            var layer = doc.GetOrCreateLayer(LayerStake, RgbColor.Magenta);
+            var outerLeft = left.Count > 0 ? -left[^1] : 0;
+            var outerRight = right.Count > 0 ? right[^1] : 0;
+            var first = Math.Ceiling((al.StartStation - 1e-9) / input.Pitch) * input.Pitch;
+            var stakes = new List<double>();
+            for (var st = first; st <= al.EndStation + 1e-9; st += input.Pitch) stakes.Add(st);
+            // 起点・終点も (測点の位置でなくても)
+            if (stakes.Count == 0 || stakes[0] - al.StartStation > 1e-6) stakes.Insert(0, al.StartStation);
+            if (al.EndStation - stakes[^1] > 1e-6) stakes.Add(al.EndStation);
+            foreach (var st in stakes)
+            {
+                var a = al.PointAt(st, outerLeft);
+                var b = al.PointAt(st, outerRight);
+                list.Add(new LineEntity(layer, a, b));
+                if (left.Count > 0) list.Add(new CircleEntity(layer, a, h * 0.3));
+                if (right.Count > 0) list.Add(new CircleEntity(layer, b, h * 0.3));
+            }
+        }
+    }
+
+    /// <summary>中心線をなめらかにたどるための追加距離 (1m ごと・主要点・起点・終点)。</summary>
+    private static List<double> SampleStations(HorizontalAlignment al, double pitch)
+    {
+        var step = Math.Min(1.0, pitch / 4);
+        var set = new SortedSet<double> { al.StartStation, al.EndStation };
+        for (var st = al.StartStation; st < al.EndStation; st += step) set.Add(st);
+        foreach (var m in al.MainPoints) set.Add(Math.Clamp(m.Station, al.StartStation, al.EndStation));
+        // ごく近い点は除く (同じ点が並ぶとポリラインが乱れる)
+        var list = new List<double>();
+        foreach (var st in set)
+            if (list.Count == 0 || st - list[^1] > 1e-6) list.Add(st);
         return list;
     }
 

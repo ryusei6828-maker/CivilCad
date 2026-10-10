@@ -19,6 +19,10 @@ public partial class AlignmentWindow : Window
         StartBox.Text = _input.StartStation.ToString(CultureInfo.InvariantCulture);
         PitchBox.Text = _input.Pitch.ToString(CultureInfo.InvariantCulture);
         TextHeightBox.Text = _input.TextHeightMm.ToString(CultureInfo.InvariantCulture);
+        LeftWidthBox.Text = _input.LeftWidths;
+        RightWidthBox.Text = _input.RightWidths;
+        ShoulderCheck.IsChecked = _input.DrawShoulders;
+        StakeCheck.IsChecked = _input.DrawStakes;
         IpGrid.ItemsSource = _input.Rows;
         Loaded += (_, _) => TryCompute();
     }
@@ -40,6 +44,12 @@ public partial class AlignmentWindow : Window
             _input.TextHeightMm = ParseDouble(TextHeightBox.Text, "文字高");
             if (_input.Pitch <= 0) throw new AlignmentException("測点間隔は正の値にしてください。");
             if (_input.TextHeightMm <= 0) throw new AlignmentException("文字高は正の値にしてください。");
+            AlignmentInput.ParseWidths(LeftWidthBox.Text, "左の幅");
+            AlignmentInput.ParseWidths(RightWidthBox.Text, "右の幅");
+            _input.LeftWidths = LeftWidthBox.Text.Trim();
+            _input.RightWidths = RightWidthBox.Text.Trim();
+            _input.DrawShoulders = ShoulderCheck.IsChecked == true;
+            _input.DrawStakes = StakeCheck.IsChecked == true;
 
             _result = _input.Compute();
             ShowResult(_result);

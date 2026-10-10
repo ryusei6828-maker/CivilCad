@@ -188,6 +188,7 @@ public partial class MainWindow : Window
                 Log($"直交モード {(Canvas.OrthoEnabled ? "オン" : "オフ")}");
                 break;
             case "RC": OpenAlignmentDialog(); break;
+            case "RL": StartTool(new RouteCreateTool(pts => Dispatcher.BeginInvoke(() => CreateRouteFromPoints(pts))), c); break;
             case "RX":
                 if (LandXmlImport.Run(this, _alignmentInput.TextHeightMm) is { } loaded) OpenAlignmentDialog(loaded);
                 break;
@@ -1051,6 +1052,31 @@ public partial class MainWindow : Window
     // ---- 路線 ----
 
     /// <summary>路線計算ダイアログ。input を渡すとその内容 (XML から読んだ路線など) で開く。</summary>
+    /// <summary>路線作成 (RL) でクリックした点を IP 表にして、路線計算の窓を開く (R・A・幅を入れて作図)。</summary>
+    private void CreateRouteFromPoints(List<Vec2> points)
+    {
+        var input = RouteFromPoints(_doc, points, _alignmentInput);
+        Log($"路線作成: {points.Count} 点 (BP・IP{Math.Max(0, points.Count - 2)} 個・EP) を IP 表にしました。各 IP の R・A と幅を入れて「作図して閉じる」を押してください。");
+        OpenAlignmentDialog(input);
+    }
+
+    /// <summary>クリックした点 (図面座標) → IP 表 (測量座標)。測点間隔・文字高・幅は前の路線の設定を引き継ぎ、路線名は使っていない名前にする。</summary>
+    public static AlignmentInput RouteFromPoints(CadDocument doc, IReadOnlyList<Vec2> points, AlignmentInput previous)
+    {
+        var used = doc.Entities.Select(e => e.Tag).Where(t => t != null).ToHashSet();
+        var name = Enumerable.Range(1, 1000).Select(i => $"路線{i}").First(n => !used.Contains("ALIGN:" + n));
+        var input = previous.Clone();
+        input.Name = name;
+        input.StartStation = 0;
+        input.Rows.Clear();
+        for (var i = 0; i < points.Count; i++)
+        {
+            var (x, y) = doc.ToSurvey(points[i]);
+            input.Rows.Add(new IpRow { Name = i == 0 ? "BP" : i == points.Count - 1 ? "EP" : $"IP{i}", X = Math.Round(x, 3), Y = Math.Round(y, 3) });
+        }
+        return input;
+    }
+
     private void OpenAlignmentDialog(AlignmentInput? input = null)
     {
         var dlg = new AlignmentWindow(input ?? _alignmentInput) { Owner = this };

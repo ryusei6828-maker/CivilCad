@@ -44,6 +44,7 @@ public static class CommandRegistry
         new("E", "削除モード", "IconErase", "クリックした図形を消す。Esc で終了"),
         new("DI", "距離・方向角", "IconDistance"),
         new("AA", "面積", "IconArea"),
+        new("RL", "路線作成 (図面で IP をクリック)", "IconRoute", "BP → IP → … → EP をクリックして Enter。路線計算の窓で R・A・幅を入れて作図"),
         new("RC", "路線計算 (IP法)", "IconRoute"),
         new("RX", "路線 XML (LandXML) 読込", "IconRoute", "J-LandXML の平面線形を IP 表にして路線計算を開く"),
         new("ST", "測点照会", "IconStation"),
