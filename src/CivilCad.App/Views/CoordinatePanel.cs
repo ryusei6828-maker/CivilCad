@@ -21,6 +21,7 @@ public sealed class CoordinateItem
     public string X { get; set; } = "";
     public string Y { get; set; } = "";
     public string Z { get; set; } = "";
+    public string Tags { get; set; } = "";
 }
 
 /// <summary>
@@ -41,6 +42,10 @@ public sealed class CoordinatePanel : DockPanel
     };
     private readonly TextBlock _title = new() { Text = "座標管理", FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center };
     private readonly ObservableCollection<CoordinateItem> _items = [];
+    private readonly ComboBox _filter = new() { Width = 130, Margin = new Thickness(0, 0, 12, 0), ToolTip = "このタグの点だけ一覧に出す" };
+    private readonly TextBox _defaultTag = new() { Width = 100, ToolTip = "点を登録・座標計測で登録するときに付けるタグ (空ならタグなし)" };
+    private const string AllTagsLabel = "(すべて)";
+    private const string NoTagLabel = "(タグなし)";
     private CadCanvas? _canvas;
     private CadDocument? _watched;
     private bool _refreshQueued;
@@ -92,9 +97,23 @@ public sealed class CoordinatePanel : DockPanel
         SetDock(buttons, Dock.Top);
         Children.Add(buttons);
 
+        // タグ: 一覧の絞り込みと、これから登録する点に付けるタグ
+        var tagRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        tagRow.Children.Add(new TextBlock { Text = "タグで絞り込み ", VerticalAlignment = VerticalAlignment.Center });
+        _filter.Items.Add(AllTagsLabel);
+        _filter.SelectedIndex = 0;
+        _filter.SelectionChanged += (_, _) => { if (!_syncing) Refresh(); };
+        tagRow.Children.Add(_filter);
+        tagRow.Children.Add(new TextBlock { Text = "登録するタグ ", VerticalAlignment = VerticalAlignment.Center });
+        _defaultTag.Text = CoordinateRegistry.DefaultTag;
+        _defaultTag.TextChanged += (_, _) => CoordinateRegistry.DefaultTag = _defaultTag.Text.Trim();
+        tagRow.Children.Add(_defaultTag);
+        SetDock(tagRow, Dock.Top);
+        Children.Add(tagRow);
+
         var hint = new TextBlock
         {
-            Text = "X = 北, Y = 東 (測量座標。座標設定の向きを含む)。点名・X・Y・Z はここで直せます (Z は空で標高なし)。",
+            Text = "X = 北, Y = 東 (測量座標。座標設定の向きを含む)。点名・X・Y・Z・タグはここで直せます (Z は空で標高なし。タグはカンマか空白で区切って複数可)。",
             TextWrapping = TextWrapping.Wrap,
             Foreground = System.Windows.Media.Brushes.Gray,
             Margin = new Thickness(0, 0, 0, 4),
@@ -112,6 +131,7 @@ public sealed class CoordinatePanel : DockPanel
         _grid.Columns.Add(Col("X (北)", nameof(CoordinateItem.X), 1.2));
         _grid.Columns.Add(Col("Y (東)", nameof(CoordinateItem.Y), 1.2));
         _grid.Columns.Add(Col("Z", nameof(CoordinateItem.Z), 0.8));
+        _grid.Columns.Add(Col("タグ", nameof(CoordinateItem.Tags), 1.0));
         _grid.ItemsSource = _items;
         _grid.BeginningEdit += (_, _) => _editing = true;
         _grid.RowEditEnding += (_, e) =>
@@ -173,12 +193,36 @@ public sealed class CoordinatePanel : DockPanel
         if (_watched is not { } doc) return;
         var selected = _grid.SelectedItems.OfType<CoordinateItem>().Select(i => i.Point).ToHashSet();
         _syncing = true;
+        // タグの絞り込みの候補を今のタグで作り直す (選んでいたタグは残す)
+        var filter = _filter.SelectedItem as string ?? AllTagsLabel;
+        var tags = CoordinateRegistry.AllTags(doc);
+        _filter.Items.Clear();
+        _filter.Items.Add(AllTagsLabel);
+        _filter.Items.Add(NoTagLabel);
+        foreach (var t in tags) _filter.Items.Add(t);
+        _filter.SelectedItem = _filter.Items.Contains(filter) ? filter : AllTagsLabel;
+        var all = CoordinateRegistry.Rows(doc);
         _items.Clear();
-        foreach (var r in CoordinateRegistry.Rows(doc))
-            _items.Add(new CoordinateItem { Point = r.Point, Name = r.Name, X = F(r.X), Y = F(r.Y), Z = r.Z is double z ? F(z) : "" });
+        foreach (var r in all.Where(r => Matches(r.Point, (string)_filter.SelectedItem)))
+            _items.Add(new CoordinateItem { Point = r.Point, Name = r.Name, X = F(r.X), Y = F(r.Y), Z = r.Z is double z ? F(z) : "", Tags = r.Tags });
         foreach (var i in _items.Where(i => selected.Contains(i.Point))) _grid.SelectedItems.Add(i);
         _syncing = false;
-        _title.Text = $"座標管理  ({_items.Count} 点)";
+        _title.Text = _items.Count == all.Count ? $"座標管理  ({all.Count} 点)" : $"座標管理  ({_items.Count} / {all.Count} 点)";
+    }
+
+    /// <summary>タグの絞り込みで一覧に出すか。</summary>
+    private static bool Matches(PointEntity p, string filter) => filter switch
+    {
+        AllTagsLabel => true,
+        NoTagLabel => !p.TagList.Any(),
+        _ => p.TagList.Contains(filter),
+    };
+
+    /// <summary>タグで絞り込む (null で全部)。</summary>
+    public void FilterByTag(string? tag)
+    {
+        _filter.SelectedItem = tag != null && _filter.Items.Contains(tag) ? tag : AllTagsLabel;
+        Refresh();
     }
 
     private void SyncFromCanvas()
@@ -207,11 +251,13 @@ public sealed class CoordinatePanel : DockPanel
         }
         var p = item.Point;
         var pos = doc.FromSurvey(x, y);
-        if (p.Name == item.Name.Trim() && p.Position.DistanceTo(pos) < 1e-9 && p.Z == z) return true;
+        var tags = (item.Tags ?? "").Trim();
+        if (p.Name == item.Name.Trim() && p.Position.DistanceTo(pos) < 1e-9 && p.Z == z && p.Tags == tags) return true;
         var made = (PointEntity)p.Clone();
         made.Name = item.Name.Trim();
         made.Position = pos;
         made.Z = z;
+        made.Tags = tags;
         doc.History.Execute(new ReplaceEntitiesCommand([(p, made)], "座標の変更"));
         _canvas.SetSelection([made]);
         Refresh();
@@ -244,9 +290,9 @@ public sealed class CoordinatePanel : DockPanel
     private void Export(bool csv)
     {
         if (_watched is not { } doc || _canvas == null) return;
-        var rows = CoordinateRegistry.Rows(doc);
-        var chosen = Selected().Select(i => i.Point).ToHashSet();
-        if (chosen.Count > 0) rows = [.. rows.Where(r => chosen.Contains(r.Point))];
+        // 選んでいれば選んだ点、選んでいなければ一覧に出ている点 (タグで絞り込んでいればその点だけ)
+        var chosen = (Selected() is { Count: > 0 } sel ? sel : [.. _items]).Select(i => i.Point).ToHashSet();
+        var rows = CoordinateRegistry.Rows(doc).Where(r => chosen.Contains(r.Point)).ToList();
         if (rows.Count == 0)
         {
             _canvas.ShowMessage("座標管理: 書き出す座標がありません。");

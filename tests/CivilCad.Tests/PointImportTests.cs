@@ -51,7 +51,15 @@ public class PointImportTests
     public void Csv_Formats(string line, string number, string name, double x, double y, double? z)
     {
         var p = Assert.Single(PointImport.ParseCsv([line]).Points);
-        Assert.Equal(new SurveyPoint(number, name, x, y, z), p);
+        Assert.Equal(new SurveyPoint(number, name, x, y, z), p with { Tag = "" });
+    }
+
+    [Fact]
+    public void Csv_TextAfterCoordinates_IsTag()
+    {
+        // 座標の後ろの文字の列 (備考など) はタグとして読む
+        Assert.Equal("備考", Assert.Single(PointImport.ParseCsv(["P1,100,200,,備考"]).Points).Tag);
+        Assert.Equal("", Assert.Single(PointImport.ParseCsv(["P1,100,200,3"]).Points).Tag);
     }
 
     [Fact]

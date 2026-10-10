@@ -162,15 +162,16 @@ public static class DxfIO
         return dxf.Entities.All.Count() - converted;
     }
 
-    /// <summary>点: 標高は Z 座標に、点名と「標高あり」は XData に書く。</summary>
+    /// <summary>点: 標高は Z 座標に、点名・「標高あり」・タグは XData に書く。</summary>
     private static netDxf.Entities.Point ToDxfPoint(PointEntity p)
     {
         var o = new netDxf.Entities.Point(new Vector3(p.Position.X, p.Position.Y, p.Z ?? 0));
-        if (!string.IsNullOrEmpty(p.Name) || p.Z != null)
+        if (!string.IsNullOrEmpty(p.Name) || p.Z != null || !string.IsNullOrEmpty(p.Tags))
         {
             var xd = new XData(new netDxf.Tables.ApplicationRegistry(AppId));
             xd.XDataRecord.Add(new XDataRecord(XDataCode.String, p.Name ?? ""));
             xd.XDataRecord.Add(new XDataRecord(XDataCode.Int16, (short)(p.Z != null ? 1 : 0)));
+            xd.XDataRecord.Add(new XDataRecord(XDataCode.String, p.Tags ?? ""));
             o.XData.Add(xd);
         }
         return o;
@@ -181,7 +182,9 @@ public static class DxfIO
         var p = new PointEntity(layer, new Vec2(o.Position.X, o.Position.Y));
         if (o.XData.TryGetValue(AppId, out var xd))
         {
-            p.Name = xd.XDataRecord.FirstOrDefault(r => r.Code == XDataCode.String)?.Value as string ?? "";
+            var strings = xd.XDataRecord.Where(r => r.Code == XDataCode.String).Select(r => r.Value as string ?? "").ToList();
+            p.Name = strings.ElementAtOrDefault(0) ?? "";
+            p.Tags = strings.ElementAtOrDefault(1) ?? "";
             if (xd.XDataRecord.FirstOrDefault(r => r.Code == XDataCode.Int16)?.Value is short hasZ && hasZ != 0) p.Z = o.Position.Z;
         }
         else if (Math.Abs(o.Position.Z) > 1e-12)

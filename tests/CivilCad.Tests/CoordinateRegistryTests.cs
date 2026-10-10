@@ -162,3 +162,133 @@ public class CoordinateRegistryTests
         Assert.Contains(bm, doc.Entities);
     });
 }
+
+/// <summary>登録する座標のタグ: 付け方・一覧の絞り込みと編集・CSV / DXF / DWG での保存。</summary>
+public class CoordinateTagTests
+{
+    private static void RunSta(Action<CadDocument, CadCanvas> action)
+    {
+        Exception? error = null;
+        var t = new Thread(() =>
+        {
+            try
+            {
+                var doc = new CadDocument { ScaleDenominator = 500 };
+                action(doc, new CadCanvas { Document = doc });
+            }
+            catch (Exception ex) { error = ex; }
+            finally { CoordinateRegistry.DefaultTag = ""; }
+        });
+        t.SetApartmentState(ApartmentState.STA);
+        t.Start();
+        t.Join();
+        if (error != null) ExceptionDispatchInfo.Capture(error).Throw();
+    }
+
+    private static string Temp(string ext) => Path.Combine(Path.GetTempPath(), "civilcad-test-" + Guid.NewGuid().ToString("N") + ext);
+
+    [Fact]
+    public void Sources_SetTags() => RunSta((doc, canvas) =>
+    {
+        // 幅杭は「幅杭」
+        var input = new AlignmentInput
+        {
+            Name = "路線A",
+            Pitch = 20,
+            RightWidths = "3",
+            DrawShoulders = false,
+            Rows = [new() { Name = "BP", X = 0, Y = 0 }, new() { Name = "EP", X = 40, Y = 0 }],
+        };
+        doc.History.Execute(AlignmentDrawer.CreateDrawCommand(doc, input.Compute(), input));
+        Assert.All(CoordinateRegistry.Rows(doc), r => Assert.Equal("幅杭", r.Tags));
+
+        // 点 (PO)・座標計測 (ID) は「登録するタグ」
+        CoordinateRegistry.DefaultTag = "境界";
+        var po = new PointTool();
+        canvas.SetTool(po);
+        po.OnPoint(new Vec2(100, 100));
+        var id = new CoordinateMeasureTool();
+        canvas.SetTool(id);
+        id.OnPoint(new Vec2(200, 100));
+        Assert.Equal(2, CoordinateRegistry.Rows(doc).Count(r => r.Tags == "境界"));
+
+        // 座標読込: CSV の座標の後ろの文字の列はタグ
+        var file = PointImport.ParseCsv(["点名,X,Y,Z,タグ", "BM1,10,20,1.5,BM", "T1,30,40,,境界 仮"]);
+        doc.Entities.AddRange(new PointImportOptions().Build(doc, file));
+        Assert.Equal("BM", CoordinateRegistry.Rows(doc).Single(r => r.Name == "BM1").Tags);
+        var t1 = CoordinateRegistry.Rows(doc).Single(r => r.Name == "T1");
+        Assert.Equal(["境界", "仮"], t1.Point.TagList);
+        Assert.Equal(["BM", "仮", "境界", "幅杭"], CoordinateRegistry.AllTags(doc).Order(StringComparer.Ordinal));
+    });
+
+    [Fact]
+    public void Panel_FiltersByTag_AndEditsTags() => RunSta((doc, canvas) =>
+    {
+        doc.Entities.AddRange(
+        [
+            new PointEntity(doc.CurrentLayer, new Vec2(0, 0)) { Name = "K1", Tags = "幅杭" },
+            new PointEntity(doc.CurrentLayer, new Vec2(1, 0)) { Name = "K2", Tags = "幅杭, 境界" },
+            new PointEntity(doc.CurrentLayer, new Vec2(2, 0)) { Name = "B1" },
+        ]);
+        var panel = new CoordinatePanel();
+        panel.Attach(canvas);
+        Assert.Equal(3, panel.Items.Count);
+        panel.FilterByTag("幅杭");
+        Assert.Equal(["K1", "K2"], panel.Items.Select(i => i.Name));
+        panel.FilterByTag("境界");
+        Assert.Equal(["K2"], panel.Items.Select(i => i.Name));
+        panel.FilterByTag(null);
+
+        // 一覧でタグを直す
+        var b1 = panel.Items.Single(i => i.Name == "B1");
+        b1.Tags = "BM";
+        Assert.True(panel.Apply(b1));
+        Assert.Equal("BM", doc.Entities.OfType<PointEntity>().Single(p => p.Name == "B1").Tags);
+        doc.History.Undo();
+        Assert.Equal("", doc.Entities.OfType<PointEntity>().Single(p => p.Name == "B1").Tags);
+    });
+
+    [Fact]
+    public void Csv_RoundTripsTags()
+    {
+        var doc = new CadDocument();
+        doc.Entities.Add(new PointEntity(doc.CurrentLayer, new Vec2(10, 20)) { Name = "K1", Tags = "幅杭, 境界" });
+        doc.Entities.Add(new PointEntity(doc.CurrentLayer, new Vec2(30, 40)) { Name = "K2", Z = 2 });
+        var path = Temp(".csv");
+        try
+        {
+            CoordinateRegistry.ExportCsv(CoordinateRegistry.Rows(doc), path);
+            Assert.Contains("K1,20.000,10.000,,幅杭 境界", File.ReadAllText(path));
+            var back = PointImport.Load(path);
+            Assert.Equal("幅杭 境界", back.Points[0].Tag);
+            Assert.Equal("", back.Points[1].Tag);
+            Assert.Equal(2, back.Points[1].Z);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData(".dxf")]
+    [InlineData(".dwg")]
+    public void Save_KeepsTags(string ext)
+    {
+        var doc = new CadDocument();
+        doc.Entities.Add(new PointEntity(doc.CurrentLayer, new Vec2(10, 20)) { Name = "K1", Tags = "幅杭 境界" });
+        var path = Temp(ext);
+        try
+        {
+            DrawingFiles.Save(doc, path);
+            var back = new CadDocument();
+            DrawingFiles.Open(back, path);
+            var p = back.Entities.OfType<PointEntity>().Single();
+            Assert.Equal(("K1", "幅杭 境界"), (p.Name, p.Tags));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+}

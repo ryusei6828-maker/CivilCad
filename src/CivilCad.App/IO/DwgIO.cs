@@ -343,7 +343,9 @@ public static class DwgIO
             if (xd != null)
             {
                 var values = xd.Records.Select(r => r.RawValue).ToList();
-                p.Name = values.OfType<string>().FirstOrDefault() ?? "";
+                var strings = values.OfType<string>().ToList();
+                p.Name = strings.ElementAtOrDefault(0) ?? "";
+                p.Tags = strings.ElementAtOrDefault(1) ?? "";
                 if (values.OfType<short>().FirstOrDefault() != 0) p.Z = pt.Location.Z;
             }
             else if (Math.Abs(pt.Location.Z) > 1e-12)

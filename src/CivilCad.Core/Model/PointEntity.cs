@@ -16,12 +16,18 @@ public sealed class PointEntity(Layer layer, Vec2 position) : Entity(layer)
     /// <summary>標高 (m)。無ければ null。</summary>
     public double? Z { get; set; }
 
+    /// <summary>タグ (分類。例: 幅杭・境界・BM)。カンマ区切りで複数も可。</summary>
+    public string Tags { get; set; } = "";
+
+    /// <summary>タグを 1 つずつに分けたもの (カンマ・読点・空白で区切る)。</summary>
+    public IEnumerable<string> TagList => Tags.Split([',', '、', '，', ' ', '　'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
     public override Box2 Bounds => new(Position, Position);
     public override double DistanceTo(Vec2 p) => p.DistanceTo(Position);
     public override bool IntersectsBox(Box2 box) => box.Contains(Position);
     public override void Translate(Vec2 delta) => Position += delta;
     public override void Rotate(Vec2 origin, double rad) => Position = Position.RotateAround(origin, rad);
     public override void Scale(Vec2 origin, double k) => Position = ScalePoint(Position, origin, k);
-    public override Entity Clone() => CopyPropertiesTo(new PointEntity(Layer, Position) { Name = Name, Z = Z });
+    public override Entity Clone() => CopyPropertiesTo(new PointEntity(Layer, Position) { Name = Name, Z = Z, Tags = Tags });
     public override IEnumerable<SnapPoint> SnapPoints => [new(Position, SnapKind.Node)];
 }

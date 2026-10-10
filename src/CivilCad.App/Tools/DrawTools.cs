@@ -461,7 +461,7 @@ public sealed class PointTool : CadTool, IStyledDrawTool
 
     public override void OnPoint(Vec2 p)
     {
-        var point = Styled(new PointEntity(Doc.CurrentLayer, p) { Name = IO.CoordinateRegistry.NextName(Doc) }); // P1, P2 … (座標管理の一覧に出る)
+        var point = Styled(new PointEntity(Doc.CurrentLayer, p) { Name = IO.CoordinateRegistry.NextName(Doc), Tags = IO.CoordinateRegistry.DefaultTag }); // P1, P2 … (座標管理の一覧に出る)
         var command = new AddEntitiesCommand([point], "点");
         Execute(command);
         _placed.Add((command, point));

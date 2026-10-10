@@ -4,8 +4,8 @@ using System.Text;
 
 namespace CivilCad.App.IO;
 
-/// <summary>読み込んだ座標点。X = 北, Y = 東 (測量座標)、Z = 標高 (無ければ null)。</summary>
-public sealed record SurveyPoint(string Number, string Name, double X, double Y, double? Z)
+/// <summary>読み込んだ座標点。X = 北, Y = 東 (測量座標)、Z = 標高 (無ければ null)、Tag = タグ (CSV の座標の後ろの文字の列。無ければ空)。</summary>
+public sealed record SurveyPoint(string Number, string Name, double X, double Y, double? Z, string Tag = "")
 {
     public string Label => Name.Length > 0 ? Name : Number;
 }
@@ -102,7 +102,7 @@ public static class PointImport
     /// <summary>1 行分。座標の組 (連続する 2 つの数値) が見つからなければ null (見出し行など)。</summary>
     private static SurveyPoint? ParseCsvFields(string[] f, int lineNo)
     {
-        // 文字の列 (点名) があれば、その後ろで最初に連続する 2 つの数値が X, Y (次も数値なら Z)。後ろの備考列は無視
+        // 文字の列 (点名) があれば、その後ろで最初に連続する 2 つの数値が X, Y (次も数値なら Z)。その後ろの最初の文字の列 (備考など) はタグ
         var firstText = Array.FindIndex(f, s => s.Length > 0 && Num(s) == null);
         if (firstText >= 0)
         {
@@ -112,7 +112,8 @@ public static class PointImport
                 var nameIndex = Array.FindLastIndex(f, i - 1, s => s.Length > 0 && Num(s) == null);
                 // 点名の直前が数値なら点番号 (No,点番,点名,X,Y,Z のような並びでは 点番)
                 var number = nameIndex > 0 && Num(f[nameIndex - 1]) != null ? f[nameIndex - 1] : "";
-                return new SurveyPoint(number, f[nameIndex], x, y, i + 2 < f.Length ? Num(f[i + 2]) : null);
+                var tag = f.Skip(i + 2).FirstOrDefault(s => s.Length > 0 && Num(s) == null) ?? "";
+                return new SurveyPoint(number, f[nameIndex], x, y, i + 2 < f.Length ? Num(f[i + 2]) : null, tag);
             }
             return null;
         }

@@ -53,7 +53,7 @@ public sealed class CoordinateMeasureTool : CadTool
         var text = $"座標計測: X(北) = {x:F3}  Y(東) = {y:F3}{latLon}";
         if (Register)
         {
-            var point = new PointEntity(Doc.CurrentLayer, p) { Name = CoordinateRegistry.NextName(Doc) };
+            var point = new PointEntity(Doc.CurrentLayer, p) { Name = CoordinateRegistry.NextName(Doc), Tags = CoordinateRegistry.DefaultTag };
             point.LineWeight = Doc.CurrentLineWeight;
             point.Color = Doc.CurrentColor;
             var command = new AddEntitiesCommand([point], "座標計測");
