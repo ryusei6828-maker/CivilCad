@@ -278,6 +278,15 @@ public partial class MainWindow : Window
     /// </summary>
     private void ShowCanvasMenu()
     {
+        var menu = BuildCanvasMenu();
+        menu.PlacementTarget = Canvas;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+        menu.IsOpen = true;
+    }
+
+    /// <summary>作図領域の右クリックメニュー。一番上で選択モードに切り替えられる (選択モード中は範囲選択の方法も選べる)。</summary>
+    private ContextMenu BuildCanvasMenu()
+    {
         var tool = Canvas.Tool;
         var menu = new ContextMenu();
         MenuItem Item(string header, Action run, bool enabled = true, string? gesture = null)
@@ -295,6 +304,13 @@ public partial class MainWindow : Window
 
         if (tool is SelectTool)
         {
+            // 選択モード (今のモード) と、範囲選択の方法
+            menu.Items.Add(new MenuItem { Header = "選択モード", IsChecked = true, IsEnabled = false, InputGestureText = "SEL" });
+            var inside = Item("範囲選択: 全体 (範囲に完全に入る図形)", () => BoxInsideButton.IsChecked = true);
+            inside.IsChecked = BoxDrag.Mode == BoxSelectMode.Inside;
+            var crossing = Item("範囲選択: 一部 (範囲に少しでもかかる図形)", () => BoxCrossingButton.IsChecked = true);
+            crossing.IsChecked = BoxDrag.Mode == BoxSelectMode.Crossing;
+            menu.Items.Add(new Separator());
             var hasSel = Canvas.Selection.Count > 0;
             Item("移動", () => RunCommand("M"), hasSel, "M");
             Item("複写", () => RunCommand("CO"), hasSel, "CO");
@@ -315,6 +331,8 @@ public partial class MainWindow : Window
         }
         else
         {
+            Item("選択モード (コマンドを終えて選ぶ)", () => RunCommand("SEL"), true, "SEL");
+            menu.Items.Add(new Separator());
             menu.Items.Add(new MenuItem { Header = $"[{tool.Name}]", IsEnabled = false });
             Item("一つ戻す", tool.StepBack, tool.CanStepBack, "Backspace");
             Item("最初からやり直す", RestartTool);
@@ -323,9 +341,7 @@ public partial class MainWindow : Window
             menu.Items.Add(new Separator());
             Item("コマンドを終了", () => Canvas.SetTool(new SelectTool()), true, "Esc");
         }
-        menu.PlacementTarget = Canvas;
-        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
-        menu.IsOpen = true;
+        return menu;
     }
 
     /// <summary>実行中のコマンドを最初からやり直す (入力途中の点などを捨てる。作った図形はそのまま)。</summary>

@@ -99,6 +99,22 @@ public class WindowLoadTests
                 Assert.Equal("SEL", selButton.Tag);
                 typeof(CivilCad.App.MainWindow).GetMethod("UpdateToolbarHighlight", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(main, []);
                 Assert.NotNull(selButton.ReadLocalValue(System.Windows.Controls.Control.BackgroundProperty) as System.Windows.Media.Brush);
+                // 右クリックメニュー: コマンド中は一番上で選択モードに、選択モード中は範囲選択の方法を選べる
+                var build = typeof(CivilCad.App.MainWindow).GetMethod("BuildCanvasMenu", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+                run.Invoke(main, ["L"]);
+                var toolMenu = (System.Windows.Controls.ContextMenu)build.Invoke(main, [])!;
+                var toSelect = (System.Windows.Controls.MenuItem)toolMenu.Items[0];
+                Assert.StartsWith("選択モード", (string)toSelect.Header);
+                toSelect.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.MenuItem.ClickEvent));
+                Assert.IsType<CivilCad.App.Tools.SelectTool>(canvas.Tool);
+                var selectMenu = (System.Windows.Controls.ContextMenu)build.Invoke(main, [])!;
+                var items = selectMenu.Items.OfType<System.Windows.Controls.MenuItem>().ToList();
+                Assert.True(items[0].IsChecked);
+                Assert.Equal("選択モード", items[0].Header);
+                var wasInside = CivilCad.App.Tools.BoxDrag.Mode == CivilCad.App.Tools.BoxSelectMode.Inside;
+                (wasInside ? items[2] : items[1]).RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.MenuItem.ClickEvent));
+                Assert.Equal(wasInside ? CivilCad.App.Tools.BoxSelectMode.Crossing : CivilCad.App.Tools.BoxSelectMode.Inside, CivilCad.App.Tools.BoxDrag.Mode);
+                (wasInside ? items[1] : items[2]).RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.MenuItem.ClickEvent)); // 元に戻す
                 var propsHost = (System.Windows.FrameworkElement)main.FindName("PropsHost");
                 typeof(CivilCad.App.MainWindow).GetMethod("RunCommand", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
                     .Invoke(main, ["PR"]);
