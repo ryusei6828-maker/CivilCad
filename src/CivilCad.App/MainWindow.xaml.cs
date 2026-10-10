@@ -182,6 +182,11 @@ public partial class MainWindow : Window
             case "PDF": PrintPdf(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
             case "SCL": StartTool(new ScaleTool(), c); break;
+            case "SEL" or "SELECT":
+                // 選択モード: 実行中のコマンドを終えて、クリック / ドラッグで選ぶ状態に戻る (選択中の図形はそのまま)
+                Canvas.SetTool(new SelectTool());
+                Log("選択モード: クリックで 1 つ選択、ドラッグで範囲選択、Shift+クリックで追加・解除。");
+                break;
             case "IC": StartTool(new ImageCropTool(), c); break;
             case "DF" or "DB":
                 if (Canvas.Selection.Count == 0) { Log("先に図形を選択してください。"); break; }
@@ -335,12 +340,15 @@ public partial class MainWindow : Window
 
     private static readonly Brush ActiveToolBrush =new SolidColorBrush(Color.FromRgb(0xCC, 0xE4, 0xFF));
 
+    /// <summary>今のモードのコマンド名。コマンドを使っていないとき (選択) は SEL。</summary>
+    private string? ActiveCommandCode => Canvas.Tool is SelectTool ? "SEL" : Canvas.Tool.CommandCode;
+
     /// <summary>実行中のコマンドのボタンを色付けして、今どのモードかを分かるようにする。</summary>
     private void UpdateToolbarHighlight()
     {
         foreach (var b in ToolbarButtons())
         {
-            if (b.Tag is string code && (code == Canvas.Tool.CommandCode || IsPanelOpen(code))) b.Background = ActiveToolBrush;
+            if (b.Tag is string code && (code == ActiveCommandCode || IsPanelOpen(code))) b.Background = ActiveToolBrush;
             else b.ClearValue(BackgroundProperty);
         }
     }

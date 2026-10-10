@@ -71,6 +71,7 @@
                 <MenuItem Header="平面直角座標系の系番号 (ZN)..." Tag="ZN" Click="Tool_Click"/>
             </MenuItem>
             <MenuItem Header="修正(_M)">
+                <MenuItem Header="選択モード (SEL / Esc)" Tag="SEL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconSelect}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="移動 (M)" Tag="M" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconMove}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="拡大縮小 (SCL)" Tag="SCL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconResize}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="2 点指示 (位置合わせ) (AL)" Tag="AL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconAlign}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
@@ -115,6 +116,8 @@
         <!-- ツールバー: 左はいつも出すボタン (ファイル・元に戻す)、右は種類ごとのタブ -->
         <DockPanel x:Name="RibbonArea" DockPanel.Dock="Top" Background="#FFEEF0F3">
             <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="2,0,6,2">
+                <Button Style="{StaticResource ToolButton}" Tag="SEL" Click="Tool_Click" ToolTip="選択モード (SEL / Esc): クリックで 1 つ選択、ドラッグで範囲選択 (全体 / 一部 は右下の「範囲選択」で切り替え)、Shift+クリックで追加・解除。実行中のコマンドは終わる"><StackPanel><Image Source="{StaticResource IconSelect}" Width="24" Height="24"/><TextBlock Text="選択" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="3,4"/>
                 <Button Style="{StaticResource ToolButton}" Command="New" ToolTip="新規 (Ctrl+N)"><StackPanel><Image Source="{StaticResource IconNew}" Width="24" Height="24"/><TextBlock Text="新規" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                 <Button Style="{StaticResource ToolButton}" Command="Open" ToolTip="DXF / SFC を開く (Ctrl+O)"><StackPanel><Image Source="{StaticResource IconOpen}" Width="24" Height="24"/><TextBlock Text="開く" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                 <Button Style="{StaticResource ToolButton}" Command="Save" ToolTip="DXF / SFC で保存 (Ctrl+S)"><StackPanel><Image Source="{StaticResource IconSave}" Width="24" Height="24"/><TextBlock Text="保存" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>

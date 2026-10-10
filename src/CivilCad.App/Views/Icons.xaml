@@ -19,6 +19,11 @@
     <StreamGeometry x:Key="PencilTip" po:Freeze="True">M10,15 L10.7,12.9 L12.1,14.3 Z</StreamGeometry>
 
     <!-- ファイル・編集 -->
+    <DrawingImage x:Key="IconSelect" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Brush="White" Pen="{StaticResource IcoInkPen}" Geometry="M7,3 L7,19 L10.6,15.6 L13.2,21.2 L15.6,20.1 L13,14.6 L18,14.6 Z"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <DrawingImage x:Key="IconNew" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
         <GeometryDrawing Brush="{StaticResource IcoWhite}" Pen="{StaticResource IcoInkPen}" Geometry="M5,2 H14 L19,7 V22 H5 Z M14,2 V7 H19"/>

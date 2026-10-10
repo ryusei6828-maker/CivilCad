@@ -38,6 +38,7 @@ public static class CommandRegistry
         new("DB", "最背面へ", "IconSendBack", "選択した図形を一番下に表示。画像は線・塗りの下になる"),
         new("PDF", "PDF に印刷", null, "用紙・縮尺・白黒を選んで PDF に書き出す"),
         new("ZN","平面直角座標系の系番号", "IconCoord", "I〜XIX系。緯度経度の表示に使う"),
+        new("SEL", "選択モード", "IconSelect", "コマンドを終えて選ぶ状態に戻る。クリックで 1 つ選択、ドラッグで範囲選択、Shift+クリックで追加・解除 (Esc でも同じ)"),
         new("M", "移動", "IconMove", "先に図形を選択"),
         new("SCL", "拡大縮小", "IconResize", "先に図形を選択。基点 → 倍率 (または 参照する長さ → 新しい長さ)"),
         new("AL", "2 点指示 (位置合わせ)", "IconAlign", "先に図形 (画像など) を選択。元の点 → 合わせ先 を 2 組指定して、移動・回転 (・拡大縮小) で合わせる"),

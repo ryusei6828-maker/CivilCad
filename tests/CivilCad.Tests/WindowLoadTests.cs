@@ -89,6 +89,16 @@ public class WindowLoadTests
                 textEdit.Close();
                 // 文字を選ぶと、閉じていたプロパティ (右側) が開く
                 var canvas = (CivilCad.App.Views.CadCanvas)main.FindName("Canvas");
+                // 選択モード (SEL): 実行中のコマンドを終えて選ぶ状態に戻り、ボタンが色付きになる
+                var run = typeof(CivilCad.App.MainWindow).GetMethod("RunCommand", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+                run.Invoke(main, ["L"]);
+                Assert.IsType<CivilCad.App.Tools.LineTool>(canvas.Tool);
+                run.Invoke(main, ["SEL"]);
+                Assert.IsType<CivilCad.App.Tools.SelectTool>(canvas.Tool);
+                var selButton = ((System.Windows.Controls.Panel)((System.Windows.Controls.DockPanel)main.FindName("RibbonArea")).Children[0]).Children.OfType<System.Windows.Controls.Button>().First();
+                Assert.Equal("SEL", selButton.Tag);
+                typeof(CivilCad.App.MainWindow).GetMethod("UpdateToolbarHighlight", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(main, []);
+                Assert.NotNull(selButton.ReadLocalValue(System.Windows.Controls.Control.BackgroundProperty) as System.Windows.Media.Brush);
                 var propsHost = (System.Windows.FrameworkElement)main.FindName("PropsHost");
                 typeof(CivilCad.App.MainWindow).GetMethod("RunCommand", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
                     .Invoke(main, ["PR"]);
