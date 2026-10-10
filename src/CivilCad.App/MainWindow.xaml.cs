@@ -70,7 +70,7 @@ public partial class MainWindow : Window
         // 文字を入れるコマンドでは、入力欄を出すプロパティ (右側) を開く
         Canvas.ToolChanged += (_, _) =>
         {
-            if (Canvas.Tool is ITextEntryTool && _propsDock != null && !_propsDock.IsOpen) SetPanelOpen(_propsDock, true);
+            if (Canvas.Tool is ITextEntryTool or ScaleTool && _propsDock != null && !_propsDock.IsOpen) SetPanelOpen(_propsDock, true);
         };
         Canvas.ContextRequested += (_, _) => ShowCanvasMenu();
         PreviewKeyDown += Window_PreviewKeyDown;

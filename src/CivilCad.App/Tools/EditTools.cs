@@ -205,28 +205,58 @@ public sealed class MoveCopyTool(bool copy) : CadTool
     }
 }
 
+/// <summary>拡大縮小のやり方。</summary>
+public enum ScaleMode
+{
+    /// <summary>倍率を指定: 基点 → 倍率 (または 参照する長さ → 新しい長さ)。</summary>
+    Factor,
+
+    /// <summary>2 点を合わせる: 選んだ図形の 2 点 → 合わせ先の 2 点。1 点目どうしを重ね、2 点間の長さを合わせる。</summary>
+    MatchTwoPoints,
+}
+
 /// <summary>
-/// 拡大縮小: 選択した図形を基点を中心に拡大・縮小する。
-/// 基点 → 倍率を入力 (2 = 2 倍、0.5 = 半分)、または 参照: 元の長さを 2 点で指定 → 新しい長さを入力 / クリック。
+/// 拡大縮小: 選択した図形を拡大・縮小する。やり方は右のプロパティで切り替える (<see cref="ScaleMode"/>)。
+/// 倍率を指定: 基点 → 倍率を入力 (2 = 2 倍、0.5 = 半分)、または 参照: 元の長さを 2 点で指定 → 新しい長さを入力 / クリック。
+///   先にプロパティで倍率を入れておくと、基点をクリックしただけでその倍率にする。
+/// 2 点を合わせる: 選んだ図形の上の 2 点 → 合わせ先 (別の図形の上) の 2 点。1 点目どうしが重なり、2 点間の長さが同じになる。
+///   向きはそのまま (RotateToMatch なら 2 点目の方向へ回転もする)。
 /// Esc を押すまで続けて同じ図形を拡大縮小できる。
 /// </summary>
 public sealed class ScaleTool : CadTool
 {
     private const int MaxPreviewEntities = 300;
     private static readonly RgbColor GhostColor = new(0x66, 0xCC, 0xFF);
+
+    /// <summary>やり方 (次の拡大縮小でも同じ)。</summary>
+    public static ScaleMode Mode { get; set; } = ScaleMode.Factor;
+
+    /// <summary>プロパティで入れた倍率。入っていれば基点をクリックしただけでこの倍率にする。</summary>
+    public static double? FixedFactor { get; set; }
+
+    /// <summary>2 点を合わせるとき、2 点目の方向へ回転もする。</summary>
+    public static bool RotateToMatch { get; set; }
+
     private List<Entity> _targets = [];
     private Vec2? _base;
     private Vec2? _ref1;
     private double? _refLength;
+    private readonly List<Vec2> _match = []; // 元の 1 点目, 元の 2 点目, 合わせ先の 1 点目
     private Vec2 _cursor;
 
     public override string Name => "拡大縮小";
     public override bool RequiresSelection => true;
-    public override bool WantsTextInput => _base != null;
-    public override bool CanStepBack => _base != null;
+    public override bool WantsTextInput => Mode == ScaleMode.Factor && _base != null;
+    public override bool CanStepBack => _base != null || _match.Count > 0;
 
-    /// <summary>参照の始点を決めたあとは、そこからの長さを測る。</summary>
-    public override Vec2? BasePoint => _ref1 ?? _base;
+    /// <summary>参照の始点を決めたあとは、そこからの長さを測る。2 点を合わせるときは直前の点。</summary>
+    public override Vec2? BasePoint => Mode == ScaleMode.MatchTwoPoints ? (_match.Count > 0 ? _match[^1] : null) : _ref1 ?? _base;
+
+    /// <summary>基点を指定済みか (倍率を入れるとすぐ拡大縮小する)。</summary>
+    public bool HasBasePoint => _base != null;
+
+    /// <summary>2 点を合わせるときに指定済みの点の数 (0〜3)。</summary>
+    public int MatchPointCount => _match.Count;
 
     protected override void OnActivated()
     {
@@ -234,15 +264,58 @@ public sealed class ScaleTool : CadTool
         UpdatePrompt();
     }
 
-    private void UpdatePrompt() => SetPrompt(
-        _base == null ? $"拡大縮小 ({_targets.Count} 個): 基点 (動かない点) を指定"
-        : _ref1 == null ? "倍率を入力 (2 = 2 倍、0.5 = 半分)、または 参照する長さの始点をクリック"
-        : _refLength == null ? "参照: 元の長さの終点を指定"
-        : $"参照: 新しい長さを入力 (m)、またはクリック (元の長さ {_refLength:0.###}m)");
+    /// <summary>やり方を変える (指定途中の点は捨てる)。</summary>
+    public void SetMode(ScaleMode mode)
+    {
+        Mode = mode;
+        ResetPoints();
+        UpdatePrompt();
+        Canvas.RedrawOverlay();
+    }
+
+    /// <summary>プロパティで倍率を入れた。基点が決まっていればすぐ拡大縮小、まだなら基点のクリックで拡大縮小する。</summary>
+    public bool SetFactor(double k)
+    {
+        if (!(k > 0) || double.IsInfinity(k))
+        {
+            Canvas.ShowMessage("拡大縮小: 倍率は 0 より大きい値にしてください。");
+            return false;
+        }
+        FixedFactor = k;
+        if (Mode == ScaleMode.Factor && _base != null) Apply(k);
+        else UpdatePrompt();
+        return true;
+    }
+
+    private void ResetPoints()
+    {
+        _base = null;
+        _ref1 = null;
+        _refLength = null;
+        _match.Clear();
+    }
+
+    private void UpdatePrompt() => SetPrompt(Mode == ScaleMode.MatchTwoPoints
+        ? _match.Count switch
+        {
+            0 => $"拡大縮小 ({_targets.Count} 個, 2 点を合わせる): 合わせる元の 1 点目 (選んだ図形の上の点) を指定",
+            1 => "合わせる元の 2 点目を指定",
+            2 => "合わせ先の 1 点目 (別の図形の上の点) を指定",
+            _ => $"合わせ先の 2 点目を指定 ({(RotateToMatch ? "向きも合わせる" : "向きはそのまま")})",
+        }
+        : _base == null
+            ? $"拡大縮小 ({_targets.Count} 個): 基点 (動かない点) を指定" + (FixedFactor is double f ? $" → {f:0.####} 倍にする" : "")
+            : _ref1 == null ? "倍率を入力 (2 = 2 倍、0.5 = 半分。右のプロパティでも可)、または 参照する長さの始点をクリック"
+            : _refLength == null ? "参照: 元の長さの終点を指定"
+            : $"参照: 新しい長さを入力 (m)、またはクリック (元の長さ {_refLength:0.###}m)");
 
     public override void StepBack()
     {
-        if (_refLength != null) _refLength = null;
+        if (Mode == ScaleMode.MatchTwoPoints)
+        {
+            if (_match.Count > 0) _match.RemoveAt(_match.Count - 1);
+        }
+        else if (_refLength != null) _refLength = null;
         else if (_ref1 != null) _ref1 = null;
         else _base = null;
         UpdatePrompt();
@@ -250,7 +323,20 @@ public sealed class ScaleTool : CadTool
 
     public override void OnPoint(Vec2 p)
     {
-        if (_base == null) _base = p;
+        if (Mode == ScaleMode.MatchTwoPoints)
+        {
+            OnMatchPoint(p);
+            return;
+        }
+        if (_base == null)
+        {
+            _base = p;
+            if (FixedFactor is double fixedK)
+            {
+                Apply(fixedK);
+                return;
+            }
+        }
         else if (_ref1 == null) _ref1 = p;
         else if (_refLength is not double refLen)
         {
@@ -270,9 +356,53 @@ public sealed class ScaleTool : CadTool
         UpdatePrompt();
     }
 
+    private void OnMatchPoint(Vec2 p)
+    {
+        // 2 点目は 1 点目と別の点
+        if (_match.Count is 1 or 3 && p.DistanceTo(_match[^1]) < 1e-9)
+        {
+            Canvas.ShowMessage("拡大縮小: 2 点目は 1 点目と別の点を指定してください。");
+            return;
+        }
+        if (_match.Count < 3)
+        {
+            _match.Add(p);
+            UpdatePrompt();
+            return;
+        }
+        var (k, rad) = MatchTransform(_match[0], _match[1], _match[2], p, RotateToMatch);
+        var (s1, t1) = (_match[0], _match[2]);
+        var pairs = _targets.Where(Doc.Entities.Contains).Select(e => (Old: e, New: Matched(e, s1, t1, k, rad))).ToList();
+        Execute(new ReplaceEntitiesCommand(pairs, $"拡大縮小 ×{k:0.####}"));
+        _targets = [.. pairs.Select(x => x.New)];
+        Canvas.SetSelection(_targets);
+        Canvas.ShowMessage($"拡大縮小: {pairs.Count} 個を {k:0.######} 倍にして 2 点を合わせました" +
+                           (RotateToMatch ? $" (回転 {rad * 180 / Math.PI:0.####}°)。" : " (向きはそのまま)。"));
+        _match.Clear();
+        SetPrompt($"続けて拡大縮小 ({_targets.Count} 個, 2 点を合わせる): 合わせる元の 1 点目を指定 (Esc で終了)");
+    }
+
+    /// <summary>元の 2 点 (s1, s2) を合わせ先 (t1, t2) に合わせる倍率と回転角 (rotate でなければ 0)。</summary>
+    public static (double K, double Rad) MatchTransform(Vec2 s1, Vec2 s2, Vec2 t1, Vec2 t2, bool rotate)
+    {
+        var vs = s2 - s1;
+        var vt = t2 - t1;
+        var k = vs.Length > 0 ? vt.Length / vs.Length : 1;
+        return (k, rotate ? GeoMath.NormalizeSignedAngle(vt.Angle - vs.Angle) : 0);
+    }
+
+    private static Entity Matched(Entity e, Vec2 s1, Vec2 t1, double k, double rad)
+    {
+        var c = e.Clone();
+        c.Translate(t1 - s1);
+        if (rad != 0) c.Rotate(t1, rad);
+        if (Math.Abs(k - 1) > 1e-15) c.Scale(t1, k);
+        return c;
+    }
+
     public override bool OnText(string text)
     {
-        if (_base == null || !TryParseNumber(text, out var v)) return false;
+        if (Mode != ScaleMode.Factor || _base == null || !TryParseNumber(text, out var v)) return false;
         if (_ref1 == null) Apply(v);                                  // 倍率
         else if (_refLength is double refLen) Apply(v / refLen);       // 新しい長さ
         else return false;
@@ -298,16 +428,19 @@ public sealed class ScaleTool : CadTool
         Canvas.SetSelection(_targets);
         Canvas.ShowMessage($"拡大縮小: {pairs.Count} 個を {k:0.####} 倍にしました。");
         // 続けて同じ図形を拡大縮小できる (Esc で終了)
-        _base = null;
-        _ref1 = null;
-        _refLength = null;
-        SetPrompt($"続けて拡大縮小 ({_targets.Count} 個): 基点を指定 (Esc で終了)");
+        ResetPoints();
+        SetPrompt($"続けて拡大縮小 ({_targets.Count} 個): 基点を指定" + (FixedFactor is double f ? $" → {f:0.####} 倍にする" : "") + " (Esc で終了)");
     }
 
     public override void OnMouseMove(Vec2 p) => _cursor = p;
 
     public override void DrawPreview(DrawingContext dc)
     {
+        if (Mode == ScaleMode.MatchTwoPoints)
+        {
+            DrawMatchPreview(dc);
+            return;
+        }
         if (_base is not Vec2 b) return;
         if (_ref1 is not Vec2 r1)
         {
@@ -318,20 +451,30 @@ public sealed class ScaleTool : CadTool
         if (_refLength is not double refLen) return;
         var k = (_cursor - r1).Length / refLen;
         if (k <= 0) return;
+        DrawGhosts(dc, e => { var c = e.Clone(); c.Scale(b, k); return c; }, p => b + (p - b) * k);
+    }
+
+    private void DrawMatchPreview(DrawingContext dc)
+    {
+        // 元の 2 点 (実線) と、指定中の点からカーソルまで (破線)
+        if (_match.Count >= 2) Canvas.DrawWorldLine(dc, CadCanvas.PreviewPen, _match[0], _match[1]);
+        if (_match.Count is 1 or 3) Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, _match[^1], _cursor);
+        if (_match.Count != 3 || _cursor.DistanceTo(_match[2]) < 1e-9) return;
+        var (k, rad) = MatchTransform(_match[0], _match[1], _match[2], _cursor, RotateToMatch);
+        var (s1, t1) = (_match[0], _match[2]);
+        DrawGhosts(dc, e => Matched(e, s1, t1, k, rad), p => t1 + (p - s1).Rotate(rad) * k);
+    }
+
+    private void DrawGhosts(DrawingContext dc, Func<Entity, Entity> transform, Func<Vec2, Vec2> map)
+    {
         if (_targets.Count > MaxPreviewEntities)
         {
             var box = _targets.Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
-            Vec2 S(Vec2 p) => b + (p - b) * k;
             Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen,
-                [S(box.Min), S(new Vec2(box.Max.X, box.Min.Y)), S(box.Max), S(new Vec2(box.Min.X, box.Max.Y))], true);
+                [map(box.Min), map(new Vec2(box.Max.X, box.Min.Y)), map(box.Max), map(new Vec2(box.Min.X, box.Max.Y))], true);
             return;
         }
-        foreach (var e in _targets)
-        {
-            var ghost = e.Clone();
-            ghost.Scale(b, k);
-            Canvas.DrawEntity(dc, ghost, GhostColor);
-        }
+        foreach (var e in _targets) Canvas.DrawEntity(dc, transform(e), GhostColor);
     }
 }
 

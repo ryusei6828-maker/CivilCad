@@ -115,4 +115,106 @@ public class ScaleToolTests
         Assert.Equal(2, doc.Entities.OfType<CircleEntity>().Single().Radius);
         Assert.Equal(new Vec2(4, 0), doc.Entities.OfType<PolylineEntity>().Single().Points[1]);
     });
+
+    /// <summary>拡大縮小のやり方の設定 (全体で共有) を毎回もとに戻す。</summary>
+    private static void RunScale(Action<CadDocument, CadCanvas, ScaleTool> action) => RunSta(() =>
+    {
+        try
+        {
+            var doc = new CadDocument();
+            var rect = new PolylineEntity(doc.CurrentLayer, [new Vec2(0, 0), new Vec2(10, 0), new Vec2(10, 5), new Vec2(0, 5)], true);
+            doc.Entities.Add(rect);
+            var canvas = new CadCanvas { Document = doc };
+            canvas.SetSelection([rect]);
+            var tool = new ScaleTool();
+            canvas.SetTool(tool);
+            action(doc, canvas, tool);
+        }
+        finally
+        {
+            ScaleTool.Mode = ScaleMode.Factor;
+            ScaleTool.FixedFactor = null;
+            ScaleTool.RotateToMatch = false;
+        }
+    });
+
+    private static PolylineEntity Rect(CadDocument doc) => doc.Entities.OfType<PolylineEntity>().Single();
+
+    [Fact]
+    public void Factor_EnteredFirst_ThenBaseClickApplies() => RunScale((doc, canvas, tool) =>
+    {
+        Assert.True(tool.SetFactor(3));          // プロパティで倍率を入れる
+        Assert.Equal(10, Rect(doc).Bounds.Width); // まだ変えない
+        tool.OnPoint(new Vec2(10, 5));             // 基点のクリックで拡大縮小
+        Assert.Equal(new Box2(new Vec2(-20, -10), new Vec2(10, 5)), Rect(doc).Bounds);
+        tool.OnPoint(Vec2.Zero);                   // 続けて同じ倍率
+        Assert.Equal(90, Rect(doc).Bounds.Width, 9);  // 30 → 90
+        Assert.False(tool.SetFactor(0));
+    });
+
+    [Fact]
+    public void Factor_AfterBase_AppliesImmediately() => RunScale((doc, canvas, tool) =>
+    {
+        tool.OnPoint(Vec2.Zero);
+        Assert.True(tool.HasBasePoint);
+        Assert.True(tool.SetFactor(0.5));
+        Assert.Equal(new Box2(Vec2.Zero, new Vec2(5, 2.5)), Rect(doc).Bounds);
+        doc.History.Undo();
+        Assert.Equal(10, Rect(doc).Bounds.Width);
+    });
+
+    [Fact]
+    public void MatchTwoPoints_ScalesAndMoves_KeepsDirection() => RunScale((doc, canvas, tool) =>
+    {
+        tool.SetMode(ScaleMode.MatchTwoPoints);
+        tool.OnPoint(new Vec2(0, 0));     // 元の 1 点目
+        tool.OnPoint(new Vec2(10, 0));    // 元の 2 点目
+        tool.OnPoint(new Vec2(99, 99));   // 間違えた点
+        tool.StepBack();
+        Assert.Equal(2, tool.MatchPointCount);
+        tool.OnPoint(new Vec2(100, 50));  // 合わせ先の 1 点目
+        tool.OnPoint(new Vec2(100, 75));  // 合わせ先の 2 点目 (真上に 25 → 長さ 25 / 10 = 2.5 倍、向きはそのまま)
+        Assert.Equal(new Box2(new Vec2(100, 50), new Vec2(125, 62.5)), Rect(doc).Bounds);
+        Assert.Equal(0, tool.MatchPointCount); // 続けて使える
+        Assert.Same(tool, canvas.Tool);
+    });
+
+    [Fact]
+    public void MatchTwoPoints_WithRotation() => RunScale((doc, canvas, tool) =>
+    {
+        ScaleTool.RotateToMatch = true;
+        tool.SetMode(ScaleMode.MatchTwoPoints);
+        tool.OnPoint(new Vec2(0, 0));
+        tool.OnPoint(new Vec2(10, 0));
+        tool.OnPoint(new Vec2(100, 50));
+        tool.OnPoint(new Vec2(100, 70));  // 真上に 20 → 2 倍・左回り 90°
+        var pts = Rect(doc).Points;
+        Assert.True(pts[0].DistanceTo(new Vec2(100, 50)) < 1e-9);
+        Assert.True(pts[1].DistanceTo(new Vec2(100, 70)) < 1e-9);
+        Assert.True(pts[2].DistanceTo(new Vec2(90, 70)) < 1e-9);
+        var (k, rad) = ScaleTool.MatchTransform(new Vec2(0, 0), new Vec2(10, 0), new Vec2(100, 50), new Vec2(100, 70), rotate: true);
+        Assert.Equal(2.0, k, 12);
+        Assert.Equal(Math.PI / 2, rad, 12);
+    });
+
+    [Fact]
+    public void PropertiesPanel_ShowsScaleInput() => RunScale((doc, canvas, tool) =>
+    {
+        var panel = new PropertiesPanel();
+        var win = new System.Windows.Window { Content = panel, Width = 300, Height = 600, Left = -3000, Top = -3000, ShowInTaskbar = false, WindowStyle = System.Windows.WindowStyle.None };
+        win.Show();
+        try
+        {
+            panel.Attach(canvas);
+            panel.Refresh();
+            Assert.NotNull(panel.ScaleFactorBox);          // 倍率を指定: 倍率の欄
+            tool.SetMode(ScaleMode.MatchTwoPoints);
+            panel.Refresh();
+            Assert.Null(panel.ScaleFactorBox);             // 2 点を合わせる: 倍率の欄は無い
+        }
+        finally
+        {
+            win.Close();
+        }
+    });
 }

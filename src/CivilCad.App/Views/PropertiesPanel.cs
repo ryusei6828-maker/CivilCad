@@ -97,6 +97,7 @@ public sealed class PropertiesPanel : UserControl
         canvas.PromptChanged += (_, _) =>
         {
             if (canvas.Tool is Tools.ITextEntryTool te && te.IsWaitingForText != (_entryBox != null)) QueueRefresh();
+            if (canvas.Tool is Tools.ScaleTool) QueueRefresh(); // 拡大縮小の手順 (基点・2 点) の表示を合わせる
         };
         WatchDocument(canvas.Document);
         // シートタブで図面が替わったら、新しい図面の変更を見張る
@@ -145,6 +146,7 @@ public sealed class PropertiesPanel : UserControl
 
         _entryBox = null;
         if (_canvas.Tool is Tools.ITextEntryTool { IsWaitingForText: true } entry) AddTextEntry(entry);
+        if (_canvas.Tool is Tools.ScaleTool scale) AddScaleInput(scale);
 
         var sel = Doc.Entities.Where(_canvas.Selection.Contains).ToList();
         if (sel.Count == 0)
@@ -598,6 +600,68 @@ public sealed class PropertiesPanel : UserControl
     }
 
     // ---- 行の部品 ----
+
+    // ---- 拡大縮小の入力 ----
+
+    /// <summary>今出している拡大縮小の倍率の入力欄 (無ければ null)。</summary>
+    public TextBox? ScaleFactorBox { get; private set; }
+
+    /// <summary>
+    /// 拡大縮小 (SCL) のやり方と数字の入力: 「倍率を指定」なら倍率の欄 (Enter で、基点が決まっていればすぐ、まだなら基点のクリックで拡大縮小)、
+    /// 「2 点を合わせる」なら手順と「向きも合わせる」。
+    /// </summary>
+    private void AddScaleInput(Tools.ScaleTool tool)
+    {
+        ScaleFactorBox = null;
+        AddSection("拡大縮小のやり方");
+        var factor = new RadioButton { Content = "倍率を指定 (基点を中心に何倍か)", GroupName = "scaleMode", Margin = new Thickness(0, 2, 0, 2), IsChecked = Tools.ScaleTool.Mode == Tools.ScaleMode.Factor };
+        var match = new RadioButton { Content = "2 点を合わせる (選んだ図形の 2 点 → 別の図形の 2 点)", GroupName = "scaleMode", Margin = new Thickness(0, 2, 0, 2), IsChecked = Tools.ScaleTool.Mode == Tools.ScaleMode.MatchTwoPoints };
+        factor.Checked += (_, _) => { tool.SetMode(Tools.ScaleMode.Factor); QueueRefresh(); };
+        match.Checked += (_, _) => { tool.SetMode(Tools.ScaleMode.MatchTwoPoints); QueueRefresh(); };
+        _body.Children.Add(factor);
+        _body.Children.Add(match);
+
+        if (Tools.ScaleTool.Mode == Tools.ScaleMode.Factor)
+        {
+            var box = new TextBox
+            {
+                Text = Tools.ScaleTool.FixedFactor is double k ? k.ToString("0.######", CultureInfo.InvariantCulture) : "",
+                FontSize = 14,
+                Padding = new Thickness(3),
+                Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xFB, 0xE6)),
+                ToolTip = "2 = 2 倍、0.5 = 半分。Enter で確定",
+            };
+            void Submit()
+            {
+                if (!double.TryParse(box.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var v)) return;
+                if (tool.SetFactor(v)) Committed?.Invoke(this, EventArgs.Empty);
+            }
+            box.PreviewKeyDown += (_, e) =>
+            {
+                if (e.Key != System.Windows.Input.Key.Enter) return;
+                Submit();
+                e.Handled = true;
+            };
+            AddRow("倍率", box);
+            var apply = new Button { Content = tool.HasBasePoint ? "この倍率で拡大縮小 (Enter)" : "この倍率にする (Enter)", Padding = new Thickness(10, 2, 10, 2), Margin = new Thickness(0, 4, 0, 0), HorizontalAlignment = System.Windows.HorizontalAlignment.Left };
+            apply.Click += (_, _) => Submit();
+            _body.Children.Add(apply);
+            AddNote(tool.HasBasePoint
+                ? "基点を指定しました。倍率を入れて Enter で拡大縮小します。"
+                : "倍率を入れて Enter → 図面で基点 (動かない点) をクリックすると、その倍率で拡大縮小します。基点を先にクリックしてから倍率を入れても同じです。");
+            ScaleFactorBox = box;
+        }
+        else
+        {
+            var rotate = new CheckBox { Content = "向きも合わせる (2 点目の方向へ回転する)", IsChecked = Tools.ScaleTool.RotateToMatch, Margin = new Thickness(0, 4, 0, 0) };
+            rotate.Click += (_, _) => { Tools.ScaleTool.RotateToMatch = rotate.IsChecked == true; _canvas!.RedrawOverlay(); };
+            _body.Children.Add(rotate);
+            string[] steps = ["1. 合わせる元の 1 点目 (選んだ図形の上)", "2. 合わせる元の 2 点目", "3. 合わせ先の 1 点目 (別の図形の上)", "4. 合わせ先の 2 点目"];
+            for (var i = 0; i < steps.Length; i++)
+                _body.Children.Add(new TextBlock { Text = (i < tool.MatchPointCount ? "✓ " : i == tool.MatchPointCount ? "→ " : "　 ") + steps[i], Margin = new Thickness(4, 1, 0, 1), FontWeight = i == tool.MatchPointCount ? FontWeights.Bold : FontWeights.Normal });
+            AddNote("1 点目どうしが重なり、2 点間の長さが合わせ先と同じになるよう拡大縮小します。スナップで図形の端点などを指定してください。");
+        }
+    }
 
     // ---- 文字の入力欄 ----
 
