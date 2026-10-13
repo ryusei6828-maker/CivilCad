@@ -45,17 +45,21 @@ public class WindowLoadTests
                 // レイヤパネルは既定で閉じ、プロパティは開いている
                 Assert.Equal(System.Windows.Visibility.Collapsed, ((System.Windows.FrameworkElement)main.FindName("LayerHost")).Visibility);
                 Assert.Equal(System.Windows.Visibility.Visible, ((System.Windows.FrameworkElement)main.FindName("PropsHost")).Visibility);
-                // ツールバーのタブ: 最初は「描画」で、線・ポリライン・円・円弧・文字が入っている
+                // ツールバーのタブ: 最初は「描画」
                 var tabs = (System.Windows.Controls.TabControl)main.FindName("RibbonTabs");
                 var draw = (System.Windows.Controls.TabItem)tabs.Items[0];
                 Assert.Equal("描画", draw.Header);
                 Assert.Equal(0, tabs.SelectedIndex);
-                Assert.Equal(["L", "PL", "C", "A", "REC", "PO", "PE", "T", "DIM", "LD", "HA", "H", "FI", "PS", "PSR"],
+                Assert.Equal(["L", "PL", "C", "A", "REC", "PO", "PE", "DIM", "H", "FI", "PS", "PSR"],
                     ((System.Windows.Controls.Panel)draw.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
-                // 「修正」タブ: 移動・複写・回転・拡大縮小・2 点指示・オフセット・トリム・延長・文字変更・結合・削除
-                var modify = (System.Windows.Controls.TabItem)tabs.Items[1];
+                // 「文字」タブに文字・文字変更・引き出し線・旗揚げ、「修正」タブに移動〜結合 (削除は左のいつも出すボタン)
+                var text = (System.Windows.Controls.TabItem)tabs.Items[1];
+                Assert.Equal("文字", text.Header);
+                Assert.Equal(["T", "ED", "LD", "HA"],
+                    ((System.Windows.Controls.Panel)text.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
+                var modify = (System.Windows.Controls.TabItem)tabs.Items[2];
                 Assert.Equal("修正", modify.Header);
-                Assert.Equal(["M", "CO", "RO", "SCL", "AL", "O", "TR", "EX", "ED", "J", "E"],
+                Assert.Equal(["M", "CO", "RO", "SCL", "AL", "O", "TR", "EX", "J"],
                     ((System.Windows.Controls.Panel)modify.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
                 Assert.NotNull(settings.Content);
                 Assert.NotNull(frame.Content);
@@ -96,6 +100,7 @@ public class WindowLoadTests
                 run.Invoke(main, ["SEL"]);
                 Assert.IsType<CivilCad.App.Tools.SelectTool>(canvas.Tool);
                 var selButton = ((System.Windows.Controls.Panel)((System.Windows.Controls.DockPanel)main.FindName("RibbonArea")).Children[0]).Children.OfType<System.Windows.Controls.Button>().First();
+                Assert.Equal("E", ((System.Windows.Controls.Panel)((System.Windows.Controls.DockPanel)main.FindName("RibbonArea")).Children[0]).Children.OfType<System.Windows.Controls.Button>().ElementAt(1).Tag);
                 Assert.Equal("SEL", selButton.Tag);
                 typeof(CivilCad.App.MainWindow).GetMethod("UpdateToolbarHighlight", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(main, []);
                 Assert.NotNull(selButton.ReadLocalValue(System.Windows.Controls.Control.BackgroundProperty) as System.Windows.Media.Brush);
