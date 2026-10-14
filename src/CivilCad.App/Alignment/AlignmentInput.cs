@@ -15,12 +15,24 @@ public sealed class IpRow
     public double A2 { get; set; }
 }
 
+/// <summary>通過点 (中心杭・中間杭・主要点) の 1 つ。Point は測量座標から作った図面の座標 (x = 東, y = 北)。</summary>
+public sealed record PassingPoint(string Name, string Kind, double Station, Vec2 Point);
+
 /// <summary>路線計算ダイアログの入力内容 (再表示できるよう保持する)。</summary>
 public sealed class AlignmentInput
 {
     public string Name { get; set; } = "路線1";
     public double StartStation { get; set; }
     public double Pitch { get; set; } = Station.DefaultPitch;
+    /// <summary>中間杭 (プラス杭) の間隔 (m)。0 なら作らない。例: 測点間隔 20m・中間杭 10m → No.1+10.00。</summary>
+    public double SubPitch { get; set; }
+
+    /// <summary>主要点 (BP・BC・EC・KA・KE・EP など) を作図・通過点に含める。</summary>
+    public bool IncludeMainPoints { get; set; } = true;
+
+    /// <summary>通過点を点名付きの点にして座標管理に登録する (タグ: 中心杭・中間杭・主要点)。</summary>
+    public bool RegisterPoints { get; set; }
+
     /// <summary>注記の文字高 (用紙上の mm)。図面の縮尺で m に換算する。</summary>
     public double TextHeightMm { get; set; } = 3.5;
     public ObservableCollection<IpRow> Rows { get; set; } = [];
@@ -51,6 +63,38 @@ public sealed class AlignmentInput
     }
 
     public string Tag => "ALIGN:" + Name;
+
+    public const string KindCenter = "中心杭";
+    public const string KindSub = "中間杭";
+    public const string KindMain = "主要点";
+
+    /// <summary>
+    /// 通過点: 測点間隔ごとの中心杭 (No.N)、中間杭の間隔ごとの中間杭 (No.N+10.00 など)、主要点 (選んでいれば)。
+    /// 追加距離の順に並べ、同じ位置の点は 1 つにする (主要点 → 中心杭 → 中間杭 の順に残す)。
+    /// </summary>
+    public List<PassingPoint> PassingPoints(HorizontalAlignment al)
+    {
+        var list = new List<PassingPoint>();
+        void Add(string name, string kind, double st)
+        {
+            if (st < al.StartStation - 1e-9 || st > al.EndStation + 1e-9) return;
+            list.Add(new PassingPoint(name, kind, st, al.PointAt(st, 0)));
+        }
+        if (IncludeMainPoints)
+            foreach (var m in al.MainPoints) Add(m.Name, KindMain, m.Station);
+        var first = Math.Ceiling((al.StartStation - 1e-9) / Pitch) * Pitch;
+        for (var st = first; st <= al.EndStation + 1e-9; st += Pitch) Add(Station.Format(st, Pitch, 0), KindCenter, st);
+        if (SubPitch > 0 && SubPitch < Pitch)
+        {
+            var s0 = Math.Ceiling((al.StartStation - 1e-9) / SubPitch) * SubPitch;
+            for (var st = s0; st <= al.EndStation + 1e-9; st += SubPitch)
+                if (Math.Abs(st / Pitch - Math.Round(st / Pitch)) > 1e-9) Add(Station.Format(st, Pitch, 2), KindSub, st);
+        }
+        var result = new List<PassingPoint>();
+        foreach (var p in list.OrderBy(p => p.Station).ThenBy(p => p.Kind == KindMain ? 0 : p.Kind == KindCenter ? 1 : 2))
+            if (result.Count == 0 || p.Station - result[^1].Station > 1e-6) result.Add(p);
+        return result;
+    }
 
     public static AlignmentInput Sample() => new()
     {
@@ -99,6 +143,9 @@ public sealed class AlignmentInput
         RightWidths = RightWidths,
         DrawShoulders = DrawShoulders,
         DrawStakes = DrawStakes,
+        SubPitch = SubPitch,
+        IncludeMainPoints = IncludeMainPoints,
+        RegisterPoints = RegisterPoints,
         Rows = [.. Rows.Select(r => new IpRow { Name = r.Name, X = r.X, Y = r.Y, R = r.R, A1 = r.A1, A2 = r.A2 })],
     };
 }

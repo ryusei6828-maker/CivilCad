@@ -102,6 +102,18 @@ public partial class MainWindow : Window
             new Size(360, 520), () => DockablePanel.OwnerPointToScreen(this, new Point(20, 90)));
         _coordDock = new DockablePanel(this, CoordHost, CoordPanel, "座標管理", _settings.CoordinatePanel, open: false,
             new Size(420, 560), () => DockablePanel.OwnerPointToScreen(this, new Point(40, 110)));
+        _routeDock = new DockablePanel(this, RouteHost, RoutePanel, "路線", _settings.RoutePanel, open: false,
+            new Size(600, 720), () => DockablePanel.OwnerPointToScreen(this, new Point(40, 110)));
+        RoutePanel.Attach(Canvas);
+        RoutePanel.Log = Log;
+        RoutePanel.CloseRequested += (_, _) => SetPanelOpen(_routeDock, false);
+        RoutePanel.FloatToggleRequested += (_, _) => SetPanelFloating(_routeDock, !_routeDock.IsFloating);
+        RoutePanel.Drawn += (input, al) =>
+        {
+            // 測点照会 (ST) は作図した路線で行う
+            _alignmentInput = input;
+            _alignment = al;
+        };
         CoordPanel.Attach(Canvas);
         CoordPanel.RunCommand = RunCommand;
         CoordPanel.CloseRequested += (_, _) => SetPanelOpen(_coordDock, false);
@@ -113,7 +125,7 @@ public partial class MainWindow : Window
         };
         PropsPanel.CloseRequested += (_, _) => SetPanelOpen(_propsDock, false);
         PropsPanel.FloatToggleRequested += (_, _) => SetPanelFloating(_propsDock, !_propsDock.IsFloating);
-        foreach (var d in new[] { _propsDock, _layerDock, _coordDock })
+        foreach (var d in new[] { _propsDock, _layerDock, _coordDock, _routeDock })
         {
             d.StateChanged += (_, _) => OnPanelStateChanged();
             d.FloatingKeyDown += Floating_PreviewKeyDown;
@@ -124,6 +136,7 @@ public partial class MainWindow : Window
             _propsDock.Update();
             _layerDock.Update();
             _coordDock.Update();
+            _routeDock.Update();
         };
         Closing += (_, e) =>
         {
@@ -136,7 +149,7 @@ public partial class MainWindow : Window
                 e.Cancel = true;
                 return;
             }
-            _propsDock.ShuttingDown = _layerDock.ShuttingDown = _coordDock.ShuttingDown = true;
+            _propsDock.ShuttingDown = _layerDock.ShuttingDown = _coordDock.ShuttingDown = _routeDock.ShuttingDown = true;
             SaveSettingsQuietly();
         };
         // 本体を閉じたらアプリを終える (隠れているフロートのパネルなどが残ってプロセスが終わらないことがあった)
@@ -147,6 +160,7 @@ public partial class MainWindow : Window
     private readonly DockablePanel _propsDock;
     private readonly DockablePanel _layerDock;
     private readonly DockablePanel _coordDock;
+    private readonly DockablePanel _routeDock;
 
     // ---- コマンド ----
 
@@ -231,7 +245,8 @@ public partial class MainWindow : Window
                 Log($"直交モード {(Canvas.OrthoEnabled ? "オン" : "オフ")}");
                 break;
             case "RC": OpenAlignmentDialog(); break;
-            case "RL": StartTool(new RouteCreateTool(pts => Dispatcher.BeginInvoke(() => CreateRouteFromPoints(pts))), c); break;
+            case "RL": OpenRoutePanel(); break;
+            case "RLF": SetPanelFloating(_routeDock, !_routeDock.IsFloating); break;
             case "RX":
                 if (LandXmlImport.Run(this, _alignmentInput.TextHeightMm) is { } loaded) OpenAlignmentDialog(loaded);
                 break;
@@ -1011,7 +1026,7 @@ public partial class MainWindow : Window
     {
         panel.SetFloating(floating);
         SaveSettingsQuietly();
-        var name = panel == _layerDock ? "レイヤパネル" : panel == _coordDock ? "座標管理" : "プロパティ";
+        var name = panel == _layerDock ? "レイヤパネル" : panel == _coordDock ? "座標管理" : panel == _routeDock ? "路線パネル" : "プロパティ";
         var side = panel == _propsDock ? "右側" : "左側";
         Log(floating ? $"{name}を別ウィンドウにしました (⇲ で{side}に戻せます)。" : $"{name}を{side}に戻しました。");
     }
@@ -1023,6 +1038,7 @@ public partial class MainWindow : Window
         "PR" => _propsDock.IsOpen,
         "PRF" => _propsDock.IsFloating,
         "CM" => _coordDock.IsOpen,
+        "RL" => _routeDock.IsOpen,
         _ => false,
     };
 
@@ -1035,6 +1051,8 @@ public partial class MainWindow : Window
         LayerFloatButton.ToolTip = _layerDock.IsFloating ? "ドッキング (メイン画面の左側に戻す)" : "フロート (別ウィンドウに切り離す)";
         CoordPanel.Width = _coordDock.IsFloating ? double.NaN : 380;
         CoordPanel.FloatButton.Content = _coordDock.IsFloating ? "⇲" : "⧉";
+        RoutePanel.Width = _routeDock.IsFloating ? double.NaN : 560;
+        RoutePanel.FloatButton.Content = _routeDock.IsFloating ? "⇲" : "⧉";
         UpdatePanelIndicators();
     }
 
@@ -1255,6 +1273,16 @@ public partial class MainWindow : Window
 
     /// <summary>路線計算ダイアログ。input を渡すとその内容 (XML から読んだ路線など) で開く。</summary>
     /// <summary>路線作成 (RL) でクリックした点を IP 表にして、路線計算の窓を開く (R・A・幅を入れて作図)。</summary>
+    /// <summary>路線作成: 路線パネルを開き、リボンの「路線」タブにする。表が空で、前に作った路線があればそれを入れておく。</summary>
+    private void OpenRoutePanel()
+    {
+        if (!_routeDock.IsOpen) SetPanelOpen(_routeDock, true);
+        foreach (var t in RibbonTabs.Items.OfType<TabItem>())
+            if ((string)t.Header == "路線") RibbonTabs.SelectedItem = t;
+        if (RoutePanel.Rows.All(r => r.IsEmpty) && _alignment != null) RoutePanel.Load(_alignmentInput);
+        Log("路線: 左の路線パネルで 始点 → IP → 終点 を入れ (「図面から追加」でクリック、手入力、Excel から Ctrl+V)、「計算」→ 通過点を選んで「作図」。");
+    }
+
     private void CreateRouteFromPoints(List<Vec2> points)
     {
         var input = RouteFromPoints(_doc, points, _alignmentInput);

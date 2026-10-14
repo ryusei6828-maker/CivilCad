@@ -76,8 +76,27 @@ public static class AlignmentDrawer
             list.Add(PlaceText(stationLayer, al.PointAt(st, -h * 1.5), dir.LeftNormal, Station.Format(st, input.Pitch, 0), h));
         }
 
+        // 中間杭 (プラス杭): 短い線と小さめの「+10.00」
+        if (input.SubPitch > 0 && input.SubPitch < input.Pitch)
+        {
+            var s0 = Math.Ceiling((al.StartStation - 1e-9) / input.SubPitch) * input.SubPitch;
+            for (var st = s0; st <= al.EndStation + 1e-9; st += input.SubPitch)
+            {
+                if (Math.Abs(st / input.Pitch - Math.Round(st / input.Pitch)) < 1e-9) continue; // 中心杭と重なる
+                list.Add(new LineEntity(stationLayer, al.PointAt(st, -h * 0.6), al.PointAt(st, h * 0.6)));
+                var dir = Vec2.FromAngle(al.Evaluate(st).Direction);
+                var label = Station.Format(st, input.Pitch, 2);
+                list.Add(PlaceText(stationLayer, al.PointAt(st, -h * 1.0), dir.LeftNormal, label[label.IndexOf('+')..], h * 0.7));
+            }
+        }
+
+        // 通過点を座標管理に登録 (点名付きの点)
+        if (input.RegisterPoints)
+            foreach (var pp in input.PassingPoints(al))
+                list.Add(new PointEntity(stationLayer, pp.Point) { Name = $"{input.Name} {pp.Name}", Tags = pp.Kind });
+
         // 主要点 (中心線の右側に表示)
-        foreach (var m in al.MainPoints)
+        foreach (var m in input.IncludeMainPoints ? al.MainPoints : [])
         {
             var right = -Vec2.FromAngle(m.Direction).LeftNormal;
             list.Add(new CircleEntity(mainLayer, m.Point, h * 0.3));
