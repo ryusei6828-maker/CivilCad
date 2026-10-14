@@ -95,7 +95,10 @@ public abstract class CadTool
 
     public virtual void DrawPreview(DrawingContext dc) { }
 
-    protected void Finish() => Canvas.SetTool(new SelectTool());
+    /// <summary>コマンドを終えたときに戻るツール (画像コマンドの中の操作など)。null なら選択に戻る。</summary>
+    public Func<CadTool>? ReturnTo { get; set; }
+
+    protected void Finish() => Canvas.SetTool(ReturnTo?.Invoke() ?? new SelectTool());
 
     protected void SetPrompt(string prompt)
     {

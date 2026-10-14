@@ -32,6 +32,7 @@ public static class CommandRegistry
         new("CEX", "座標を CSV に書き出す", "IconSave", "座標管理の一覧で選んでいれば選んだ点だけ"),
         new("SEX", "座標を SIMA に書き出す", "IconSave", "座標管理の一覧で選んでいれば選んだ点だけ"),
         new("PI", "座標読込 (SIMA / CSV)", "IconPoints", "座標ファイルの点を、点の印と点名で図面に配置"),
+        new("IMG", "画像 (読込・トリミング・2点位置合わせ)", "IconImage", "画像をクリックして選び、バーのボタン (I: 読込 / C: トリミング / A: 2点位置合わせ / R: トリミング解除) で操作。終えると画像コマンドに戻る"),
         new("IM", "画像読込 (JPG / PNG / TIFF / PDF)", "IconImage", "ワールドファイル (.jgw/.tfw など) があればその位置に、無ければ位置と幅を指定して配置。PDF は Enter で原寸"),
         new("IC", "画像のトリミング", "IconCrop", "画像を選んで (またはクリックして)、残す範囲の対角の 2 点を指定。R でトリミングを解除"),
         new("DF", "最前面へ", "IconBringFront", "選択した図形を一番上に表示。画像は線・文字より上になる"),

@@ -99,6 +99,12 @@ public sealed class DrawInputBar : Border
         _panel.Children.Clear();
         _fields.Clear();
         var tool = _canvas?.Tool;
+        if (tool?.CommandCode == ImageTool.Code && _canvas != null)
+        {
+            Visibility = Visibility.Visible;
+            BuildImageBar(tool);
+            return;
+        }
         if (tool is not IStyledDrawTool || _doc is not { } doc)
         {
             Visibility = Visibility.Collapsed;
@@ -295,6 +301,64 @@ public sealed class DrawInputBar : Border
     {
         if (text.Length > 0)
             _guide.Children.Add(new TextBlock { Text = text, Foreground = GuideBrush, FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
+    }
+
+    // ---- 画像コマンド ----
+
+    private static readonly Brush ModeOnBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x0E, 0x63, 0x9C)));
+    private static readonly Brush ModeOffBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x3C, 0x3C, 0x44)));
+
+    /// <summary>画像コマンドのバー: 読込・トリミング・2点位置合わせ・トリミング解除のボタン (今の操作を強調)。</summary>
+    private void BuildImageBar(CadTool tool)
+    {
+        var canvas = _canvas!;
+        _guide.Children.Clear();
+        _panel.Children.Add(new TextBlock
+        {
+            Text = "画像",
+            Foreground = Brushes.White,
+            FontWeight = FontWeights.Bold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 12, 0),
+        });
+        AddModeButton("読込…", "I", tool is ImagePlaceTool, () => ImageTool.Start(canvas, ImageMode.Load),
+            "画像・PDF (JPG / PNG / TIFF / BMP / GIF / PDF) を開いて配置する。ワールドファイルがあればその位置に置く");
+        AddModeButton("トリミング", "C", tool is ImageCropTool, () => ImageTool.Start(canvas, ImageMode.Crop),
+            "選んだ画像 (またはクリックした画像) の、残す範囲の対角の 2 点を指定");
+        AddModeButton("2点位置合わせ", "A", tool is AlignTool, () => ImageTool.Start(canvas, ImageMode.Align),
+            "選んだ画像の上の 2 点を、図面上の 2 点に合わせる (移動・回転・大きさ)");
+        AddModeButton("トリミング解除", "R", false, () => ImageTool.ResetCrop(canvas), "選んだ画像を全体の表示に戻す");
+        if (tool is AlignTool)
+        {
+            AddSeparator();
+            AddCheck("大きさも合わせる", AlignTool.ScaleToFit, v => { AlignTool.ScaleToFit = v; canvas.Tool.RefreshPrompt(); },
+                "オンなら 2 点間の長さも合わせる (拡大縮小)。オフなら回転と移動だけ");
+        }
+        AddGuideText(tool is ImageTool
+            ? "画像をクリックして選ぶ → ボタンか I / C / A / R を入力。Esc で画像コマンドを終える"
+            : "Esc でこの操作をやめて画像コマンドに戻る。操作を終えても画像コマンドに戻る");
+    }
+
+    private void AddModeButton(string label, string key, bool active, Action run, string tip)
+    {
+        var b = new Button
+        {
+            Content = $"{label} ({key})",
+            Foreground = Brushes.White,
+            Background = active ? ModeOnBrush : ModeOffBrush,
+            BorderBrush = KeyCapBorder,
+            Padding = new Thickness(10, 2, 10, 2),
+            Margin = new Thickness(0, 0, 6, 0),
+            Focusable = false,
+            ToolTip = tip,
+            FontWeight = active ? FontWeights.Bold : FontWeights.Normal,
+        };
+        b.Click += (_, _) =>
+        {
+            run();
+            Committed?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.Children.Add(b);
     }
 
     // ---- 部品 ----

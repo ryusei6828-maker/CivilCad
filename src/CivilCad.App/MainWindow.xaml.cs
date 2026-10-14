@@ -105,6 +105,7 @@ public partial class MainWindow : Window
         _routeDock = new DockablePanel(this, RouteHost, RoutePanel, "路線", _settings.RoutePanel, open: false,
             new Size(600, 720), () => DockablePanel.OwnerPointToScreen(this, new Point(40, 110)));
         RoutePanel.Attach(Canvas);
+        ImageTool.LoadRequested = ImportImage;
         RoutePanel.Log = Log;
         RoutePanel.CloseRequested += (_, _) => SetPanelOpen(_routeDock, false);
         RoutePanel.FloatToggleRequested += (_, _) => SetPanelFloating(_routeDock, !_routeDock.IsFloating);
@@ -192,7 +193,11 @@ public partial class MainWindow : Window
             case "J": JoinSelection(); break;
             case "H": StartTool(new HatchTool(), c); break;
             case "PI": ImportPoints(); break;
-            case "IM": ImportImage(); break;
+            case "IMG" or "画像": StartTool(new ImageTool(), ImageTool.Code); break;
+            case "IM":
+                StartTool(new ImageTool(), ImageTool.Code);
+                ImportImage();
+                break;
             case "PDF": PrintPdf(); break;
             case "M": StartTool(new MoveCopyTool(copy: false), c); break;
             case "SCL": StartTool(new ScaleTool(), c); break;
@@ -201,7 +206,10 @@ public partial class MainWindow : Window
                 Canvas.SetTool(new SelectTool());
                 Log("選択モード: クリックで 1 つ選択、ドラッグで範囲選択、Shift+クリックで追加・解除。");
                 break;
-            case "IC": StartTool(new ImageCropTool(), c); break;
+            case "IC":
+                StartTool(new ImageTool(), ImageTool.Code);
+                ImageTool.Start(Canvas, ImageMode.Crop);
+                break;
             case "DF" or "DB":
                 if (Canvas.Selection.Count == 0) { Log("先に図形を選択してください。"); break; }
                 _doc.History.Execute(new DrawOrderCommand([.. Canvas.Selection], toFront: c == "DF"));
@@ -1224,12 +1232,15 @@ public partial class MainWindow : Window
         if (info.Placement is not { } pl)
         {
             Log($"画像「{Path.GetFileName(path)}」({info.PixelWidth}×{info.PixelHeight}) には位置情報 (ワールドファイル) がありません。配置する位置を指定してください。" +
-                "置いた後に 2 点指示 (AL) で、画像の上の 2 点を図面の 2 点に合わせられます。");
-            StartTool(new ImagePlaceTool(path, info.PixelWidth, info.PixelHeight), "IM");
+                "置いた後に「2点位置合わせ」で、画像の上の 2 点を図面の 2 点に合わせられます。");
+            ImageTool.Run(Canvas, new ImagePlaceTool(path, info.PixelWidth, info.PixelHeight));
+            CommandBox.Focus();
             return;
         }
         var img = new ImageEntity(_doc.CurrentLayer, path, info.PixelWidth, info.PixelHeight, pl.Origin, pl.U, pl.V);
         _doc.History.Execute(new AddEntitiesCommand([img], "画像読込"));
+        Canvas.SetSelection([img]);
+        Canvas.SetTool(ImageTool.Hub()); // 続けてトリミング・位置合わせができる
         if (!Canvas.VisibleWorldBox.Contains(img.Bounds))
             Canvas.ZoomTo(img.Bounds.Inflate(Math.Max(img.Bounds.Width, img.Bounds.Height) * 0.05));
         Log($"画像読込: {Path.GetFileName(path)} ({info.PixelWidth}×{info.PixelHeight}) を {info.PlacementSource} の位置に配置しました " +
@@ -1265,8 +1276,9 @@ public partial class MainWindow : Window
         ImageCache.Forget(path);
         var (w, h) = PdfRenderer.PixelSize(page);
         Log($"PDF「{Path.GetFileName(path)}」{page.Label} を読み込みます。左下の位置と幅を指定してください (Enter で原寸 = {_doc.ScaleText} で用紙の大きさ)。" +
-            "置いた後に 2 点指示 (AL) で、PDF の上の 2 点を図面の 2 点に合わせられます。");
-        StartTool(new ImagePlaceTool(path, w, h, page.Index, page.WidthMm), "IM");
+            "置いた後に「2点位置合わせ」で、PDF の上の 2 点を図面の 2 点に合わせられます。");
+        ImageTool.Run(Canvas, new ImagePlaceTool(path, w, h, page.Index, page.WidthMm));
+        CommandBox.Focus();
     }
 
     // ---- 路線 ----

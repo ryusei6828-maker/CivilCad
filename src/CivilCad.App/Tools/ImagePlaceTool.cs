@@ -79,6 +79,7 @@ public sealed class ImagePlaceTool(string path, int pixelWidth, int pixelHeight,
     {
         var img = Make(bottom);
         Execute(new AddEntitiesCommand([img], "画像の配置"));
+        Canvas.SetSelection([img]);
         Canvas.ShowMessage($"{(paperWidthMm != null ? $"PDF {page + 1} ページ" : "画像")}「{Path.GetFileName(path)}」を配置しました (幅 {img.Width:0.###}m × 高さ {img.Height:0.###}m)。");
         Finish();
     }

@@ -132,6 +132,54 @@ public class ImageOrderCropTests
     });
 
     [Fact]
+    public void ImageCommand_SelectCropAlignReset_ReturnsToImageCommand() => RunSta((doc, canvas) =>
+    {
+        var img = Image(doc.CurrentLayer);
+        doc.Entities.Add(img);
+        canvas.SetTool(ImageTool.Hub());
+        var loads = 0;
+        ImageTool.LoadRequested = () => loads++;
+        try
+        {
+            // 画像をクリックして選ぶ
+            canvas.Tool.OnPoint(new Vec2(1, 0.4));
+            Assert.Equal([img], canvas.Selection);
+
+            // C: トリミング → 終えると画像コマンドに戻り、トリミングした画像が選ばれている
+            Assert.True(canvas.Tool.OnText("c"));
+            Assert.IsType<ImageCropTool>(canvas.Tool);
+            Assert.Equal(ImageTool.Code, canvas.Tool.CommandCode);
+            canvas.Tool.OnPoint(new Vec2(1, 0.5));
+            canvas.Tool.OnPoint(new Vec2(3, 2));
+            Assert.IsType<ImageTool>(canvas.Tool);
+            var cropped = Assert.Single(doc.Entities.OfType<ImageEntity>());
+            Assert.True(cropped.IsCropped);
+            Assert.Equal([cropped], canvas.Selection);
+
+            // A: 2点位置合わせ (東へ 10m 動かす) → Esc で画像コマンドに戻る
+            Assert.True(canvas.Tool.OnText("A"));
+            Assert.IsType<AlignTool>(canvas.Tool);
+            foreach (var p in new[] { new Vec2(1, 0.5), new Vec2(11, 0.5), new Vec2(3, 0.5), new Vec2(13, 0.5) }) canvas.Tool.OnPoint(p);
+            canvas.Tool.OnCancel();
+            Assert.IsType<ImageTool>(canvas.Tool);
+            var moved = Assert.Single(doc.Entities.OfType<ImageEntity>());
+            Assert.Equal(11, moved.Bounds.Min.X, 9);
+
+            // R: トリミング解除、I: 読込 (ファイルの窓は MainWindow)
+            Assert.True(canvas.Tool.OnText("r"));
+            Assert.False(Assert.Single(doc.Entities.OfType<ImageEntity>()).IsCropped);
+            Assert.IsType<ImageTool>(canvas.Tool);
+            Assert.True(canvas.Tool.OnText("i"));
+            Assert.Equal(1, loads);
+
+            // Esc で画像コマンドを終える
+            canvas.Tool.OnCancel();
+            Assert.IsType<SelectTool>(canvas.Tool);
+        }
+        finally { ImageTool.LoadRequested = null; }
+    });
+
+    [Fact]
     public void Dxf_KeepsCropAndFront()
     {
         var png = MakePng();
