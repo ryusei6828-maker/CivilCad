@@ -131,6 +131,19 @@ public class WindowLoadTests
                 Assert.Equal(System.Windows.Visibility.Collapsed, propsHost.Visibility); // 線では開かない
                 canvas.SetSelection([label]);
                 Assert.Equal(System.Windows.Visibility.Visible, propsHost.Visibility);
+                // コピーして新しいシートに貼り付け: 同じ位置に入り、選択される
+                canvas.SetSelection([line]);
+                run.Invoke(main, ["CB"]);
+                var firstDoc = canvas.Document;
+                typeof(CivilCad.App.MainWindow).GetMethod("New_Executed", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(main, [main, null]);
+                Assert.NotSame(firstDoc, canvas.Document);
+                run.Invoke(main, ["PA"]);
+                var pastedLine = Assert.IsType<CivilCad.Core.Model.LineEntity>(Assert.Single(canvas.Document.Entities));
+                Assert.Equal(line.Start, pastedLine.Start);
+                Assert.Equal([pastedLine], canvas.Selection);
+                CivilCad.App.Tools.EntityClipboard.Clear();
+                foreach (var s in (System.Collections.IEnumerable)typeof(CivilCad.App.MainWindow).GetField("_sheets", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(main)!)
+                    s.GetType().GetMethod("MarkSaved")!.Invoke(s, null);
                 // 「座標管理」タブを開くと座標の一覧も開く
                 var coordHost = (System.Windows.FrameworkElement)main.FindName("CoordHost");
                 Assert.Equal(System.Windows.Visibility.Collapsed, coordHost.Visibility);

@@ -83,6 +83,11 @@
                 <MenuItem Header="延長 (EX)" Tag="EX" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconExtend}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="結合 (J)" Tag="J" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconJoin}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
+                <MenuItem Header="コピー (Ctrl+C)" Tag="CB" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCopy}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="切り取り (Ctrl+X)" Tag="CUT" Click="Tool_Click"/>
+                <MenuItem Header="貼り付け 同じ位置 (Ctrl+V)" Tag="PA" Click="Tool_Click"/>
+                <MenuItem Header="貼り付け 位置を指定 (Ctrl+Shift+V)" Tag="PAP" Click="Tool_Click"/>
+                <Separator/>
                 <MenuItem Header="削除モード (E)" Tag="E" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconErase}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
             <MenuItem Header="表示(_V)">

@@ -191,6 +191,13 @@ public partial class MainWindow : Window
                               : "北に合わせる方位記号がありません (手動にした方位記号は無く、方位記号も選択されていません)。");
                 break;
             case "J": JoinSelection(); break;
+            case "CB": CopySelection(cut: false); break;
+            case "CUT": CopySelection(cut: true); break;
+            case "PA": PasteInPlace(); break;
+            case "PAP":
+                if (!EntityClipboard.HasContent) { Log("貼り付け: コピーした図形がありません (先に図形を選んで Ctrl+C)。"); break; }
+                StartTool(new PasteTool(), c);
+                break;
             case "H": StartTool(new HatchTool(), c); break;
             case "PI": ImportPoints(); break;
             case "IMG" or "画像": StartTool(new ImageTool(), ImageTool.Code); break;
@@ -341,6 +348,11 @@ public partial class MainWindow : Window
             Item("2 点指示 (位置合わせ)", () => RunCommand("AL"), hasSel, "AL");
             Item("削除", DeleteSelection, hasSel, "Delete");
             menu.Items.Add(new Separator());
+            Item("コピー", () => CopySelection(cut: false), hasSel, "Ctrl+C");
+            Item("切り取り", () => CopySelection(cut: true), hasSel, "Ctrl+X");
+            Item("貼り付け (同じ位置)", PasteInPlace, EntityClipboard.HasContent, "Ctrl+V");
+            Item("貼り付け (位置を指定)", () => RunCommand("PAP"), EntityClipboard.HasContent, "Ctrl+Shift+V");
+            menu.Items.Add(new Separator());
             Item("最前面へ (画像は線・文字より上)", () => RunCommand("DF"), hasSel, "DF");
             Item("最背面へ (画像は一番下)", () => RunCommand("DB"), hasSel, "DB");
             if (Canvas.Selection.Count == 1 && Canvas.Selection.First() is ImageEntity)
@@ -424,6 +436,14 @@ public partial class MainWindow : Window
         Canvas.RedrawOverlay();
     }
 
+    /// <summary>Ctrl+C / X / V を図形のコピー・貼り付けにしてよいか (コマンド欄が空、または作図領域・ツールバーにフォーカスがある)。</summary>
+    private bool CanvasHasClipboardFocus() => Keyboard.FocusedElement switch
+    {
+        TextBox box when box == CommandBox => box.Text.Length == 0,
+        System.Windows.Controls.Primitives.TextBoxBase or ComboBox or DataGridCell or DataGrid or ComboBoxItem => false,
+        _ => !InputBar.IsKeyboardFocusWithin,
+    };
+
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         // Ctrl+Tab / Ctrl+Shift+Tab でシート切り替え
@@ -455,6 +475,20 @@ public partial class MainWindow : Window
         // 設定で割り当てたショートカット (F3 スナップ / F8 直交 もここ)
         if (TryRunShortcut(e))
         {
+            e.Handled = true;
+            return;
+        }
+
+        // Ctrl+C コピー / Ctrl+X 切り取り / Ctrl+V 同じ位置に貼り付け / Ctrl+Shift+V 位置を指定して貼り付け
+        // (文字の入力欄・座標の一覧の中では、そちらのコピー・貼り付けにする)
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)
+            && e.Key is Key.C or Key.X or Key.V && CanvasHasClipboardFocus())
+        {
+            var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+            if (e.Key == Key.V) RunCommand(shift ? "PAP" : "PA");
+            else if (!shift) CopySelection(cut: e.Key == Key.X);
+            else return;
+            Canvas.RedrawOverlay();
             e.Handled = true;
             return;
         }
@@ -528,6 +562,39 @@ public partial class MainWindow : Window
     }
 
     private void Delete_Click(object sender, RoutedEventArgs e) => DeleteSelection();
+
+    /// <summary>コピー (Ctrl+C) / 切り取り (Ctrl+X): 選択した図形を覚える。別のシートにも貼り付けられる。</summary>
+    private void CopySelection(bool cut)
+    {
+        if (Canvas.Selection.Count == 0)
+        {
+            Log(cut ? "切り取り: 先に図形を選択してください。" : "コピー: 先に図形を選択してください。");
+            return;
+        }
+        var items = Canvas.Selection.ToList();
+        EntityClipboard.Copy(_doc, items);
+        if (cut)
+        {
+            _doc.History.Execute(new RemoveEntitiesCommand(items, "切り取り"));
+            Canvas.ClearSelection();
+        }
+        Log($"{items.Count} 個を{(cut ? "切り取りました" : "コピーしました")}。Ctrl+V で同じ位置に、Ctrl+Shift+V で位置を指定して貼り付け (別のシートにも貼り付けられます)。");
+    }
+
+    /// <summary>貼り付け (Ctrl+V): コピーした図形を同じ位置 (同じ座標) に貼り付けて選択する。</summary>
+    private void PasteInPlace()
+    {
+        if (!EntityClipboard.HasContent)
+        {
+            Log("貼り付け: コピーした図形がありません (先に図形を選んで Ctrl+C)。");
+            return;
+        }
+        var pasted = EntityClipboard.CreateFor(_doc);
+        if (Canvas.Tool is not SelectTool) Canvas.SetTool(new SelectTool());
+        _doc.History.Execute(new AddEntitiesCommand(pasted, "貼り付け"));
+        Canvas.SetSelection(pasted);
+        Log($"{pasted.Count} 個を同じ位置に貼り付けました (選択中: そのまま移動 M などができます)。");
+    }
 
     // ---- ファイル・編集 ----
 
