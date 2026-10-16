@@ -7,6 +7,7 @@ using System.Windows.Media;
 using CivilCad.Alignment;
 using HorizontalAlignment = CivilCad.Alignment.HorizontalAlignment;
 using CivilCad.App.Alignment;
+using CivilCad.App.Sections;
 using CivilCad.App.Drawing;
 using CivilCad.App.IO;
 using CivilCad.App.Settings;
@@ -266,6 +267,7 @@ public partial class MainWindow : Window
             case "RX":
                 if (LandXmlImport.Run(this, _alignmentInput.TextHeightMm) is { } loaded) OpenAlignmentDialog(loaded);
                 break;
+            case "VX": ImportRouteSections(null, askScales: true); break;
             case "FR": OpenFrameDialog(); break;
             case "SC": OpenScaleDialog(); break;
             case "ZN": OpenZoneDialog(); break;
@@ -612,12 +614,17 @@ public partial class MainWindow : Window
             Filter = DrawingFiles.OpenFilter,
         };
         if (dlg.ShowDialog(this) != true) return;
+        OpenDrawingFile(dlg.FileName);
+    }
 
+    /// <summary>図面ファイルを開く (空のシートならそこに、そうでなければ新しいタブに)。</summary>
+    private void OpenDrawingFile(string fileName)
+    {
         // 同じファイルが開いていればそのタブへ
-        if (_sheets.FirstOrDefault(s => string.Equals(s.FilePath, dlg.FileName, StringComparison.OrdinalIgnoreCase)) is { } opened)
+        if (_sheets.FirstOrDefault(s => string.Equals(s.FilePath, fileName, StringComparison.OrdinalIgnoreCase)) is { } opened)
         {
             ActivateSheet(opened);
-            Log($"既に開いています: {dlg.FileName}");
+            Log($"既に開いています: {fileName}");
             return;
         }
 
@@ -628,15 +635,15 @@ public partial class MainWindow : Window
         ActivateSheet(created ? AddSheet() : _active);
         try
         {
-            var loaded = DrawingFiles.Open(_doc, dlg.FileName);
+            var loaded = DrawingFiles.Open(_doc, fileName);
             var note = loaded.Note;
             // 図面の縮尺 (と DXF / DWG の座標の単位) を選んでもらう
             var extents = _doc.Entities.Where(_doc.IsVisible).Aggregate(Box2.Empty, (acc, x) => acc.Union(x.Bounds));
-            if (ImportScaleWindow.Ask(this, dlg.FileName, loaded, extents.IsEmpty ? null : extents, sheetScale) is not var (scale, unit))
+            if (ImportScaleWindow.Ask(this, fileName, loaded, extents.IsEmpty ? null : extents, sheetScale) is not var (scale, unit))
             {
                 if (created) RemoveSheet(_active, previous);
                 else _doc.Clear();
-                Log($"読み込みをやめました: {dlg.FileName}");
+                Log($"読み込みをやめました: {fileName}");
                 return;
             }
             var (factor, sheet) = DrawingFiles.ApplyImportScale(_doc, loaded, scale, unit);
@@ -646,11 +653,11 @@ public partial class MainWindow : Window
                 _doc.PlaneZone = defZone;
                 note += $"  座標系は既定の {PlaneRectangular.Find(defZone)!.Name}にしました。";
             }
-            _filePath = dlg.FileName;
+            _filePath = fileName;
             _alignment = null;
             _active.MarkSaved();
             Canvas.SetTool(new SelectTool());
-            Log($"読み込みました: {dlg.FileName} ({_doc.Entities.Count} 図形, {_doc.Layers.Count} レイヤ)" + note);
+            Log($"読み込みました: {fileName} ({_doc.Entities.Count} 図形, {_doc.Layers.Count} レイヤ)" + note);
             ZoomAfterOpen(sheet);
             OnActiveSheetInfoChanged();
         }
@@ -715,6 +722,138 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(this, ex.Message, "印刷エラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    // ---- 外から渡されたファイル・縦横断図 ----
+
+    /// <summary>
+    /// 起動時の引数や、ほかの CivilCad・CivilCadPoint から渡されたファイルを開く。
+    /// 「--sections ファイル」は LandXML の縦断・横断から縦横断図を作る。そのほかは図面ファイルとして開く。
+    /// </summary>
+    public void OpenFromArgs(string[] args)
+    {
+        // 窓を前に出す (最小化していれば戻す)
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        Topmost = true;
+        Topmost = false;
+
+        for (var i = 0; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (a.Equals("--sections", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                ImportRouteSections(args[++i], askScales: false);
+                continue;
+            }
+            if (a.StartsWith("--", StringComparison.Ordinal)) continue;
+            if (!File.Exists(a))
+            {
+                Log($"ファイルがありません: {a}");
+                continue;
+            }
+            if (Path.GetExtension(a).Equals(".xml", StringComparison.OrdinalIgnoreCase)) ImportRouteSections(a, askScales: true);
+            else OpenDrawingFile(a);
+        }
+    }
+
+    /// <summary>
+    /// LandXML の縦断 (地盤線 ProfSurf・計画縦断 ProfAlign) と横断 (CrossSects) から、縦断図・横断図を新しいシートに作る。
+    /// path が null ならファイルを選ばせる。askScales = false なら前に使った縮尺のまま作る (CivilCadPoint から開いたとき)。
+    /// </summary>
+    private void ImportRouteSections(string? path, bool askScales)
+    {
+        if (path == null)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "縦断・横断の入った LandXML を開く",
+                Filter = "LandXML (*.xml)|*.xml|すべてのファイル (*.*)|*.*",
+            };
+            if (dlg.ShowDialog(this) != true) return;
+            path = dlg.FileName;
+        }
+
+        List<RouteSections> routes;
+        try { routes = LandXmlSectionReader.Read(path).Where(r => !r.IsEmpty).ToList(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Xml.XmlException or AlignmentException)
+        {
+            MessageBox.Show(this, $"{Path.GetFileName(path)} を読み込めませんでした。\n{ex.Message}", "縦横断図", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (routes.Count == 0)
+        {
+            MessageBox.Show(this, $"{Path.GetFileName(path)} には縦断 (ProfSurf・ProfAlign) も横断 (CrossSects) もありません。", "縦横断図",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var route = routes[0];
+        if (routes.Count > 1)
+        {
+            var index = LandXmlImport.Pick(this, "このファイルには縦断・横断のある路線が複数あります。縦横断図を作る路線を選んでください。",
+                routes.Select(r => $"{r.Name}    (横断 {r.Sections.Count} 測点)").ToList());
+            if (index < 0) return;
+            route = routes[index];
+        }
+
+        var hasProfile = route.GroundProfiles.Count > 0 || route.Design != null;
+        var hasSections = route.Sections.Any(s => s.Lines.Count > 0);
+        var scales = SectionScaleWindow.Last;
+        if (askScales)
+        {
+            var w = new SectionScaleWindow(route.Name, hasProfile, hasSections) { Owner = this };
+            if (w.ShowDialog() != true || w.Result is not { } picked) return;
+            scales = picked;
+        }
+
+        Sheet? first = null;
+        try
+        {
+            if (hasProfile)
+            {
+                var sheet = NewSheetForDrawing($"縦断図_{route.Name}");
+                SectionDrawing.DrawProfile(sheet.Doc, route, scales);
+                FinishDrawnSheet(sheet);
+                first ??= sheet;
+            }
+            if (hasSections)
+            {
+                var sheet = NewSheetForDrawing($"横断図_{route.Name}");
+                var n = SectionDrawing.DrawSections(sheet.Doc, route, scales);
+                FinishDrawnSheet(sheet);
+                first ??= sheet;
+                Log($"横断図: {n} 測点を 1:{scales.Section:0} で並べました。");
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            MessageBox.Show(this, ex.Message, "縦横断図", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        if (first == null) return;
+        ActivateSheet(first);
+        Canvas.ZoomExtents();
+        Log($"縦横断図を作りました: {route.Name} ({Path.GetFileName(path)})" +
+            (hasProfile ? $"  縦断図 H=1:{scales.ProfileHorizontal:0} V=1:{scales.ProfileVertical:0}" : "") +
+            (route.GroundProfiles.Count > 0 ? $"  地盤線: {string.Join("・", route.GroundProfiles.Select(g => g.Name))}" : "") +
+            (route.Design != null ? "  計画縦断あり" : ""));
+    }
+
+    /// <summary>図を描くための新しいシート (いまのシートが空ならそれを使う)。座標系は付けない (図面の座標は図の上の位置)。</summary>
+    private Sheet NewSheetForDrawing(string name)
+    {
+        var sheet = _active.IsBlank ? _active : AddSheet();
+        sheet.DisplayName = name;
+        sheet.Doc.PlaneZone = null;
+        return sheet;
+    }
+
+    /// <summary>描き終えたシート: 元に戻す履歴を空にして「保存済み」にしない (新しい図なので保存をうながす)。</summary>
+    private void FinishDrawnSheet(Sheet sheet)
+    {
+        sheet.Doc.History.Clear();
+        sheet.MarkUnsaved();
+        sheet.Doc.NotifyChanged();
+        if (sheet == _active) OnActiveSheetInfoChanged();
     }
 
     // ---- シートタブ ----

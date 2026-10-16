@@ -15,8 +15,21 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        // 開くファイルを渡されて起動したとき、すでに CivilCad が開いていればそちらで開いて終わる
+        if (e.Args.Length > 0 && SingleInstance.TrySend(e.Args))
+        {
+            Shutdown();
+            return;
+        }
         DispatcherUnhandledException += OnUnhandledException;
         Settings.UserPresetStore.Load(); // 登録したプリセット
+
+        var main = new MainWindow();
+        MainWindow = main;
+        main.Show();
+        if (e.Args.Length > 0) main.Dispatcher.BeginInvoke(() => main.OpenFromArgs(e.Args), DispatcherPriority.ApplicationIdle);
+        // ほかから渡されたファイル (CivilCadPoint の「CivilCad で開く」など) をこの窓で開く
+        SingleInstance.StartServer(args => main.Dispatcher.BeginInvoke(() => main.OpenFromArgs(args)));
     }
 
     /// <summary>

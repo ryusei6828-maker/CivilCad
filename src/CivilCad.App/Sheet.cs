@@ -49,7 +49,10 @@ public sealed class Sheet : INotifyPropertyChanged
         }
     }
 
-    public string FileName => FilePath != null ? Path.GetFileName(FilePath) : $"無題{UntitledNumber}";
+    public string FileName => FilePath != null ? Path.GetFileName(FilePath) : DisplayName ?? $"無題{UntitledNumber}";
+
+    /// <summary>まだ保存していないシートの名前 (縦断図など、作ったときに付ける)。null なら「無題N」。</summary>
+    public string? DisplayName { get; set; }
 
     /// <summary>タブの見出し (未保存の変更があれば *)。</summary>
     public string Title => FileName + (IsModified ? " *" : "");
@@ -75,6 +78,13 @@ public sealed class Sheet : INotifyPropertyChanged
 
     /// <summary>何も描かれておらず、保存も読み込みもしていない (開いたファイルの入れ物に使い回せる)。</summary>
     public bool IsBlank => FilePath == null && Doc.Entities.Count == 0 && !IsModified;
+
+    /// <summary>まだ保存していない新しい図として扱う (閉じるときに保存を確かめる)。</summary>
+    public void MarkUnsaved()
+    {
+        _savedVersion = -1;
+        OnPropertyChanged(nameof(Title));
+    }
 
     public void MarkSaved()
     {

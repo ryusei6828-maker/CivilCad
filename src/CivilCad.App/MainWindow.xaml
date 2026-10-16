@@ -107,6 +107,7 @@
                 <MenuItem Header="路線作成 (図面で IP をクリック) (RL)" Tag="RL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="路線計算 IP法 (RC)..." Tag="RC" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="路線 XML (LandXML) 読込 (RX)..." Tag="RX" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="縦横断図 (LandXML の縦断・横断から) (VX)..." Tag="VX" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="測点照会 (ST)" Tag="ST" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconStation}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
             <MenuItem Header="設定(_S)">
@@ -198,6 +199,7 @@
                         <Button Style="{StaticResource ToolButton}" Tag="RL" Click="Tool_Click" ToolTip="路線作成 (RL): 路線パネルを開く。始点 → IP → 終点 を表に入れて (図面から・手入力・Excel から貼り付け) 計算し、通過点 (No.杭・中間杭) を選んで作図"><StackPanel><Image Source="{StaticResource IconRoute}" Width="24" Height="24"/><TextBlock Text="路線作成" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="RC" Click="Tool_Click" ToolTip="路線計算 IP法 (RC)"><StackPanel><Image Source="{StaticResource IconRoute}" Width="24" Height="24"/><TextBlock Text="路線計算" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="RX" Click="Tool_Click" ToolTip="路線 XML (LandXML) 読込 (RX)"><StackPanel><Image Source="{StaticResource IconRoute}" Width="24" Height="24"/><TextBlock Text="XML 読込" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="VX" Click="Tool_Click" ToolTip="縦横断図 (VX): LandXML の縦断 (地盤線・計画縦断) と横断から、縦断図・横断図のシートを作る。CivilCadPoint (点群) や CivilCad3D の書き出しを読める"><StackPanel><Image Source="{StaticResource IconRoute}" Width="24" Height="24"/><TextBlock Text="縦横断図" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="ST" Click="Tool_Click" ToolTip="測点照会 (ST)"><StackPanel><Image Source="{StaticResource IconStation}" Width="24" Height="24"/><TextBlock Text="測点照会" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>

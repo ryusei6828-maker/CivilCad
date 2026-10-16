@@ -62,6 +62,7 @@ public static class CommandRegistry
         new("RLF", "路線パネル フロート/ドッキング", "IconRoute", "別ウィンドウに切り離す / 左側に戻す"),
         new("RC", "路線計算 (IP法)", "IconRoute"),
         new("RX", "路線 XML (LandXML) 読込", "IconRoute", "J-LandXML の平面線形を IP 表にして路線計算を開く"),
+        new("VX", "縦横断図 (LandXML)", "IconRoute", "LandXML の縦断・横断 (CivilCadPoint・CivilCad3D の書き出し) から縦断図・横断図のシートを作る"),
         new("ST", "測点照会", "IconStation"),
         new("ZE", "全体表示", "IconZoomExtents"),
         new("LA", "レイヤパネル 開く/閉じる", "IconLayers"),
