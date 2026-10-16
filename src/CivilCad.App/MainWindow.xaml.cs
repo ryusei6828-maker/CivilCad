@@ -244,6 +244,7 @@ public partial class MainWindow : Window
             case "PRF": SetPanelFloating(_propsDock, !_propsDock.IsFloating); break;
             case "CM": SetPanelOpen(_coordDock, !_coordDock.IsOpen); break;
             case "CMF": SetPanelFloating(_coordDock, !_coordDock.IsFloating); break;
+            case "CD": DrawCoordinates(); break;
             case "CEX": SetPanelOpen(_coordDock, true); CoordPanel.ExportCsv(); break;
             case "SEX": SetPanelOpen(_coordDock, true); CoordPanel.ExportSima(); break;
             case "U": Undo_Executed(this, null!); break;
@@ -1213,6 +1214,41 @@ public partial class MainWindow : Window
     // ---- 座標読込 ----
 
     /// <summary>SIMA (.sim) / CSV の座標を読み、点の印と点名を図面に置く (元に戻すで一度に消せる)。</summary>
+    /// <summary>座標の描画 (CD): 登録した点に、選んだマーク (十字＋〇など) と点名を描く。</summary>
+    private void DrawCoordinates()
+    {
+        var all = CoordinateRegistry.Rows(_doc).Select(r => r.Point).ToList();
+        if (all.Count == 0)
+        {
+            Log("座標の描画: 登録した座標がありません (座標管理で点を登録・読込してください)。");
+            return;
+        }
+        var selected = all.Where(Canvas.Selection.Contains).ToList();
+        var listed = CoordPanel.Items.Select(i => i.Point).Where(all.Contains).ToList();
+        var dlg = new CoordinateDrawWindow(selected.Count, listed.Count, all.Count, $"座標管理の一覧の点 ({CoordPanel.FilterLabel})") { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var points = dlg.Target switch
+        {
+            CoordinateDrawTarget.Selected => selected,
+            CoordinateDrawTarget.Listed => listed,
+            _ => all,
+        };
+        if (dlg.Erase)
+        {
+            if (CoordinateMarks.CreateEraseCommand(_doc, points) is { } erase)
+            {
+                _doc.History.Execute(erase);
+                Log($"座標の描画: {points.Count} 点のマーク・点名を消しました。");
+            }
+            else Log("座標の描画: 消すマークがありません。");
+            return;
+        }
+        var s = PointMarkSettings.Current;
+        _doc.History.Execute(CoordinateMarks.CreateDrawCommand(_doc, points, s));
+        Log($"座標の描画: {points.Count} 点に「{CoordinateMarks.Label(s.Kind)}」を描きました" +
+            (s.DrawName ? " (点名あり)" : " (点名なし)") + "。同じ点をもう一度描くと置き換えます。");
+    }
+
     private void ImportPoints()
     {
         var open = new OpenFileDialog

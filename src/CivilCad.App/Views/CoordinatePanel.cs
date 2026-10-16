@@ -62,6 +62,9 @@ public sealed class CoordinatePanel : DockPanel
 
     public IReadOnlyList<CoordinateItem> Items => _items;
 
+    /// <summary>今のタグの絞り込み (「(すべて)」など)。</summary>
+    public string FilterLabel => _filter.SelectedItem as string ?? AllTagsLabel;
+
     public CoordinatePanel()
     {
         Width = 380;
@@ -90,6 +93,7 @@ public sealed class CoordinatePanel : DockPanel
         }
         B("図面で追加", "点 (PO) で図面をクリックして点を登録する (点名は P1, P2 …)", () => _canvas?.SetTool(new PointTool()));
         B("削除", "一覧で選んだ点を図面から消す", DeleteSelected);
+        B("描画", "座標の描画 (CD): 点にマーク (十字＋〇など) と点名を描く", () => RunCommand?.Invoke("CD"));
         B("表示", "一覧で選んだ点が見えるように拡大する", ZoomToSelected);
         B("CSV 書き出し", "点名,X,Y,Z の CSV に書き出す (選んでいれば選んだ点だけ)", () => Export(csv: true));
         B("SIMA 書き出し", "SIMA (A01) に書き出す (選んでいれば選んだ点だけ)", () => Export(csv: false));
