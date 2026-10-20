@@ -112,8 +112,8 @@ public static partial class SfcIO
             return sb.ToString();
         });
 
-    // ブロックの終わりは "SXF*/" のほか、属性付きの "SXF3*/" などもある
-    [GeneratedRegex(@"#(\d+)\s*=\s*([a-z_0-9]+)\s*\((.*?)\)\s*;?\s*SXF\d*\*/", RegexOptions.Singleline)]
+    // ブロックの終わりは "SXF*/" のほか、属性付きの "SXF3*/"、Ver.3.1 のフィーチャ (クロソイドなど) の "SXF3.1*/" もある
+    [GeneratedRegex(@"#(\d+)\s*=\s*([a-z_0-9]+)\s*\((.*?)\)\s*;?\s*SXF[\d.]*\*/", RegexOptions.Singleline)]
     private static partial Regex EntityRegex();
 
     [GeneratedRegex(@"\\X2\\([0-9A-Fa-f]+)\\X0\\")]
@@ -259,13 +259,13 @@ public static partial class SfcIO
             or "arc_feature" or "ellipse_feature" or "ellipse_arc_feature" or "spline_feature" or "clothoid_feature";
 
         /// <summary>
-        /// 図面の縮尺 = 部分図 (sfig 種別 1) のうち、図形の数が最も多い縮尺。
+        /// 図面の縮尺 = 部分図 (sfig 種別 1: 数学座標系、2: 測地座標系) のうち、図形の数が最も多い縮尺。
         /// (縮尺の違う部分図が混ざっていても、主な図が実寸になるようにする)
         /// </summary>
         private double DetectScale(List<Feature> top)
         {
             var best = top.Where(f => f.Name == "sfig_locate_feature" && f.Args.Count >= 7 &&
-                                      _sfigs.TryGetValue(f.Args[1], out var s) && s.Flag == "1")
+                                      _sfigs.TryGetValue(f.Args[1], out var s) && s.Flag is "1" or "2")
                 .Select(f => (Ratio: Math.Abs(D(f.Args[5])), Count: _sfigs[f.Args[1]].Members.Count))
                 .Where(x => x.Ratio > 0)
                 .GroupBy(x => Math.Round(1 / x.Ratio))
@@ -343,7 +343,8 @@ public static partial class SfcIO
                     break;
 
                 case "clothoid_feature":
-                    Add(ClothoidCurve(L(a[0]), P(a[4], a[5]), D(a[6]), a[7] == "1" ? 1 : -1, D(a[8]), D(a[9]), D(a[10]), t), a[1], a[3], a[2]);
+                    // 回転方向は円弧と同じ: 0 = 反時計回り (原点から見て左に曲がる)、1 = 時計回り
+                    Add(ClothoidCurve(L(a[0]), P(a[4], a[5]), D(a[6]), a[7] == "1" ? -1 : 1, D(a[8]), D(a[9]), D(a[10]), t), a[1], a[3], a[2]);
                     break;
 
                 case "point_marker_feature":

@@ -151,6 +151,62 @@ public class SfcTests
         }
     }
 
+    private static CadDocument LoadText(string text, out SfcIO.LoadResult result)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"civilcad_{Guid.NewGuid():N}.sfc");
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        File.WriteAllText(path, text, Encoding.GetEncoding(932));
+        try
+        {
+            var doc = new CadDocument();
+            result = SfcIO.Load(doc, path);
+            return doc;
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Sfc_Sxf31Clothoid_IsRead_TurnsLeftForZero_AndGeodeticPartSetsScale()
+    {
+        // Ver.3.1 のクロソイドは "SXF3.1*/" で終わる。測地座標系の部分図 (種別 2) を 1/500 で配置
+        const string text = """
+            ISO-10303-21;
+            DATA;
+            /*SXF
+            #10 = layer_feature(\'L1\','1')
+            SXF*/
+            /*SXF3.1
+            #20 = clothoid_feature('1','2','1','1','0.0','0.0','100000.0','0','0.0','0.0','50000.0')
+            SXF3.1*/
+            /*SXF3.1
+            #30 = clothoid_feature('1','2','1','1','0.0','0.0','100000.0','1','0.0','0.0','50000.0')
+            SXF3.1*/
+            /*SXF
+            #40 = line_feature('1','1','1','1','0.0','0.0','-10000.0','0.0')
+            SXF*/
+            /*SXF
+            #50 = sfig_org_feature(\'ROUTE\','2')
+            SXF*/
+            /*SXF
+            #60 = sfig_locate_feature('0',\'ROUTE\','0.0','0.0','0.0','0.002','0.002')
+            SXF*/
+            ENDSEC;
+            """;
+        var doc = LoadText(text, out var r);
+        Assert.Equal(500, r.ScaleDenominator);
+        Assert.Single(doc.Entities.OfType<LineEntity>()); // クロソイドの後の図形も失われない
+        var curves = doc.Entities.OfType<PolylineEntity>().ToList();
+        Assert.Equal(2, curves.Count);
+        // A = 100m、L = 50m の終点: x = L - L⁵/(40A⁴) ≈ 49.92m、y ≈ L³/(6A²) ≈ 2.08m。回転方向 0 = 左 (y > 0)、1 = 右
+        AssertNear(Vec2.Zero, curves[0].Points[0]);
+        Assert.Equal(49.922, curves[0].Points[^1].X, 2);
+        Assert.Equal(2.08, curves[0].Points[^1].Y, 1);
+        Assert.Equal(-2.08, curves[1].Points[^1].Y, 1);
+    }
+
     [Fact]
     public void MainExtents_IgnoresFarStrayEntities()
     {
