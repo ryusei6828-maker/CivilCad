@@ -45,6 +45,9 @@ public partial class MainWindow : Window
         RegisterTrueNorth();
         InitializeComponent();
         SheetTabs.ItemsSource = _sheets;
+        SheetTabs.PreviewMouseMove += SheetTabs_PreviewMouseMove;
+        SheetTabs.PreviewMouseLeftButtonUp += SheetTabs_PreviewMouseLeftButtonUp;
+        SheetTabs.LostMouseCapture += (_, _) => EndTabDrag();
         ActivateSheet(AddSheet());
         LayerGrid.CellEditEnding += LayerGrid_CellEditEnding;
 
@@ -989,6 +992,92 @@ public partial class MainWindow : Window
             ActivateSheet(s);
             FocusCommandBox();
         }
+    }
+
+    // ---- シートタブのドラッグで並べ替え ----
+
+    private Sheet? _tabDragSheet;
+    private Point _tabDragStart;
+    private bool _tabDragging;
+
+    /// <summary>タブを押した: 少し動かしたらドラッグで並べ替え (× ボタンは除く)。</summary>
+    private void SheetTab_LeftDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: Sheet s } || e.OriginalSource is Button) return;
+        _tabDragSheet = s;
+        _tabDragStart = e.GetPosition(SheetTabs);
+        _tabDragging = false;
+    }
+
+    private void SheetTabs_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_tabDragSheet is not { } dragged) return;
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            EndTabDrag();
+            return;
+        }
+        var p = e.GetPosition(SheetTabs);
+        if (!_tabDragging)
+        {
+            if (Math.Abs(p.X - _tabDragStart.X) < SystemParameters.MinimumHorizontalDragDistance) return;
+            _tabDragging = true;
+            SheetTabs.CaptureMouse();
+            SheetTabs.Cursor = Cursors.SizeWE;
+        }
+        MoveDraggedTab(dragged, p.X);
+    }
+
+    /// <summary>
+    /// ドラッグ中のタブを、カーソルが越えた隣のタブの位置へ動かす (隣のタブの真ん中を越えたら入れ替える。
+    /// 幅の違うタブで行ったり来たりしないように)。x は SheetTabs の中の位置。
+    /// </summary>
+    public bool MoveDraggedTab(Sheet dragged, double x)
+    {
+        var from = _sheets.IndexOf(dragged);
+        if (from < 0) return false;
+        var centers = _sheets.Select((_, i) => SheetTabs.ItemContainerGenerator.ContainerFromIndex(i) is FrameworkElement { IsVisible: true } tab
+            ? tab.TranslatePoint(new Point(tab.ActualWidth / 2, 0), SheetTabs).X : (double?)null).ToList();
+        var to = TabDropIndex(from, centers, x);
+        if (to == from) return false;
+        _sheets.Move(from, to);
+        return true;
+    }
+
+    /// <summary>
+    /// ドラッグ中のタブ (from 番目) の移動先: 左のタブは真ん中より左に、右のタブは真ん中より右にカーソルが来たら、その位置へ。
+    /// centers は各タブの真ん中の x (見えていないタブは null)。
+    /// </summary>
+    public static int TabDropIndex(int from, IReadOnlyList<double?> centers, double x)
+    {
+        for (var i = 0; i < from; i++)
+            if (centers[i] is double c && x < c) return i;
+        for (var i = centers.Count - 1; i > from; i--)
+            if (centers[i] is double c && x > c) return i;
+        return from;
+    }
+
+    private void SheetTabs_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_tabDragging && _tabDragSheet is { } dragged)
+        {
+            EndTabDrag();
+            ActivateSheet(dragged);
+            FocusCommandBox();
+            e.Handled = true; // ドラッグの終わりはクリック (切り替え) にしない
+            return;
+        }
+        _tabDragSheet = null;
+    }
+
+    private void EndTabDrag()
+    {
+        var wasDragging = _tabDragging;
+        _tabDragSheet = null;
+        _tabDragging = false;
+        if (!wasDragging) return;
+        SheetTabs.Cursor = null;
+        if (SheetTabs.IsMouseCaptured) SheetTabs.ReleaseMouseCapture();
     }
 
     /// <summary>中ボタンクリックでも閉じる。</summary>

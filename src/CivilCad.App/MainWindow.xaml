@@ -431,7 +431,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border x:Name="Tab" Margin="0,3,1,0" Padding="10,3,4,3" CornerRadius="4,4,0,0" Cursor="Hand"
-                                            Background="#FF3E3E42" MouseLeftButtonUp="SheetTab_Click" MouseDown="SheetTab_MouseDown"
+                                            Background="#FF3E3E42" MouseLeftButtonUp="SheetTab_Click" MouseLeftButtonDown="SheetTab_LeftDown" MouseDown="SheetTab_MouseDown"
                                             ToolTip="{Binding FilePath}">
                                         <StackPanel Orientation="Horizontal">
                                             <StackPanel>
