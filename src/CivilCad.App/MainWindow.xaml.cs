@@ -75,6 +75,10 @@ public partial class MainWindow : Window
         };
         Canvas.ContextRequested += (_, _) => ShowCanvasMenu();
         PreviewKeyDown += Window_PreviewKeyDown;
+        // ファイルをドラッグ＆ドロップで開く (図面・プロジェクト・画像・PDF)
+        AllowDrop = true;
+        PreviewDragOver += Window_PreviewDragOver;
+        PreviewDrop += Window_PreviewDrop;
         Loaded += (_, _) =>
         {
             Canvas.SetTool(new SelectTool());
@@ -1489,7 +1493,12 @@ public partial class MainWindow : Window
                      "画像ファイル (*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif)|*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp;*.gif|PDF (*.pdf)|*.pdf|すべてのファイル (*.*)|*.*",
         };
         if (open.ShowDialog(this) != true) return;
-        var path = open.FileName;
+        ImportImageFile(open.FileName);
+    }
+
+    /// <summary>画像・PDF ファイルを読み込んで配置する (画像読込・ドラッグ＆ドロップ)。</summary>
+    private void ImportImageFile(string path)
+    {
         if (PdfRenderer.IsPdf(path))
         {
             ImportPdf(path);
@@ -1962,6 +1971,61 @@ public partial class MainWindow : Window
     private void UpdateTitle() =>
         Title = "CivilCad - " + (_projectPath != null ? $"{Path.GetFileNameWithoutExtension(_projectPath)} : " : "") +
                 $"{_active.FileName}  [{_active.Doc.ScaleText} / {_active.ZoneText}]";
+
+    // ---- ドラッグ＆ドロップ ----
+
+    private static readonly string[] DrawingExtensions = [".dxf", ".dwg", ".jww", ".sfc", ".p21", ".p2z", ".ccp"];
+    private static readonly string[] ImageExtensions = [".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif", ".pdf"];
+
+    /// <summary>ドロップで開けるファイルか (図面・プロジェクト・画像・PDF)。</summary>
+    public static bool CanOpenByDrop(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return DrawingExtensions.Contains(ext) || ImageExtensions.Contains(ext);
+    }
+
+    private static string[] DroppedFiles(DragEventArgs e) =>
+        e.Data.GetDataPresent(DataFormats.FileDrop) && e.Data.GetData(DataFormats.FileDrop) is string[] files ? files : [];
+
+    private void Window_PreviewDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return; // 文字のドラッグなどは入力欄に任せる
+        e.Effects = DroppedFiles(e).Any(CanOpenByDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void Window_PreviewDrop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+        var files = DroppedFiles(e);
+        e.Handled = true;
+        // ドロップを受け取ってから開く (縮尺を選ぶ窓などで、ドラッグ元のエクスプローラーを待たせない)
+        Dispatcher.BeginInvoke(() => OpenDroppedFiles(files));
+    }
+
+    /// <summary>
+    /// ドロップしたファイルを開く: 図面 (DXF・DWG・JWW・SFC・P21) は新しいシートに、プロジェクト (.ccp) はシートごと、
+    /// 画像・PDF は今のシートに配置する。開けない種類のファイルはメッセージを出す。
+    /// </summary>
+    public void OpenDroppedFiles(IEnumerable<string> files)
+    {
+        Activate();
+        foreach (var f in files)
+        {
+            var ext = Path.GetExtension(f).ToLowerInvariant();
+            if (Directory.Exists(f))
+                Log($"フォルダは開けません: {f}");
+            else if (DrawingExtensions.Contains(ext))
+                OpenDrawingFile(f);
+            else if (ImageExtensions.Contains(ext))
+            {
+                StartTool(new ImageTool(), ImageTool.Code);
+                ImportImageFile(f);
+            }
+            else
+                Log($"ドロップしたファイルは開けない種類です: {Path.GetFileName(f)} (開けるのは DXF・DWG・JWW・SFC・P21・CivilCad プロジェクト・画像・PDF)");
+        }
+    }
 
     // ---- プロジェクト ----
 

@@ -144,6 +144,24 @@ public class WindowLoadTests
                 CivilCad.App.Tools.EntityClipboard.Clear();
                 foreach (var s in (System.Collections.IEnumerable)typeof(CivilCad.App.MainWindow).GetField("_sheets", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(main)!)
                     s.GetType().GetMethod("MarkSaved")!.Invoke(s, null);
+                // ドラッグ＆ドロップ: プロジェクトを落とすとシートとして開く (開けない種類はメッセージだけ)
+                Assert.True(CivilCad.App.MainWindow.CanOpenByDrop(@"C:\a\本線.SFC"));
+                Assert.True(CivilCad.App.MainWindow.CanOpenByDrop(@"C:\a\p.ccp"));
+                Assert.False(CivilCad.App.MainWindow.CanOpenByDrop(@"C:\a\memo.txt"));
+                var projDoc = new CivilCad.Core.Model.CadDocument();
+                projDoc.Entities.Add(new CivilCad.Core.Model.PointEntity(projDoc.CurrentLayer, new CivilCad.Core.Geometry.Vec2(1, 2)) { Name = "落とした点" });
+                var projPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"civilcad_{Guid.NewGuid():N}.ccp");
+                CivilCad.App.IO.ProjectFile.Save(projPath, [new CivilCad.App.IO.ProjectSheet("ドロップ", projDoc, CivilCad.App.Alignment.AlignmentInput.Sample(), false)], 0);
+                try
+                {
+                    main.OpenDroppedFiles([projPath, @"C:\a\memo.txt"]);
+                    Assert.Contains(canvas.Document.Entities.OfType<CivilCad.Core.Model.PointEntity>(), p => p.Name == "落とした点");
+                    Assert.Contains("ドロップ", main.Title);
+                }
+                finally
+                {
+                    System.IO.File.Delete(projPath);
+                }
                 // 「座標管理」タブを開くと座標の一覧も開く
                 var coordHost = (System.Windows.FrameworkElement)main.FindName("CoordHost");
                 Assert.Equal(System.Windows.Visibility.Collapsed, coordHost.Visibility);
