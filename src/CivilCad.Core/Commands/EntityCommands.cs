@@ -225,3 +225,27 @@ public sealed class SetSurveyFrameCommand(double rotation, Vec2 pivot) : IUndoab
 
     public void Undo(CadDocument doc) => doc.SetSurveyFrame(_oldRotation, _oldPivot);
 }
+
+/// <summary>図形の並び順をまとめて変える (座標の並べ替えなど)。図形そのものは変えない。</summary>
+public sealed class ReorderEntitiesCommand(IEnumerable<Entity> newOrder, string name) : IUndoableCommand
+{
+    private readonly List<Entity> _new = [.. newOrder];
+    private List<Entity> _old = [];
+
+    public string Name => name;
+
+    public void Do(CadDocument doc)
+    {
+        _old = [.. doc.Entities];
+        doc.Entities.Clear();
+        doc.Entities.AddRange(_new);
+        doc.NotifyChanged();
+    }
+
+    public void Undo(CadDocument doc)
+    {
+        doc.Entities.Clear();
+        doc.Entities.AddRange(_old);
+        doc.NotifyChanged();
+    }
+}

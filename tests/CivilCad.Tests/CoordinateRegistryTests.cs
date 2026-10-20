@@ -249,6 +249,76 @@ public class CoordinateTagTests
     });
 
     [Fact]
+    public void Sort_NaturalNameOrder_XYZ_OnlyMovesPoints_Undo()
+    {
+        var doc = new CadDocument();
+        var line = new LineEntity(doc.CurrentLayer, Vec2.Zero, new Vec2(1, 1));
+        PointEntity P(string name, double x, double y, double? z = null) => new(doc.CurrentLayer, doc.FromSurvey(x, y)) { Name = name, Z = z };
+        var p10 = P("P10", 3, 1, 5);
+        var p2 = P("P2", 1, 3);
+        var p1 = P("p1", 2, 2, 7);
+        doc.Entities.AddRange([p10, line, p2, p1]);
+
+        doc.History.Execute(CoordinateRegistry.SortCommand(doc, CoordinateSort.NameAsc)!);
+        Assert.Equal(["p1", "P2", "P10"], CoordinateRegistry.Rows(doc).Select(r => r.Name)); // P2 は P10 より前
+        Assert.Same(line, doc.Entities[1]);                                                    // ほかの図形の順番は変えない
+        doc.History.Execute(CoordinateRegistry.SortCommand(doc, CoordinateSort.XDesc)!);
+        Assert.Equal(["P10", "p1", "P2"], CoordinateRegistry.Rows(doc).Select(r => r.Name));
+        Assert.Null(CoordinateRegistry.SortCommand(doc, CoordinateSort.ZAsc));               // 変わらなければ null (標高の無い P2 は最後)
+        doc.History.Execute(CoordinateRegistry.SortCommand(doc, CoordinateSort.ZDesc)!);
+        Assert.Equal(["p1", "P10", "P2"], CoordinateRegistry.Rows(doc).Select(r => r.Name)); // 標高の無い点は大きい順でも最後
+        doc.History.Undo();
+        doc.History.Undo();
+        Assert.Equal(["p1", "P2", "P10"], CoordinateRegistry.Rows(doc).Select(r => r.Name));
+        doc.History.Undo();
+        Assert.Equal(["P10", "P2", "p1"], CoordinateRegistry.Rows(doc).Select(r => r.Name));
+    }
+
+    [Fact]
+    public void Panel_ManualEntry_RenameKeepsOrder_CurrentCellStays() => RunSta((doc, canvas) =>
+    {
+        doc.Entities.AddRange([
+            new PointEntity(doc.CurrentLayer, doc.FromSurvey(10, 20)) { Name = "A" },
+            new PointEntity(doc.CurrentLayer, doc.FromSurvey(30, 40)) { Name = "B" },
+        ]);
+        var panel = new CoordinatePanel();
+        panel.Attach(canvas);
+
+        // 点名を Z… に変えても並びは変わらない
+        var a = panel.Items[0];
+        a.Name = "Z1";
+        Assert.True(panel.Apply(a));
+        Assert.Equal(["Z1", "B"], panel.Items.Select(i => i.Name));
+
+        // 一覧で 2 行目のセルにいるとき、作り直しても同じセルのまま (一番上に戻らない)
+        var grid = (System.Windows.Controls.DataGrid)panel.Children.OfType<System.Windows.Controls.DataGrid>().Single();
+        grid.CurrentCell = new System.Windows.Controls.DataGridCellInfo(panel.Items[1], grid.Columns[1]);
+        panel.Refresh();
+        Assert.Same(panel.Items[1], grid.CurrentCell.Item);
+        Assert.Same(grid.Columns[1], grid.CurrentCell.Column);
+
+        // 手入力: 新しい行に X・Y (点名が空なら P1)、Z、タグ
+        Assert.True(panel.AddNew(new CoordinateItem { X = "50", Y = "60", Z = "1.5" }));
+        var added = doc.Entities.OfType<PointEntity>().Last();
+        Assert.Equal("P1", added.Name);
+        Assert.Equal(1.5, added.Z);
+        var (x, y) = doc.ToSurvey(added.Position);
+        Assert.Equal((50.0, 60.0), (Math.Round(x, 6), Math.Round(y, 6)));
+        Assert.Equal(["Z1", "B", "P1"], panel.Items.Select(i => i.Name));
+        Assert.False(panel.AddNew(new CoordinateItem { Name = "Q", X = "abc", Y = "1" })); // 数でなければ登録しない
+        Assert.False(panel.AddNew(new CoordinateItem()));                                   // 空の行は無視
+        Assert.Equal(3, panel.Items.Count);
+
+        // 並べ替え (点名 A→Z) と元に戻す
+        panel.Sort(CoordinateSort.NameAsc);
+        panel.Refresh();
+        Assert.Equal(["B", "P1", "Z1"], panel.Items.Select(i => i.Name));
+        doc.History.Undo();
+        panel.Refresh();
+        Assert.Equal(["Z1", "B", "P1"], panel.Items.Select(i => i.Name));
+    });
+
+    [Fact]
     public void Csv_RoundTripsTags()
     {
         var doc = new CadDocument();

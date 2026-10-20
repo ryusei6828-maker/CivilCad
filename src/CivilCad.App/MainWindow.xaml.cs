@@ -999,7 +999,7 @@ public partial class MainWindow : Window
         {
             // 英字キー単独は「文字を入力していないとき」だけショートカットにする
             var typingInCommand = CommandBox.IsKeyboardFocused && (CommandBox.Text.Length > 0 || Canvas.Tool.WantsTextInput);
-            var typingElsewhere = !CommandBox.IsKeyboardFocused && Keyboard.FocusedElement is TextBox;
+            var typingElsewhere = !CommandBox.IsKeyboardFocused && Keyboard.FocusedElement is TextBox or DataGridCell; // 表のセル (座標管理など) では打った文字をセルに入れる
             if (typingInCommand || typingElsewhere) return false;
         }
         RunCommand(code);
@@ -1364,7 +1364,7 @@ public partial class MainWindow : Window
             return;
         }
         var selected = all.Where(Canvas.Selection.Contains).ToList();
-        var listed = CoordPanel.Items.Select(i => i.Point).Where(all.Contains).ToList();
+        var listed = CoordPanel.Items.Select(i => i.Point).OfType<PointEntity>().Where(all.Contains).ToList();
         var dlg = new CoordinateDrawWindow(selected.Count, listed.Count, all.Count, $"座標管理の一覧の点 ({CoordPanel.FilterLabel})") { Owner = this };
         if (dlg.ShowDialog() != true) return;
         var points = dlg.Target switch

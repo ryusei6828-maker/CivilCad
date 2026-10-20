@@ -13,10 +13,10 @@ using Microsoft.Win32;
 
 namespace CivilCad.App.Views;
 
-/// <summary>座標管理の一覧の 1 行 (編集用)。X = 北, Y = 東。Z は空なら標高なし。</summary>
+/// <summary>座標管理の一覧の 1 行 (編集用)。X = 北, Y = 東。Z は空なら標高なし。Point が null なら手入力中の新しい行。</summary>
 public sealed class CoordinateItem
 {
-    public required PointEntity Point { get; init; }
+    public PointEntity? Point { get; set; }
     public string Name { get; set; } = "";
     public string X { get; set; } = "";
     public string Y { get; set; } = "";
@@ -34,8 +34,8 @@ public sealed class CoordinatePanel : DockPanel
     private readonly DataGrid _grid = new()
     {
         AutoGenerateColumns = false,
-        CanUserAddRows = false,
-        CanUserSortColumns = true,
+        CanUserAddRows = true, // 最後の空の行に打ち込むと点を登録する
+        CanUserSortColumns = false, // 点名を直しても勝手に並び替わらないように (並べ替えはボタンで)
         HeadersVisibility = DataGridHeadersVisibility.Column,
         SelectionMode = DataGridSelectionMode.Extended,
         GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
@@ -98,6 +98,20 @@ public sealed class CoordinatePanel : DockPanel
         B("CSV 書き出し", "点名,X,Y,Z の CSV に書き出す (選んでいれば選んだ点だけ)", () => Export(csv: true));
         B("SIMA 書き出し", "SIMA (A01) に書き出す (選んでいれば選んだ点だけ)", () => Export(csv: false));
         B("読込", "SIMA / CSV の座標を読み込んで登録する", () => RunCommand?.Invoke("PI"));
+        var sort = B("並べ替え ▾", "点名 (A→Z)・X・Y・Z・タグの順に並べ替える (元に戻せる)。並べた順で書き出す", () => { });
+        sort.ContextMenu = new ContextMenu();
+        foreach (var s in Enum.GetValues<CoordinateSort>())
+        {
+            var item = new MenuItem { Header = CoordinateRegistry.SortLabel(s) };
+            item.Click += (_, _) => Sort(s);
+            sort.ContextMenu.Items.Add(item);
+        }
+        sort.Click += (_, _) =>
+        {
+            sort.ContextMenu.PlacementTarget = sort;
+            sort.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            sort.ContextMenu.IsOpen = true;
+        };
         SetDock(buttons, Dock.Top);
         Children.Add(buttons);
 
@@ -117,7 +131,8 @@ public sealed class CoordinatePanel : DockPanel
 
         var hint = new TextBlock
         {
-            Text = "X = 北, Y = 東 (測量座標。座標設定の向きを含む)。点名・X・Y・Z・タグはここで直せます (Z は空で標高なし。タグはカンマか空白で区切って複数可)。",
+            Text = "X = 北, Y = 東 (測量座標。座標設定の向きを含む)。点名・X・Y・Z・タグはここで直せます (Z は空で標高なし。タグはカンマか空白で区切って複数可)。" +
+                   "一番下の空の行に X・Y を打ち込むと点を登録します (点名が空なら P1, P2 …)。Enter で下のセル、Tab で右のセルへ (Excel と同じ)。",
             TextWrapping = TextWrapping.Wrap,
             Foreground = System.Windows.Media.Brushes.Gray,
             Margin = new Thickness(0, 0, 0, 4),
@@ -142,13 +157,13 @@ public sealed class CoordinatePanel : DockPanel
         {
             _editing = false;
             if (e.EditAction == DataGridEditAction.Commit && e.Row.Item is CoordinateItem item)
-                Dispatcher.BeginInvoke(() => Apply(item)); // バインドの書き戻しの後で
+                Dispatcher.BeginInvoke(() => { if (item.Point == null) AddNew(item); else Apply(item); }); // バインドの書き戻しの後で
         };
         _grid.SelectionChanged += (_, _) =>
         {
             if (_syncing || _canvas == null) return;
             _syncing = true;
-            _canvas.SetSelection(_grid.SelectedItems.OfType<CoordinateItem>().Select(i => i.Point));
+            _canvas.SetSelection(_grid.SelectedItems.OfType<CoordinateItem>().Select(i => i.Point).OfType<PointEntity>());
             _syncing = false;
         };
         _grid.PreviewKeyDown += (_, e) =>
@@ -191,11 +206,15 @@ public sealed class CoordinatePanel : DockPanel
 
     private static string F(double v) => v.ToString("F3", CultureInfo.InvariantCulture);
 
-    /// <summary>一覧を図面の今の点から作り直す。</summary>
+    /// <summary>一覧を図面の今の点から作り直す。今のセル (Enter で移った先) はそのまま残す。</summary>
     public void Refresh()
     {
         if (_watched is not { } doc) return;
-        var selected = _grid.SelectedItems.OfType<CoordinateItem>().Select(i => i.Point).ToHashSet();
+        var selected = _grid.SelectedItems.OfType<CoordinateItem>().Select(i => i.Point).OfType<PointEntity>().ToHashSet();
+        var current = _grid.CurrentCell;
+        var currentRow = current.Item is CoordinateItem ci ? _items.IndexOf(ci) : current.Item == System.Windows.Data.CollectionView.NewItemPlaceholder ? int.MaxValue : -1;
+        var currentColumn = current.Column != null ? _grid.Columns.IndexOf(current.Column) : -1;
+        var hadFocus = _grid.IsKeyboardFocusWithin;
         _syncing = true;
         // タグの絞り込みの候補を今のタグで作り直す (選んでいたタグは残す)
         var filter = _filter.SelectedItem as string ?? AllTagsLabel;
@@ -209,9 +228,62 @@ public sealed class CoordinatePanel : DockPanel
         _items.Clear();
         foreach (var r in all.Where(r => Matches(r.Point, (string)_filter.SelectedItem)))
             _items.Add(new CoordinateItem { Point = r.Point, Name = r.Name, X = F(r.X), Y = F(r.Y), Z = r.Z is double z ? F(z) : "", Tags = r.Tags });
-        foreach (var i in _items.Where(i => selected.Contains(i.Point))) _grid.SelectedItems.Add(i);
+        foreach (var i in _items.Where(i => i.Point != null && selected.Contains(i.Point))) _grid.SelectedItems.Add(i);
+        RestoreCurrentCell(currentRow, currentColumn, hadFocus);
         _syncing = false;
         _title.Text = _items.Count == all.Count ? $"座標管理  ({all.Count} 点)" : $"座標管理  ({_items.Count} / {all.Count} 点)";
+    }
+
+    /// <summary>作り直した一覧で、前と同じ位置のセルを今のセルにする (キーボードの入力先も戻す)。</summary>
+    private void RestoreCurrentCell(int row, int column, bool focus)
+    {
+        if (row < 0 || column < 0 || column >= _grid.Columns.Count) return;
+        object item = row < _items.Count ? _items[row] : System.Windows.Data.CollectionView.NewItemPlaceholder;
+        var col = _grid.Columns[column];
+        _grid.CurrentCell = new DataGridCellInfo(item, col);
+        if (!focus) return;
+        _grid.ScrollIntoView(item, col);
+        _grid.UpdateLayout();
+        if (_grid.ItemContainerGenerator.ContainerFromItem(item) is DataGridRow r && col.GetCellContent(r)?.Parent is DataGridCell cell)
+            cell.Focus();
+    }
+
+    /// <summary>登録した座標を並べ替える (元に戻せる)。</summary>
+    public void Sort(CoordinateSort sort)
+    {
+        if (_watched is not { } doc) return;
+        if (CoordinateRegistry.SortCommand(doc, sort) is { } cmd)
+        {
+            doc.History.Execute(cmd);
+            _canvas?.ShowMessage($"座標管理: {CoordinateRegistry.SortLabel(sort)} に並べ替えました (Ctrl+Z で戻せます)。");
+        }
+        else _canvas?.ShowMessage("座標管理: 並べ替えても順番は変わりません。");
+    }
+
+    /// <summary>手入力した新しい行を点として登録する (X・Y が必要。点名が空なら P1, P2 …)。</summary>
+    public bool AddNew(CoordinateItem item)
+    {
+        if (_watched is not { } doc || _canvas == null) return false;
+        if (item.Name.Trim().Length == 0 && item.X.Trim().Length == 0 && item.Y.Trim().Length == 0 && item.Z.Trim().Length == 0 && item.Tags.Trim().Length == 0)
+        {
+            Refresh(); // 何も入れなかった行は消す
+            return false;
+        }
+        double? z = null;
+        if (!TryNum(item.X, out var x) || !TryNum(item.Y, out var y) ||
+            (item.Z.Trim().Length > 0 && !(TryNum(item.Z, out var zv) && (z = zv) != null)))
+        {
+            _canvas.ShowMessage("座標管理: 新しい点は X・Y を数で入れてください (Z は空で標高なし)。");
+            Refresh();
+            return false;
+        }
+        var name = item.Name.Trim().Length > 0 ? item.Name.Trim() : CoordinateRegistry.NextName(doc);
+        var tags = item.Tags.Trim().Length > 0 ? item.Tags.Trim() : CoordinateRegistry.DefaultTag;
+        var p = new PointEntity(doc.CurrentLayer, doc.FromSurvey(x, y)) { Name = name, Z = z, Tags = tags };
+        doc.History.Execute(new AddEntitiesCommand([p], $"座標の登録 {name}"));
+        item.Point = p;
+        Refresh();
+        return true;
     }
 
     /// <summary>タグの絞り込みで一覧に出すか。</summary>
@@ -244,7 +316,7 @@ public sealed class CoordinatePanel : DockPanel
     /// <summary>一覧で直した値を図面の点に反映する (元に戻せる)。</summary>
     public bool Apply(CoordinateItem item)
     {
-        if (_watched is not { } doc || _canvas == null) return false;
+        if (_watched is not { } doc || _canvas == null || item.Point == null) return false;
         double? z = null;
         if (item.Name.Trim().Length == 0 || !TryNum(item.X, out var x) || !TryNum(item.Y, out var y) ||
             (item.Z.Trim().Length > 0 && !(TryNum(item.Z, out var zv) && (z = zv) != null)))
@@ -268,12 +340,12 @@ public sealed class CoordinatePanel : DockPanel
         return true;
     }
 
-    private List<CoordinateItem> Selected() => [.. _grid.SelectedItems.OfType<CoordinateItem>()];
+    private List<CoordinateItem> Selected() => [.. _grid.SelectedItems.OfType<CoordinateItem>().Where(i => i.Point != null)];
 
     private void DeleteSelected()
     {
         if (_watched is not { } doc || Selected() is not { Count: > 0 } sel) return;
-        doc.History.Execute(new RemoveEntitiesCommand([.. sel.Select(i => i.Point)], $"座標の削除 ({sel.Count} 点)"));
+        doc.History.Execute(new RemoveEntitiesCommand([.. sel.Select(i => i.Point!)], $"座標の削除 ({sel.Count} 点)"));
         _canvas?.ClearSelection();
         _canvas?.ShowMessage($"座標管理: {sel.Count} 点を削除しました (Ctrl+Z で戻せます)。");
     }
@@ -281,7 +353,7 @@ public sealed class CoordinatePanel : DockPanel
     private void ZoomToSelected()
     {
         if (_canvas == null) return;
-        var pts = (Selected() is { Count: > 0 } sel ? sel : [.. _items]).Select(i => i.Point.Position).ToList();
+        var pts = (Selected() is { Count: > 0 } sel ? sel : [.. _items]).Select(i => i.Point).OfType<PointEntity>().Select(p => p.Position).ToList();
         if (pts.Count == 0) return;
         var box = Box2.FromPoints(pts);
         var pad = Math.Max(Math.Max(box.Width, box.Height) * 0.1, _watched!.PaperMmToMeters(20));
@@ -295,7 +367,7 @@ public sealed class CoordinatePanel : DockPanel
     {
         if (_watched is not { } doc || _canvas == null) return;
         // 選んでいれば選んだ点、選んでいなければ一覧に出ている点 (タグで絞り込んでいればその点だけ)
-        var chosen = (Selected() is { Count: > 0 } sel ? sel : [.. _items]).Select(i => i.Point).ToHashSet();
+        var chosen = (Selected() is { Count: > 0 } sel ? sel : [.. _items]).Select(i => i.Point).OfType<PointEntity>().ToHashSet();
         var rows = CoordinateRegistry.Rows(doc).Where(r => chosen.Contains(r.Point)).ToList();
         if (rows.Count == 0)
         {

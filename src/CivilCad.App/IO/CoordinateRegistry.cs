@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Text;
+using CivilCad.Core.Commands;
 using CivilCad.Core.Model;
 
 namespace CivilCad.App.IO;
@@ -12,6 +13,9 @@ public sealed record CoordinateRow(PointEntity Point, string Name, double X, dou
 /// 登録された座標 (点名のある点) の一覧と、CSV / SIMA への書き出し。
 /// 座標は座標設定の向きを含めた測量座標 (X = 北, Y = 東)。
 /// </summary>
+/// <summary>座標の並べ替えの基準。</summary>
+public enum CoordinateSort { NameAsc, NameDesc, XAsc, XDesc, YAsc, YDesc, ZAsc, ZDesc, TagsAsc }
+
 public static class CoordinateRegistry
 {
     /// <summary>登録された座標 (点名のある点) を図面の並び順で。</summary>
@@ -64,5 +68,81 @@ public static class CoordinateRegistry
         sb.Append("A99,\r\n");
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         File.WriteAllText(path, sb.ToString(), Encoding.GetEncoding(932));
+    }
+
+    public static string SortLabel(CoordinateSort sort) => sort switch
+    {
+        CoordinateSort.NameAsc => "点名 A→Z (P2 → P10 の順)",
+        CoordinateSort.NameDesc => "点名 Z→A",
+        CoordinateSort.XAsc => "X (北) 小さい順",
+        CoordinateSort.XDesc => "X (北) 大きい順",
+        CoordinateSort.YAsc => "Y (東) 小さい順",
+        CoordinateSort.YDesc => "Y (東) 大きい順",
+        CoordinateSort.ZAsc => "Z (標高) 小さい順",
+        CoordinateSort.ZDesc => "Z (標高) 大きい順",
+        CoordinateSort.TagsAsc => "タグ順",
+        _ => sort.ToString(),
+    };
+
+    /// <summary>
+    /// 登録した座標を並べ替えるコマンド (元に戻せる)。座標の点どうしの順番だけを入れ替え、ほかの図形の順番は変えない。
+    /// 並べ替えた順は一覧・CSV / SIMA の書き出しの順になる。同じ値どうしは今の順を保つ。点が 2 つ未満なら null。
+    /// </summary>
+    public static IUndoableCommand? SortCommand(CadDocument doc, CoordinateSort sort)
+    {
+        var rows = Rows(doc);
+        if (rows.Count < 2) return null;
+        IEnumerable<CoordinateRow> sorted = sort switch
+        {
+            CoordinateSort.NameAsc => rows.OrderBy(r => r.Name, NaturalComparer.Instance),
+            CoordinateSort.NameDesc => rows.OrderByDescending(r => r.Name, NaturalComparer.Instance),
+            CoordinateSort.XAsc => rows.OrderBy(r => r.X),
+            CoordinateSort.XDesc => rows.OrderByDescending(r => r.X),
+            CoordinateSort.YAsc => rows.OrderBy(r => r.Y),
+            CoordinateSort.YDesc => rows.OrderByDescending(r => r.Y),
+            // 標高の無い点は最後
+            CoordinateSort.ZAsc => rows.OrderBy(r => r.Z is null).ThenBy(r => r.Z),
+            CoordinateSort.ZDesc => rows.OrderBy(r => r.Z is null).ThenByDescending(r => r.Z),
+            CoordinateSort.TagsAsc => rows.OrderBy(r => r.Tags.Length == 0).ThenBy(r => r.Tags, NaturalComparer.Instance).ThenBy(r => r.Name, NaturalComparer.Instance),
+            _ => rows,
+        };
+        var queue = new Queue<PointEntity>(sorted.Select(r => r.Point));
+        var points = rows.Select(r => r.Point).ToHashSet();
+        var order = doc.Entities.Select(e => e is PointEntity p && points.Contains(p) ? queue.Dequeue() : e).ToList();
+        return order.SequenceEqual(doc.Entities) ? null : new ReorderEntitiesCommand(order, $"座標の並べ替え ({SortLabel(sort)})");
+    }
+
+    /// <summary>数字の部分を数として比べる (P2 &lt; P10、No.9 &lt; No.10)。大文字・小文字は区別しない。</summary>
+    public sealed class NaturalComparer : IComparer<string>
+    {
+        public static NaturalComparer Instance { get; } = new();
+
+        public int Compare(string? a, string? b)
+        {
+            a ??= "";
+            b ??= "";
+            int i = 0, j = 0;
+            while (i < a.Length && j < b.Length)
+            {
+                if (char.IsAsciiDigit(a[i]) && char.IsAsciiDigit(b[j]))
+                {
+                    var si = i;
+                    var sj = j;
+                    while (i < a.Length && char.IsAsciiDigit(a[i])) i++;
+                    while (j < b.Length && char.IsAsciiDigit(b[j])) j++;
+                    var na = a[si..i].TrimStart('0');
+                    var nb = b[sj..j].TrimStart('0');
+                    if (na.Length != nb.Length) return na.Length.CompareTo(nb.Length);
+                    var c = string.CompareOrdinal(na, nb);
+                    if (c != 0) return c;
+                    continue;
+                }
+                var d = string.Compare(a[i].ToString(), b[j].ToString(), StringComparison.OrdinalIgnoreCase);
+                if (d != 0) return d;
+                i++;
+                j++;
+            }
+            return (a.Length - i).CompareTo(b.Length - j);
+        }
     }
 }
