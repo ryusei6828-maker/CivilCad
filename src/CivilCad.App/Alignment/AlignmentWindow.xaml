@@ -49,6 +49,8 @@
                                 ToolTip="Excel 等からコピーした 名称,X,Y,R,A1,A2 の表を貼り付けます"/>
                         <Button Content="XML 読込" Margin="0,0,0,4" Click="LoadXml_Click"
                                 ToolTip="路線の LandXML (J-LandXML) を読み込み、IP 表・路線名・開始追加距離・測点間隔を置き換えます"/>
+                        <Button Content="XML 出力" Margin="0,0,0,4" Click="SaveXml_Click"
+                                ToolTip="計算した路線 (平面線形・IP・測点間隔) を LandXML (J-LandXML) に書き出します"/>
                     </StackPanel>
                     <DataGrid x:Name="IpGrid" AutoGenerateColumns="False" CanUserAddRows="True" CanUserSortColumns="False"
                               HeadersVisibility="Column" SelectionUnit="FullRow">

@@ -225,9 +225,14 @@ public sealed class RoutePanel : DockPanel
         Put(new GroupBox { Header = "通過点一覧 (Ctrl+C でコピーできる)", Content = _passGrid }, 5);
 
         // 作図
-        var draw = new Button { Content = "作図", Width = 120, HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Margin = new Thickness(0, 6, 0, 0), ToolTip = "中心線・No.杭・中間杭・主要点・幅を作図する (同じ路線名の作図は置き換える)" };
+        var draw = new Button { Content = "作図", Width = 120, Margin = new Thickness(0, 6, 0, 0), ToolTip = "中心線・No.杭・中間杭・主要点・幅を作図する (同じ路線名の作図は置き換える)" };
         draw.Click += (_, _) => Draw();
-        Put(draw, 6);
+        var xml = new Button { Content = "XML 出力...", Width = 110, Margin = new Thickness(0, 6, 8, 0), ToolTip = "路線 (平面線形・IP・測点間隔) を LandXML (J-LandXML) に書き出す" };
+        xml.Click += (_, _) => ExportXml();
+        var bottom = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
+        bottom.Children.Add(xml);
+        bottom.Children.Add(draw);
+        Put(bottom, 6);
     }
 
     private static TextBlock Label(string text) => new() { Text = text, VerticalAlignment = System.Windows.VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) };
@@ -453,6 +458,15 @@ public sealed class RoutePanel : DockPanel
             _passing.Add(new PassingRow(p.Name, p.Kind, p.Station.ToString("F3", CultureInfo.InvariantCulture),
                 x.ToString("F3", CultureInfo.InvariantCulture), y.ToString("F3", CultureInfo.InvariantCulture)));
         }
+    }
+
+    /// <summary>計算して、路線を LandXML に書き出す (保存先を選ぶ)。</summary>
+    public bool ExportXml()
+    {
+        if (!Compute() || _result == null) return false;
+        if (LandXmlExport.Run(Window.GetWindow(this), _resultInput, _canvas?.Document.PlaneZone) is not { } path) return false;
+        Log?.Invoke($"路線「{_resultInput.Name}」を XML (LandXML) に書き出しました: {path}");
+        return true;
     }
 
     /// <summary>作図する (計算していなければ計算してから)。同じ路線名の作図は置き換える。</summary>

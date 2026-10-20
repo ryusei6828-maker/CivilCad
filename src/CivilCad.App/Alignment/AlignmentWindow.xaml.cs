@@ -120,6 +120,15 @@ public partial class AlignmentWindow : Window
 
     private void Compute_Click(object sender, RoutedEventArgs e) => TryCompute();
 
+    /// <summary>XML 出力に書く平面直角座標系の系番号 (図面に設定してあれば)。</summary>
+    public int? PlaneZone { get; set; }
+
+    private void SaveXml_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryCompute()) return;
+        if (LandXmlExport.Run(this, _input, PlaneZone) is { } path) ErrorText.Text = $"XML に書き出しました: {path}";
+    }
+
     private void Draw_Click(object sender, RoutedEventArgs e)
     {
         if (!TryCompute() || _result == null) return;

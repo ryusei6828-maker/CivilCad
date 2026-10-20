@@ -267,6 +267,7 @@ public partial class MainWindow : Window
             case "RX":
                 if (LandXmlImport.Run(this, _alignmentInput.TextHeightMm) is { } loaded) OpenAlignmentDialog(loaded);
                 break;
+            case "RXO": ExportRouteXml(); break;
             case "VX": ImportRouteSections(null, askScales: true); break;
             case "FR": OpenFrameDialog(); break;
             case "SC": OpenScaleDialog(); break;
@@ -1537,6 +1538,27 @@ public partial class MainWindow : Window
         Log("路線: 左の路線パネルで 始点 → IP → 終点 を入れ (「図面から追加」でクリック、手入力、Excel から Ctrl+V)、「計算」→ 通過点を選んで「作図」。");
     }
 
+    /// <summary>
+    /// 路線を XML (LandXML) に書き出す: 路線パネルの表に入力があればその路線 (計算して)、
+    /// 無ければ最後に作図した路線 (路線計算・XML 読込・路線パネル)。
+    /// </summary>
+    private void ExportRouteXml()
+    {
+        if (RoutePanel.Rows.Any(r => !r.IsEmpty))
+        {
+            if (!_routeDock.IsOpen) SetPanelOpen(_routeDock, true);
+            if (!RoutePanel.ExportXml() && RoutePanel.Result == null) Log("路線 XML 出力: 路線パネルの表を直してください (エラーは路線パネルに出ています)。");
+            return;
+        }
+        if (_alignment == null)
+        {
+            Log("路線 XML 出力: 書き出す路線がありません。路線作成 (RL) か路線計算 (RC) で路線を作ってください。");
+            return;
+        }
+        if (LandXmlExport.Run(this, _alignmentInput, _doc.PlaneZone) is { } path)
+            Log($"路線「{_alignmentInput.Name}」を XML (LandXML) に書き出しました: {path}");
+    }
+
     private void CreateRouteFromPoints(List<Vec2> points)
     {
         var input = RouteFromPoints(_doc, points, _alignmentInput);
@@ -1563,7 +1585,7 @@ public partial class MainWindow : Window
 
     private void OpenAlignmentDialog(AlignmentInput? input = null)
     {
-        var dlg = new AlignmentWindow(input ?? _alignmentInput) { Owner = this };
+        var dlg = new AlignmentWindow(input ?? _alignmentInput) { Owner = this, PlaneZone = _doc.PlaneZone };
         if (dlg.ShowDialog() != true || dlg.ResultInput == null || dlg.ResultAlignment == null) return;
         _alignmentInput = dlg.ResultInput;
         _alignment = dlg.ResultAlignment;
