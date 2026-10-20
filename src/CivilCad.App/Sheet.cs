@@ -19,8 +19,14 @@ public sealed class Sheet : INotifyPropertyChanged
     private bool _isActive;
     private long _savedVersion;
 
-    public Sheet()
+    public Sheet() : this(new CadDocument())
     {
+    }
+
+    /// <summary>読み込んだ図面 (プロジェクトのシートなど) でシートを作る。</summary>
+    public Sheet(CadDocument doc)
+    {
+        Doc = doc;
         UntitledNumber = ++_untitledCounter;
         Doc.Changed += (_, _) => OnPropertyChanged(nameof(Title));
         Doc.PropertyChanged += (_, e) =>
@@ -34,7 +40,7 @@ public sealed class Sheet : INotifyPropertyChanged
         };
     }
 
-    public CadDocument Doc { get; } = new();
+    public CadDocument Doc { get; }
     public int UntitledNumber { get; }
 
     public string? FilePath

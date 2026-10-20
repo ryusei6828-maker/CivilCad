@@ -26,7 +26,7 @@ public static class DrawingFiles
 {
     /// <summary>開くダイアログのフィルタ。</summary>
     public const string OpenFilter =
-        "図面ファイル (*.dxf;*.dwg;*.jww;*.sfc;*.p21;*.p2z)|*.dxf;*.dwg;*.jww;*.sfc;*.p21;*.p2z|DXF ファイル (*.dxf)|*.dxf|DWG ファイル (*.dwg)|*.dwg|Jw_cad ファイル (*.jww)|*.jww|SXF (SFC) ファイル (*.sfc)|*.sfc|SXF (P21) ファイル (*.p21;*.p2z)|*.p21;*.p2z";
+        "図面・プロジェクト (*.dxf;*.dwg;*.jww;*.sfc;*.p21;*.p2z;*.ccp)|*.dxf;*.dwg;*.jww;*.sfc;*.p21;*.p2z;*.ccp|CivilCad プロジェクト (*.ccp)|*.ccp|DXF ファイル (*.dxf)|*.dxf|DWG ファイル (*.dwg)|*.dwg|Jw_cad ファイル (*.jww)|*.jww|SXF (SFC) ファイル (*.sfc)|*.sfc|SXF (P21) ファイル (*.p21;*.p2z)|*.p21;*.p2z";
 
     /// <summary>保存ダイアログの形式 (拡張子とフィルタの表示名)。順番がフィルタの番号になる。</summary>
     public static IReadOnlyList<(string Ext, string Label)> SaveFormats { get; } =

@@ -120,6 +120,20 @@ public static class SymbolLibrary
         UserChanged?.Invoke(null, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// 図面 (プロジェクト) に入っていたプリセットの形を、表示用に覚える。登録プリセットの一覧には足さない。
+    /// 組み込み・登録済みに同じ種類があれば何もしない (この PC の登録を優先する)。
+    /// </summary>
+    public static void RegisterForDisplay(SymbolDefinition def)
+    {
+        if (string.IsNullOrEmpty(def.Kind) || def.Shapes is not { Count: > 0 } || BuiltIn.Any(d => d.Kind == def.Kind)) return;
+        lock (_user)
+        {
+            if (_user.Any(d => d.Kind == def.Kind)) return;
+            _removed[def.Kind] = def with { IsUser = true };
+        }
+    }
+
     public static bool RemoveUser(string kind)
     {
         lock (_user)

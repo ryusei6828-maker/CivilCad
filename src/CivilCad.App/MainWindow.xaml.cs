@@ -144,7 +144,20 @@ public partial class MainWindow : Window
         {
             // 保存していないシートがあれば確認する
             var unsaved = _sheets.Where(s => s.IsModified).ToList();
-            if (unsaved.Count > 0 && MessageBox.Show(this,
+            if (unsaved.Count > 0 && _projectPath != null)
+            {
+                // プロジェクトを開いているときは、プロジェクトに保存して終われるようにする
+                var answer = MessageBox.Show(this,
+                    $"保存していないシートがあります:\n{string.Join("\n", unsaved.Select(s => "・" + s.FileName))}\n\n" +
+                    $"プロジェクト「{Path.GetFileName(_projectPath)}」に保存して終了しますか?\n(いいえ: 保存せずに終了)",
+                    "確認", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                if (answer == MessageBoxResult.Cancel || answer == MessageBoxResult.Yes && !SaveProject(saveAs: false))
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            }
+            else if (unsaved.Count > 0 && MessageBox.Show(this,
                     $"保存していないシートがあります:\n{string.Join("\n", unsaved.Select(s => "・" + s.FileName))}\n\n保存せずに終了しますか?",
                     "確認", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
             {
@@ -246,6 +259,9 @@ public partial class MainWindow : Window
             case "CM": SetPanelOpen(_coordDock, !_coordDock.IsOpen); break;
             case "CMF": SetPanelFloating(_coordDock, !_coordDock.IsFloating); break;
             case "CD": DrawCoordinates(); break;
+            case "PJO": OpenProjectDialog(); break;
+            case "PJS": SaveProject(saveAs: false); break;
+            case "PJA": SaveProject(saveAs: true); break;
             case "CEX": SetPanelOpen(_coordDock, true); CoordPanel.ExportCsv(); break;
             case "SEX": SetPanelOpen(_coordDock, true); CoordPanel.ExportSima(); break;
             case "U": Undo_Executed(this, null!); break;
@@ -476,6 +492,20 @@ public partial class MainWindow : Window
             }
         }
 
+        // Ctrl+Shift+S: プロジェクトを保存。Ctrl+S: プロジェクトを開いていればプロジェクトに上書き保存 (開いていなければ従来の「名前を付けて保存」)
+        if (e.Key == Key.S && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            SaveProject(saveAs: false);
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control && _projectPath != null)
+        {
+            SaveProject(saveAs: false);
+            e.Handled = true;
+            return;
+        }
+
         // 設定で割り当てたショートカット (F3 スナップ / F8 直交 もここ)
         if (TryRunShortcut(e))
         {
@@ -621,6 +651,12 @@ public partial class MainWindow : Window
     /// <summary>図面ファイルを開く (空のシートならそこに、そうでなければ新しいタブに)。</summary>
     private void OpenDrawingFile(string fileName)
     {
+        if (ProjectFile.IsProject(fileName))
+        {
+            OpenProject(fileName);
+            return;
+        }
+
         // 同じファイルが開いていればそのタブへ
         if (_sheets.FirstOrDefault(s => string.Equals(s.FilePath, fileName, StringComparison.OrdinalIgnoreCase)) is { } opened)
         {
@@ -1924,7 +1960,108 @@ public partial class MainWindow : Window
     }
 
     private void UpdateTitle() =>
-        Title = $"CivilCad - {_active.FileName}  [{_active.Doc.ScaleText} / {_active.ZoneText}]";
+        Title = "CivilCad - " + (_projectPath != null ? $"{Path.GetFileNameWithoutExtension(_projectPath)} : " : "") +
+                $"{_active.FileName}  [{_active.Doc.ScaleText} / {_active.ZoneText}]";
+
+    // ---- プロジェクト ----
+
+    /// <summary>開いている (保存した) プロジェクトファイル。null ならプロジェクトとして保存していない。</summary>
+    private string? _projectPath;
+
+    private void OpenProjectDialog()
+    {
+        var dlg = new OpenFileDialog { Title = "CivilCad プロジェクトを開く", Filter = ProjectFile.Filter };
+        if (dlg.ShowDialog(this) == true) OpenProject(dlg.FileName);
+    }
+
+    /// <summary>
+    /// プロジェクトを開く: プロジェクトのシートをタブに加える (何も描いていない空のシートは閉じる)。
+    /// 路線の入力 (IP 表など) も戻し、作図済みだった路線は計算し直して測点照会などに使えるようにする。
+    /// </summary>
+    public void OpenProject(string path)
+    {
+        if (_projectPath != null && string.Equals(Path.GetFullPath(path), Path.GetFullPath(_projectPath), StringComparison.OrdinalIgnoreCase)
+            && MessageBox.Show(this, "このプロジェクトは既に開いています。もう一度読み込んで、シートを追加しますか?", "プロジェクトを開く",
+                MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+            return;
+        ProjectData data;
+        try
+        {
+            data = ProjectFile.Load(path);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, $"{Path.GetFileName(path)} を開けませんでした。\n{ex.Message}", "プロジェクトを開く", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var blanks = _sheets.Where(s => s.IsBlank).ToList();
+        var added = new List<Sheet>();
+        foreach (var ps in data.Sheets)
+        {
+            var sheet = new Sheet(ps.Doc) { DisplayName = ps.Name, AlignmentInput = ps.Alignment, ViewCenter = ps.ViewCenter, ViewScale = ps.ViewScale };
+            if (ps.HasAlignment)
+            {
+                try
+                {
+                    sheet.Alignment = ps.Alignment.Compute();
+                }
+                catch (CivilCad.Alignment.AlignmentException)
+                {
+                    sheet.Alignment = null;
+                }
+            }
+            sheet.MarkSaved();
+            _sheets.Add(sheet);
+            added.Add(sheet);
+        }
+        ActivateSheet(added[data.ActiveIndex]);
+        foreach (var b in blanks) _sheets.Remove(b);
+        _projectPath = path;
+        UpdateTitle();
+        var points = added.Sum(s => CoordinateRegistry.Rows(s.Doc).Count);
+        var routes = added.Count(s => s.Alignment != null);
+        Log($"プロジェクトを開きました: {path}  (シート {added.Count} 枚、図形 {added.Sum(s => s.Doc.Entities.Count)} 個、登録座標 {points} 点" +
+            (routes > 0 ? $"、路線 {routes} 本" : "") + ")" +
+            (data.SkippedEntities > 0 ? $"  読めなかった図形が {data.SkippedEntities} 個あります。" : "") +
+            (added.SelectMany(s => s.Doc.Entities).OfType<ImageEntity>().Any(i => !File.Exists(i.Path)) ? "  見つからない画像があります (画像はプロジェクトに入らないので、画像ファイルも一緒に移してください)。" : ""));
+    }
+
+    /// <summary>開いているシートすべてをプロジェクトファイルに保存する。saveAs か、まだ保存していなければ保存先を選ぶ。</summary>
+    private bool SaveProject(bool saveAs)
+    {
+        var path = _projectPath;
+        if (saveAs || path == null)
+        {
+            var dlg = new SaveFileDialog
+            {
+                Title = "CivilCad プロジェクトを保存",
+                Filter = ProjectFile.Filter,
+                FileName = path != null ? Path.GetFileName(path) : (_sheets.FirstOrDefault(s => s.FilePath != null) is { } f ? Path.GetFileNameWithoutExtension(f.FilePath) : "プロジェクト") + ProjectFile.Extension,
+            };
+            if (dlg.ShowDialog(this) != true) return false;
+            path = dlg.FileName;
+        }
+        _active.ViewCenter = Canvas.ViewCenter;
+        _active.ViewScale = Canvas.Scale;
+        var sheets = _sheets.Select(s => new ProjectSheet(
+            s.DisplayName ?? (s.FilePath != null ? Path.GetFileNameWithoutExtension(s.FilePath) : s.FileName),
+            s.Doc, s.AlignmentInput, s.Alignment != null, s.ViewCenter, s.ViewScale, s.FilePath)).ToList();
+        try
+        {
+            ProjectFile.Save(path, sheets, _sheets.IndexOf(_active), typeof(MainWindow).Assembly.GetName().Version?.ToString(3));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, ex.Message, "プロジェクトの保存", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+        foreach (var s in _sheets) s.MarkSaved();
+        _projectPath = path;
+        UpdateTitle();
+        var points = _sheets.Sum(s => CoordinateRegistry.Rows(s.Doc).Count);
+        Log($"プロジェクトを保存しました: {path}  (シート {_sheets.Count} 枚、登録座標 {points} 点、路線 {_sheets.Count(s => s.Alignment != null)} 本)");
+        return true;
+    }
 
     private static T? FindParent<T>(DependencyObject d) where T : DependencyObject
     {
