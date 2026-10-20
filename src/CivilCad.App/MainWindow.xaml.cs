@@ -22,6 +22,12 @@ namespace CivilCad.App;
 
 public partial class MainWindow : Window
 {
+    /// <summary>
+    /// 本体を閉じたらアプリ (Application) を終えるか。ふつうは true。
+    /// テストでは false にする: アプリを終えると、同じプロセスのほかのテストでウィンドウを表示できなくなるため。
+    /// </summary>
+    public static bool ShutdownAppOnClose { get; set; } = true;
+
     private readonly List<string> _messages = [];
     private readonly AppSettings _settings = AppSettings.Load();
     private Dictionary<KeyChord, string> _keyMap = [];
@@ -170,7 +176,10 @@ public partial class MainWindow : Window
             SaveSettingsQuietly();
         };
         // 本体を閉じたらアプリを終える (隠れているフロートのパネルなどが残ってプロセスが終わらないことがあった)
-        Closed += (_, _) => Application.Current?.Shutdown();
+        Closed += (_, _) =>
+        {
+            if (ShutdownAppOnClose) Application.Current?.Shutdown();
+        };
         OnPanelStateChanged();
     }
 

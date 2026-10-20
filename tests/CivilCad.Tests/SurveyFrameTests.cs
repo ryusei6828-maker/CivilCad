@@ -13,6 +13,7 @@ namespace CivilCad.Tests;
 /// 座標設定 (CS) を 2 点で行っても図面は回さず、測量座標の向きをシートに持つ。
 /// 座標の入力・計測の方向角・方位記号・保存はこの向きで扱う。矩形 (REC) も。
 /// </summary>
+[Collection("SharedToolSettings")] // 共有の設定を書き換える
 public class SurveyFrameTests
 {
     private static void RunSta(Action<CadDocument, CadCanvas> action)

@@ -6,6 +6,7 @@ using CivilCad.Core.Model;
 
 namespace CivilCad.Tests;
 
+[Collection("SharedToolSettings")] // 共有の設定を書き換える
 public class DragSelectTests
 {
     private static void RunSta(Action action)

@@ -4,6 +4,7 @@ using CivilCad.App.Settings;
 namespace CivilCad.Tests;
 
 /// <summary>画面 (XAML) が例外なく組み立てられるかの確認。WPF は STA スレッドが必要。</summary>
+[Collection("SharedToolSettings")] // 共有の設定を書き換える
 public class WindowLoadTests
 {
     [Fact]
@@ -12,10 +13,14 @@ public class WindowLoadTests
         Exception? error = null;
         var thread = new Thread(() =>
         {
+            // 本体を閉じてもアプリを終えない (終えると、このあとのテストでウィンドウを表示できなくなる)
+            CivilCad.App.MainWindow.ShutdownAppOnClose = false;
             try
             {
                 var app = new CivilCad.App.App();
                 app.InitializeComponent(); // アイコン等のリソースを読み込む
+                // App.xaml は「本体を閉じたら終える」設定。テストでは終えない (同上)
+                app.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
                 var main = new CivilCad.App.MainWindow();
                 {
                     // 文字コマンド: クリックした位置に入力欄が出て、打った文字が見本・確定に使われる
@@ -235,6 +240,10 @@ public class WindowLoadTests
             catch (Exception ex)
             {
                 error = ex;
+            }
+            finally
+            {
+                CivilCad.App.MainWindow.ShutdownAppOnClose = true;
             }
         });
         thread.SetApartmentState(ApartmentState.STA);

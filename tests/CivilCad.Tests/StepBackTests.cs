@@ -7,6 +7,7 @@ using CivilCad.Core.Model;
 namespace CivilCad.Tests;
 
 /// <summary>右クリックメニューの「一つ戻す」(StepBack)。</summary>
+[Collection("SharedToolSettings")] // 共有の設定を書き換える
 public class StepBackTests
 {
     private static void RunSta(Action<CadDocument, CadCanvas> action)

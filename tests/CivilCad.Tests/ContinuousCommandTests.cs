@@ -7,6 +7,7 @@ using CivilCad.Core.Model;
 namespace CivilCad.Tests;
 
 /// <summary>コマンドは 1 つ描いても終わらず、続けて描ける (Esc で終了)。</summary>
+[Collection("SharedToolSettings")] // 共有の設定を書き換える
 public class ContinuousCommandTests
 {
     private static void RunSta(Action<CadDocument, CadCanvas> action)
