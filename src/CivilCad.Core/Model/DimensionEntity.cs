@@ -42,8 +42,29 @@ public sealed class DimensionEntity(Layer layer, Vec2 p1, Vec2 p2, Vec2 linePoin
         }
     }
 
-    /// <summary>計った長さ (m)。</summary>
-    public double Measured => Math.Abs((P2 - P1).Dot(Direction));
+    /// <summary>
+    /// 縦の長さの倍率 (シートの縦の縮尺 / 横の縮尺。縦横で縮尺が違う縦断図などで 1 以外)。
+    /// 寸法値は図面上の縦の長さにこれを掛けた実際の長さで計る。
+    /// </summary>
+    public double VerticalFactor { get; set; } = 1;
+
+    /// <summary>
+    /// 計った長さ (m)。縦横で縮尺が違えば、実際の大きさ (縦を VerticalFactor 倍) に直してから計る向きの長さを求める
+    /// (水平の寸法は横の長さ、垂直の寸法は縦の長さ、平行の寸法は実際の斜めの長さ)。
+    /// </summary>
+    public double Measured
+    {
+        get
+        {
+            var d = P2 - P1;
+            var u = Direction;
+            var f = VerticalFactor;
+            if (Math.Abs(f - 1) < 1e-12) return Math.Abs(d.Dot(u));
+            // 実際の差 r = (dx, dy·f)、実際の向き u' = (ux, uy·f) / |…| → r·u'
+            var norm = Math.Sqrt(u.X * u.X + u.Y * u.Y * f * f);
+            return norm > 0 ? Math.Abs(d.X * u.X + d.Y * u.Y * f * f) / norm : 0;
+        }
+    }
 
     public string MeasuredText
     {
@@ -163,6 +184,7 @@ public sealed class DimensionEntity(Layer layer, Vec2 p1, Vec2 p2, Vec2 linePoin
         Unit = Unit,
         Decimals = Decimals,
         TextOverride = TextOverride,
+        VerticalFactor = VerticalFactor,
     });
 
     public override IEnumerable<SnapPoint> SnapPoints

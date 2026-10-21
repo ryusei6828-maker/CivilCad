@@ -146,6 +146,7 @@ public static class ProjectFile
             ViewCenter = s.ViewCenter,
             ViewScale = s.ViewScale,
             Scale = d.ScaleDenominator,
+            VerticalScale = d.HasVerticalScale ? d.VerticalScaleDenominator : null,
             PlaneZone = d.PlaneZone,
             SurveyRotation = d.SurveyRotation,
             SurveyPivot = d.SurveyPivot,
@@ -193,6 +194,7 @@ public static class ProjectFile
             {
                 P1 = d.P1, P2 = d.P2, LinePoint = d.LinePoint, Angle = d.Angle, TextHeight = d.TextHeight, TerminatorSize = d.TerminatorSize,
                 Terminator = d.Terminator, Unit = d.Unit, Decimals = d.Decimals, TextOverride = d.TextOverride,
+                VerticalFactor = Math.Abs(d.VerticalFactor - 1) > 1e-12 ? d.VerticalFactor : null,
             },
             _ => null,
         };
@@ -303,6 +305,7 @@ public static class ProjectFile
     {
         doc.Clear();
         if (s.Scale > 0) doc.ScaleDenominator = s.Scale;
+        if (s.VerticalScale is > 0) doc.VerticalScaleDenominator = s.VerticalScale;
         doc.PlaneZone = s.PlaneZone;
         doc.SetSurveyFrame(s.SurveyRotation, s.SurveyPivot);
         doc.UseTrueNorth = s.UseTrueNorth;
@@ -374,6 +377,7 @@ public static class ProjectFile
         DimensionDto d => new DimensionEntity(layer, d.P1, d.P2, d.LinePoint, d.Angle, d.TextHeight, d.TerminatorSize)
         {
             Terminator = d.Terminator, Unit = d.Unit, Decimals = d.Decimals, TextOverride = d.TextOverride,
+            VerticalFactor = d.VerticalFactor is > 0 and var f ? f : 1,
         },
         _ => null,
     };
@@ -407,6 +411,7 @@ public static class ProjectFile
         public Vec2? ViewCenter { get; set; }
         public double? ViewScale { get; set; }
         public double Scale { get; set; } = 500;
+        public double? VerticalScale { get; set; }
         public int? PlaneZone { get; set; }
         public double SurveyRotation { get; set; }
         public Vec2 SurveyPivot { get; set; }
@@ -559,6 +564,7 @@ public static class ProjectFile
         public DimUnit Unit { get; set; }
         public int Decimals { get; set; } = 3;
         public string? TextOverride { get; set; }
+        public double? VerticalFactor { get; set; }
     }
 
     /// <summary>座標は [x, y] で書く。</summary>

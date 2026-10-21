@@ -101,6 +101,7 @@ public sealed class DimensionTool : CadTool, IStyledDrawTool
         Terminator = DimSettings.Terminator,
         Unit = DimSettings.Unit,
         Decimals = DimSettings.Decimals,
+        VerticalFactor = Doc.VerticalFactor, // 縦横で縮尺が違うシートでは縦の長さを縦の縮尺で計る
     };
 
     private void Place(Vec2 a, Vec2 b, Vec2 line)

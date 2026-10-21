@@ -673,14 +673,14 @@ public partial class MainWindow : Window
             var note = loaded.Note;
             // 図面の縮尺 (と DXF / DWG の座標の単位) を選んでもらう
             var extents = _doc.Entities.Where(_doc.IsVisible).Aggregate(Box2.Empty, (acc, x) => acc.Union(x.Bounds));
-            if (ImportScaleWindow.Ask(this, fileName, loaded, extents.IsEmpty ? null : extents, sheetScale) is not var (scale, unit))
+            if (ImportScaleWindow.Ask(this, fileName, loaded, extents.IsEmpty ? null : extents, sheetScale) is not var (scale, unit, vertical))
             {
                 if (created) RemoveSheet(_active, previous);
                 else _doc.Clear();
                 Log($"読み込みをやめました: {fileName}");
                 return;
             }
-            var (factor, sheet) = DrawingFiles.ApplyImportScale(_doc, loaded, scale, unit);
+            var (factor, sheet) = DrawingFiles.ApplyImportScale(_doc, loaded, scale, unit, vertical);
             note = $"  縮尺 {_doc.ScaleText}" + (Math.Abs(factor - 1) > 1e-12 ? $" (ファイルの値を {factor:0.######} 倍)" : "") + " で読み込みました。" + note;
             if (_doc.PlaneZone == null && _settings.DefaultPlaneZone is int defZone)
             {
@@ -1335,17 +1335,29 @@ public partial class MainWindow : Window
 
     private void OpenScaleDialog()
     {
-        var dlg = new ScaleWindow(_doc.ScaleDenominator) { Owner = this };
-        if (dlg.ShowDialog() != true || dlg.Result == _doc.ScaleDenominator) return;
-        ChangeScale(dlg.Result, dlg.Mode);
+        var dlg = new ScaleWindow(_doc.ScaleDenominator, _doc.HasVerticalScale ? _doc.VerticalScaleDenominator : null) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var newVertical = dlg.VerticalResult;
+        var oldVertical = _doc.HasVerticalScale ? _doc.VerticalScaleDenominator : null;
+        if (dlg.Result != _doc.ScaleDenominator) ChangeScale(dlg.Result, dlg.Mode, newVertical);
+        else if (newVertical != oldVertical)
+        {
+            _doc.History.Execute(new SetVerticalScaleCommand(newVertical));
+            Log(newVertical is double v
+                ? $"縦の縮尺を 1:{v:0.##} にしました ({_doc.ScaleText})。距離・面積の計測と寸法の値は、縦の長さを縦の縮尺で直します。"
+                : $"縦の縮尺をなくしました (縦横とも {_doc.ScaleText})。");
+        }
         CommandBox.Focus();
     }
 
     /// <summary>シートの縮尺を変える (元に戻すで一度に戻る)。</summary>
-    private void ChangeScale(double scale, ScaleChangeMode mode)
+    private void ChangeScale(double scale, ScaleChangeMode mode, double? vertical = null)
     {
         var k = scale / _doc.ScaleDenominator;
-        _doc.History.Execute(PaperRescale.Command(_doc, scale, mode, Canvas.ScaleView)); // 図寸固定は表示も同じだけ広げて見た目を変えない
+        // 縦の縮尺 (と寸法の縦の倍率) も新しい横の縮尺に合わせ直す (元に戻すで一度に戻る)
+        _doc.History.Execute(new CompositeCommand($"縮尺 1:{scale:0.##}",
+            PaperRescale.Command(_doc, scale, mode, Canvas.ScaleView), // 図寸固定は表示も同じだけ広げて見た目を変えない
+            new SetVerticalScaleCommand(vertical)));
         if (mode == ScaleChangeMode.KeepPaper)
         {
             Log($"シートの縮尺を {_doc.ScaleText} にしました (図面をそのまま: 図面全体を {k:0.####} 倍。計測の値も {_doc.ScaleText} の値になります)。");

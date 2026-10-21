@@ -44,6 +44,7 @@ public static class SectionDrawing
     public static int DrawProfile(CadDocument doc, RouteSections r, SectionScales scales)
     {
         doc.ScaleDenominator = scales.ProfileHorizontal;
+        doc.VerticalScaleDenominator = scales.ProfileVertical; // 計測・寸法で高さを縦の縮尺で読む
         var th = doc.PaperMmToMeters(2.5);
         var ex = scales.Exaggeration;
         var lGround = doc.GetOrCreateLayer("現況地盤", GroundColor);

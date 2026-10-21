@@ -28,7 +28,9 @@ public static partial class SfcIO
         int.TryParse(tag[MarkerTagPrefix.Length..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var c) && c is >= 1 and <= 7 ? c : DotMarker;
 
     /// <param name="Sheet">用紙の範囲 (図面座標 m)。drawing_sheet_feature が無ければ null。</param>
-    public sealed record LoadResult(int Entities, int Skipped, double ScaleDenominator, IReadOnlyDictionary<string, int> SkippedKinds, Box2? Sheet = null);
+    /// <param name="VerticalScaleDenominator">部分図の縦と横の倍率が違えば (縦断図など) 縦の縮尺の分母。同じなら null。</param>
+    public sealed record LoadResult(int Entities, int Skipped, double ScaleDenominator, IReadOnlyDictionary<string, int> SkippedKinds, Box2? Sheet = null,
+        double? VerticalScaleDenominator = null);
 
     /// <summary>SXF のフィーチャ (名前と引数。文字列は X2 表記を戻したもの)。P21 の読み書きでも使う。</summary>
     internal sealed record Feature(string Name, List<string> Args);
@@ -225,14 +227,15 @@ public static partial class SfcIO
                 }
             }
 
-            var scale = DetectScale(top);
+            var (scale, vertical) = DetectScale(top);
             _paperMmToMeter = scale / 1000;
             doc.ScaleDenominator = scale;
+            doc.VerticalScaleDenominator = vertical;
             Emit(top, Affine.Scale(_paperMmToMeter), 0);
 
             doc.Entities.AddRange(_output);
             doc.NotifyChanged();
-            return new LoadResult(_output.Count, _skippedCount, scale, _skipped, SheetBox(features));
+            return new LoadResult(_output.Count, _skippedCount, scale, _skipped, SheetBox(features), vertical);
         }
 
         /// <summary>用紙 (drawing_sheet_feature: 名前, 用紙種別, 向き, 幅, 高さ) の範囲を図面座標で。</summary>
@@ -261,20 +264,26 @@ public static partial class SfcIO
         /// <summary>
         /// 図面の縮尺 = 部分図 (sfig 種別 1: 数学座標系、2: 測地座標系) のうち、図形の数が最も多い縮尺。
         /// (縮尺の違う部分図が混ざっていても、主な図が実寸になるようにする)
+        /// その部分図の縦の倍率が横と違えば (縦断図など)、縦の縮尺も返す (同じなら null)。
         /// </summary>
-        private double DetectScale(List<Feature> top)
+        private (double Scale, double? Vertical) DetectScale(List<Feature> top)
         {
             var best = top.Where(f => f.Name == "sfig_locate_feature" && f.Args.Count >= 7 &&
                                       _sfigs.TryGetValue(f.Args[1], out var s) && s.Flag is "1" or "2")
-                .Select(f => (Ratio: Math.Abs(D(f.Args[5])), Count: _sfigs[f.Args[1]].Members.Count))
+                .Select(f => (Ratio: Math.Abs(D(f.Args[5])), RatioY: Math.Abs(D(f.Args[6])), Count: _sfigs[f.Args[1]].Members.Count))
                 .Where(x => x.Ratio > 0)
                 .GroupBy(x => Math.Round(1 / x.Ratio))
                 .OrderByDescending(g => g.Sum(x => x.Count))
                 .FirstOrDefault();
-            if (best != null) return best.Key;
+            if (best != null)
+            {
+                var vertical = best.Where(x => x.RatioY > 0).GroupBy(x => Math.Round(1 / x.RatioY))
+                    .OrderByDescending(g => g.Sum(x => x.Count)).Select(g => (double?)g.Key).FirstOrDefault();
+                return (best.Key, vertical is double v && Math.Abs(v - best.Key) > 1e-9 ? v : null);
+            }
             // 部分図が無い (図枠・表題欄だけなど) ときは、用紙上の縮尺の文字 (表題欄の「1:100」「S=1/100」) から
             var fromText = top.Where(f => f.Name == "text_string_feature" && f.Args.Count > 3).Select(f => ScaleFromText(f.Args[3])).FirstOrDefault(s => s > 1);
-            return fromText > 1 ? fromText : 1;
+            return (fromText > 1 ? fromText : 1, null);
         }
 
         private static double ScaleFromText(string s)

@@ -61,7 +61,37 @@ public sealed class CadDocument : INotifyPropertyChanged
         }
     }
 
-    public string ScaleText => $"1:{ScaleDenominator:0.##}";
+    private double? _verticalScaleDenominator;
+
+    /// <summary>
+    /// 縦の縮尺の分母 (縦断図など、縦と横で縮尺が違う図。例: 横 1:1000・縦 1:100 なら 100)。null なら横と同じ。
+    /// 図形は用紙どおりの形 (横の縮尺で換算した大きさ) のまま持ち、計測・寸法で縦の長さを縦の縮尺に直す。
+    /// </summary>
+    public double? VerticalScaleDenominator
+    {
+        get => _verticalScaleDenominator;
+        set
+        {
+            if (value is double v && !(v > 0)) throw new ArgumentOutOfRangeException(nameof(value), "縮尺は正の値にしてください。");
+            if (_verticalScaleDenominator == value) return;
+            _verticalScaleDenominator = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ScaleText));
+            NotifyChanged();
+        }
+    }
+
+    /// <summary>縦と横で縮尺が違う。</summary>
+    public bool HasVerticalScale => VerticalScaleDenominator is double v && Math.Abs(v - ScaleDenominator) > 1e-9;
+
+    /// <summary>図面上の縦の長さ (m) → 実際の縦の長さ (m) の倍率 (縦の縮尺 / 横の縮尺。横 1:1000・縦 1:100 なら 0.1)。</summary>
+    public double VerticalFactor => VerticalScaleDenominator is double v ? v / ScaleDenominator : 1;
+
+    /// <summary>図面上の差 (Δx, Δy) → 実際の差 (縦は縦の縮尺で直す)。</summary>
+    public Vec2 ToRealDelta(Vec2 d) => new(d.X, d.Y * VerticalFactor);
+
+    /// <summary>縮尺の表示 (1:500、縦横で違えば H=1:1000 V=1:100)。</summary>
+    public string ScaleText => HasVerticalScale ? $"H=1:{ScaleDenominator:0.##} V=1:{VerticalScaleDenominator:0.##}" : $"1:{ScaleDenominator:0.##}";
 
     /// <summary>平面直角座標系の系番号 (1〜19)。null は未設定。</summary>
     public int? PlaneZone
@@ -309,6 +339,7 @@ public sealed class CadDocument : INotifyPropertyChanged
         if (!Layers.Contains(layer0)) Layers.Add(layer0);
         OnlyCurrentLayerEditable = false;
         PlaneZone = null;
+        VerticalScaleDenominator = null;
         SurveyRotation = 0;
         SurveyPivot = Vec2.Zero;
         History.Clear();

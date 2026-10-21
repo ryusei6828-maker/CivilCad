@@ -53,7 +53,9 @@ public static class DrawingFiles
     /// <param name="FileScale">ファイルに書いてあった縮尺 (分母)。無ければ null。</param>
     /// <param name="FileUnit">DXF / DWG の座標の単位 ($INSUNITS)。分からなければ null。</param>
     /// <param name="PaperFormat">SFC / P21 / JWW: 用紙上の mm とファイルの縮尺から実寸 (m) に換算して読んだ。</param>
-    public sealed record OpenResult(string Note, Box2? Sheet, double? FileScale = null, ImportUnit? FileUnit = null, bool PaperFormat = false);
+    /// <param name="FileVerticalScale">ファイルの縦の縮尺 (縦横で違うとき。SFC・P21 の部分図の倍率から)。</param>
+    public sealed record OpenResult(string Note, Box2? Sheet, double? FileScale = null, ImportUnit? FileUnit = null, bool PaperFormat = false,
+        double? FileVerticalScale = null);
 
     /// <summary>
     /// ファイルを読み込んで doc を置き換える。全部のレイヤが非表示で何も見えないときは、全レイヤを表示にする
@@ -81,14 +83,14 @@ public static class DrawingFiles
                 var r = SfcIO.Load(doc, path);
                 PointLabels.Fold(doc); // 点の横の点名・標高の文字を点に戻す
                 var note = r.Skipped > 0 ? $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}")) : "";
-                return new OpenResult(note, r.Sheet, r.ScaleDenominator, null, true);
+                return new OpenResult(note, r.Sheet, r.ScaleDenominator, null, true, r.VerticalScaleDenominator);
             }
             case ".p21" or ".p2z":
             {
                 var r = P21IO.Load(doc, path);
                 PointLabels.Fold(doc);
                 var note = r.Skipped > 0 ? $"  ※未対応 {r.Skipped} 個: " + string.Join(", ", r.SkippedKinds.Select(k => $"{k.Key} {k.Value}")) : "";
-                return new OpenResult(note, r.Sheet, r.ScaleDenominator, null, true);
+                return new OpenResult(note, r.Sheet, r.ScaleDenominator, null, true, r.VerticalScaleDenominator);
             }
             case ".jww":
             {
@@ -105,7 +107,8 @@ public static class DrawingFiles
             default:
             {
                 var skipped = DxfIO.Load(doc, path, out var scale, out var unit);
-                return new OpenResult(skipped > 0 ? $"  ※未対応の図形 {skipped} 個は読み込んでいません (ブロック・寸法・ハッチング等)" : "", null, scale, unit);
+                return new OpenResult(skipped > 0 ? $"  ※未対応の図形 {skipped} 個は読み込んでいません (ブロック・寸法・ハッチング等)" : "", null, scale, unit,
+                    FileVerticalScale: doc.HasVerticalScale ? doc.VerticalScaleDenominator : null);
             }
         }
     }
@@ -132,7 +135,7 @@ public static class DrawingFiles
     /// 読み込んだ図面を、選んだ縮尺・単位にする (図形を原点を基準に拡大・縮小し、シートの縮尺を scale にする)。
     /// 文字・記号は用紙上の大きさのまま。戻り値は倍率と、用紙の範囲 (あれば)。
     /// </summary>
-    public static (double Factor, Box2? Sheet) ApplyImportScale(CadDocument doc, OpenResult r, double scale, ImportUnit unit)
+    public static (double Factor, Box2? Sheet) ApplyImportScale(CadDocument doc, OpenResult r, double scale, ImportUnit unit, double? vertical = null)
     {
         var k = ImportFactor(r, scale, unit);
         if (Math.Abs(k - 1) > 1e-12)
@@ -152,7 +155,9 @@ public static class DrawingFiles
             }
         }
         doc.ScaleDenominator = scale;
+        doc.VerticalScaleDenominator = vertical is double v && Math.Abs(v - scale) > 1e-9 ? v : null;
         foreach (var s in doc.Entities.OfType<SymbolEntity>()) s.Size = doc.PaperMmToMeters(s.SizeMm);
+        foreach (var d in doc.Entities.OfType<DimensionEntity>()) d.VerticalFactor = doc.VerticalFactor;
         doc.History.Clear();
         doc.NotifyChanged();
         var sheet = r.Sheet is Box2 b ? new Box2(b.Min * k, b.Max * k) : (Box2?)null;

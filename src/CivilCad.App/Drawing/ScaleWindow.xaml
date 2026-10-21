@@ -8,6 +8,13 @@
             <TextBlock Text="このシートの縮尺   1 :" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="14"/>
             <ComboBox x:Name="ScaleBox" Width="120" IsEditable="True" FontSize="14" TextBoxBase.TextChanged="ScaleBox_TextChanged"/>
         </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="縦の縮尺           1 :" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="14"/>
+            <ComboBox x:Name="VerticalBox" Width="120" IsEditable="True" FontSize="14"
+                      ToolTip="縦断図など、縦と横で縮尺が違うときに入れる (例: 横 1:1000・縦 1:100)。空なら横と同じ"/>
+        </StackPanel>
+        <TextBlock Margin="0,2,0,0" Foreground="Gray" TextWrapping="Wrap"
+                   Text="縦断図など縦横で縮尺が違う図のときだけ入れます (空なら横と同じ)。図形はそのままで、距離・面積の計測と寸法の値で縦の長さを縦の縮尺に直します。"/>
         <TextBlock x:Name="InfoText" Margin="0,8,0,0" Foreground="Gray" TextWrapping="Wrap"/>
         <TextBlock Margin="0,10,0,2" Text="すでに描いた図形:"/>
         <RadioButton x:Name="KeepPaperRadio" GroupName="mode" Margin="0,2">

@@ -249,3 +249,35 @@ public sealed class ReorderEntitiesCommand(IEnumerable<Entity> newOrder, string 
         doc.NotifyChanged();
     }
 }
+
+/// <summary>
+/// シートの縦の縮尺を変える (null なら横と同じ)。寸法の縦の倍率もシートに合わせ直す。
+/// 横の縮尺を変えたあとに今の縦の縮尺で実行すると、寸法の倍率だけを合わせ直せる。
+/// </summary>
+public sealed class SetVerticalScaleCommand(double? verticalScaleDenominator) : IUndoableCommand
+{
+    private double? _old;
+    private readonly Dictionary<DimensionEntity, double> _oldFactors = [];
+
+    public string Name => verticalScaleDenominator is double v ? $"縦の縮尺 1:{v:0.##}" : "縦の縮尺 (横と同じ)";
+
+    public void Do(CadDocument doc)
+    {
+        _old = doc.VerticalScaleDenominator;
+        _oldFactors.Clear();
+        doc.VerticalScaleDenominator = verticalScaleDenominator;
+        foreach (var d in doc.Entities.OfType<DimensionEntity>())
+        {
+            _oldFactors[d] = d.VerticalFactor;
+            d.VerticalFactor = doc.VerticalFactor;
+        }
+        doc.NotifyChanged();
+    }
+
+    public void Undo(CadDocument doc)
+    {
+        doc.VerticalScaleDenominator = _old;
+        foreach (var (d, f) in _oldFactors) d.VerticalFactor = f;
+        doc.NotifyChanged();
+    }
+}

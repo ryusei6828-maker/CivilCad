@@ -109,7 +109,7 @@ public static class SfcWriter
         {
             var (paper, pw, ph, origin) = Layout(doc);
             var k = doc.ScaleDenominator / 1000;
-            var partName = $"図面:{doc.ScaleText.Replace(':', '/')}";
+            var partName = $"図面:1/{doc.ScaleDenominator:0.##}";
 
             // 色・線幅の表を先に作る (定義は使用より前に書く)
             foreach (var e in Entities)

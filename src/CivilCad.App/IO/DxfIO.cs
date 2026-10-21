@@ -20,6 +20,9 @@ public static class DxfIO
     private const string SurveyPivotXVariable = "$USERR2";
     private const string SurveyPivotYVariable = "$USERR3";
 
+    /// <summary>縦の縮尺の分母 (縦横で縮尺が違う縦断図など。0 = 横と同じ)。</summary>
+    private const string VerticalScaleVariable = "$USERR4";
+
     /// <summary>CivilCad 独自の情報 (PDF のページ番号など) を図形の XData に書くときのアプリ名。</summary>
     private const string AppId = "CIVILCAD";
 
@@ -71,6 +74,7 @@ public static class DxfIO
         dxf.DrawingVariables.AddCustomVariable(new netDxf.Header.HeaderVariable(SurveyRotationVariable, 40, doc.SurveyRotation));
         dxf.DrawingVariables.AddCustomVariable(new netDxf.Header.HeaderVariable(SurveyPivotXVariable, 40, doc.SurveyPivot.X));
         dxf.DrawingVariables.AddCustomVariable(new netDxf.Header.HeaderVariable(SurveyPivotYVariable, 40, doc.SurveyPivot.Y));
+        dxf.DrawingVariables.AddCustomVariable(new netDxf.Header.HeaderVariable(VerticalScaleVariable, 40, doc.HasVerticalScale ? doc.VerticalScaleDenominator!.Value : 0.0));
         dxf.Save(path);
     }
 
@@ -99,6 +103,8 @@ public static class DxfIO
             dxf.DrawingVariables.TryGetCustomVariable(SurveyPivotXVariable, out var pxVar) && Real(pxVar.Value) is double px &&
             dxf.DrawingVariables.TryGetCustomVariable(SurveyPivotYVariable, out var pyVar) && Real(pyVar.Value) is double py)
             doc.SetSurveyFrame(rot, new Vec2(px, py));
+        if (dxf.DrawingVariables.TryGetCustomVariable(VerticalScaleVariable, out var vVar) && Real(vVar.Value) is double vs && vs > 0)
+            doc.VerticalScaleDenominator = vs;
         if (dxf.DrawingVariables.TryGetCustomVariable(PlaneZoneVariable, out var zoneVar) &&
             Convert.ToInt32(zoneVar.Value, System.Globalization.CultureInfo.InvariantCulture) is >= 1 and <= 19 and var zone)
             doc.PlaneZone = zone;

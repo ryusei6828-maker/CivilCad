@@ -46,8 +46,15 @@ public static class MeasureSettings
     public static string UnitLabel => Unit.Label();
 
     /// <param name="surveyRotation">測量座標の向き (方向角を測量座標で出す)。</param>
-    public static string DistanceText(Vec2 a, Vec2 b, double surveyRotation = 0)
+    /// <param name="verticalFactor">縦の長さの倍率 (縦横で縮尺が違うシート)。1 以外なら実際の長さと高低差・勾配を書く。</param>
+    public static string DistanceText(Vec2 a, Vec2 b, double surveyRotation = 0, double verticalFactor = 1)
     {
+        if (Math.Abs(verticalFactor - 1) > 1e-12)
+        {
+            var r = new Vec2(b.X - a.X, (b.Y - a.Y) * verticalFactor);
+            var t = $"L={Num(Length(r.Length))}{UnitLabel}";
+            return Detail ? $"{t}  ΔH={Num(Length(r.Y))}{UnitLabel}" + (Math.Abs(r.X) > 1e-9 ? $"  i={r.Y / Math.Abs(r.X) * 100:0.###}%" : "") : t;
+        }
         var d = (b - a).Rotate(surveyRotation);
         var text = $"L={Num(Length(d.Length))}{UnitLabel}";
         return Detail ? $"{text}  θ={Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}" : text;
@@ -208,11 +215,21 @@ public sealed class DistanceTool : MeasureToolBase
         }
         if (p.DistanceTo(a) < 1e-12) return;
         _second = p;
-        var d = (p - a).Rotate(Doc.SurveyRotation); // ΔX・ΔY・方向角は測量座標の向きで (長さは同じ)
         var u = MeasureSettings.UnitLabel;
         string L(double v) => $"{MeasureSettings.Num(MeasureSettings.Length(v))} {u}";
-        Canvas.ShowMessage($"距離 = {L(d.Length)}   ΔX(北) = {L(d.Y)}  ΔY(東) = {L(d.X)}   方向角 = {Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}");
-        Measured(MeasureSettings.DistanceText(a, p, Doc.SurveyRotation), MeasureSettings.ReadableAngle(a, p), TextHAlign.Center, TextVAlign.Bottom);
+        if (Doc.HasVerticalScale)
+        {
+            // 縦横で縮尺が違うシート (縦断図など): 縦は縦の縮尺で直して、斜めの長さ・水平距離・高低差・勾配
+            var r = Doc.ToRealDelta(p - a);
+            Canvas.ShowMessage($"距離 = {L(r.Length)}   水平 = {L(Math.Abs(r.X))}  高低差 = {L(r.Y)}" +
+                               (Math.Abs(r.X) > 1e-9 ? $"   勾配 = {r.Y / Math.Abs(r.X) * 100:0.###} %" : "") + $"   ({Doc.ScaleText})");
+        }
+        else
+        {
+            var d = (p - a).Rotate(Doc.SurveyRotation); // ΔX・ΔY・方向角は測量座標の向きで (長さは同じ)
+            Canvas.ShowMessage($"距離 = {L(d.Length)}   ΔX(北) = {L(d.Y)}  ΔY(東) = {L(d.X)}   方向角 = {Angles.ToDms(Angles.ToSurveyAzimuth(d.Angle))}");
+        }
+        Measured(MeasureSettings.DistanceText(a, p, Doc.SurveyRotation, Doc.VerticalFactor), MeasureSettings.ReadableAngle(a, p), TextHAlign.Center, TextVAlign.Bottom);
     }
 
     protected override void DrawMeasurePreview(DrawingContext dc)
@@ -271,9 +288,9 @@ public sealed class AreaTool : MeasureToolBase
             var a = _points[i];
             var b = _points[(i + 1) % _points.Count];
             sum += a.Cross(b);
-            perimeter += a.DistanceTo(b);
+            perimeter += Doc.ToRealDelta(b - a).Length; // 縦横で縮尺が違えば縦を直した長さ
         }
-        var area = Math.Abs(sum) / 2;
+        var area = Math.Abs(sum) / 2 * Doc.VerticalFactor; // 縦横で縮尺が違えば縦の倍率を掛ける
         var u = MeasureSettings.UnitLabel;
         Canvas.ShowMessage($"面積 = {MeasureSettings.Num(MeasureSettings.Area(area))} {u}²   周長 = {MeasureSettings.Num(MeasureSettings.Length(perimeter))} {u}" +
                            $"   ({_points.Count} 点)");
