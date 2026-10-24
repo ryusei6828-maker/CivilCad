@@ -145,4 +145,67 @@ public class ProjectFileTests
             if (Directory.Exists(moved)) Directory.Delete(moved, true);
         }
     }
+    [Fact]
+    public void SheetFiles_SavedOneByOne_ProjectListsThem()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"civilcad_{Guid.NewGuid():N}");
+        var moved = dir + "_moved";
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var project = Path.Combine(dir, "道路工事.ccp");
+            Assert.Equal(Path.Combine(dir, "道路工事"), ProjectFile.SheetFolder(project));
+            var a = new CadDocument();
+            a.Entities.Add(new LineEntity(a.CurrentLayer, Vec2.Zero, new Vec2(10, 0)));
+            var b = new CadDocument { ScaleDenominator = 250 };
+            b.Entities.Add(new PointEntity(b.CurrentLayer, new Vec2(1, 2)) { Name = "BM1" });
+
+            // シート名はファイル名に使えない文字を _ にし、重なれば (2)
+            var fa = ProjectFile.NewSheetPath(project, "平面図", []);
+            Assert.Equal(Path.Combine(dir, "道路工事", "平面図.ccs"), fa);
+            var fb = ProjectFile.NewSheetPath(project, "平面図", [fa]);
+            Assert.Equal(Path.Combine(dir, "道路工事", "平面図 (2).ccs"), fb);
+            Assert.Equal(Path.Combine(dir, "道路工事", "No.1_断面.ccs"), ProjectFile.NewSheetPath(project, "No.1/断面", []));
+
+            ProjectFile.SaveSheet(fa, new ProjectSheet("平面図", a, AlignmentInput.Sample(), false));
+            ProjectFile.SaveSheet(fb, new ProjectSheet("座標", b, AlignmentInput.Sample(), false));
+            ProjectFile.SaveProjectList(project, [fa, fb], 1);
+            Assert.True(File.Exists(fa) && File.Exists(fb));
+
+            // 1 枚だけ保存し直しても、もう 1 枚のファイルは変わらない
+            var before = File.ReadAllText(fb);
+            a.Entities.Add(new CircleEntity(a.CurrentLayer, Vec2.Zero, 3));
+            ProjectFile.SaveSheet(fa, new ProjectSheet("平面図", a, AlignmentInput.Sample(), false));
+            Assert.Equal(before, File.ReadAllText(fb));
+
+            Directory.Move(dir, moved); // フォルダごと移しても読める (一覧は相対の場所)
+            var loaded = ProjectFile.Load(Path.Combine(moved, "道路工事.ccp"));
+            Assert.Equal(["平面図", "座標"], loaded.Sheets.Select(s => s.Name));
+            Assert.Equal(1, loaded.ActiveIndex);
+            Assert.Equal(2, loaded.Sheets[0].Doc.Entities.Count);
+            Assert.Equal(250, loaded.Sheets[1].Doc.ScaleDenominator);
+            Assert.Equal(Path.Combine(moved, "道路工事", "平面図 (2).ccs"), loaded.Sheets[1].SheetFile);
+            Assert.Empty(loaded.Missing!);
+
+            // シートファイルは 1 枚だけでも開ける
+            var one = ProjectFile.Load(Path.Combine(moved, "道路工事", "平面図.ccs"));
+            Assert.Equal("平面図", Assert.Single(one.Sheets).Name);
+            Assert.True(ProjectFile.IsProject(Path.Combine(moved, "道路工事", "平面図.ccs")));
+
+            // 見つからないシートは飛ばして、名前を返す
+            File.Delete(Path.Combine(moved, "道路工事", "平面図.ccs"));
+            var partial = ProjectFile.Load(Path.Combine(moved, "道路工事.ccp"));
+            Assert.Equal("座標", Assert.Single(partial.Sheets).Name);
+            Assert.Equal("平面図.ccs", Path.GetFileName(Assert.Single(partial.Missing!)));
+
+            // シートが 0 枚の一覧 (全部のタブを閉じた) も開ける
+            ProjectFile.SaveProjectList(Path.Combine(moved, "空.ccp"), [], 0);
+            Assert.Empty(ProjectFile.Load(Path.Combine(moved, "空.ccp")).Sheets);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            if (Directory.Exists(moved)) Directory.Delete(moved, true);
+        }
+    }
 }

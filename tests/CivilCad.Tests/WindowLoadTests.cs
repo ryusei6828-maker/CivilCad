@@ -162,6 +162,33 @@ public class WindowLoadTests
                 {
                     System.IO.File.Delete(projPath);
                 }
+                // プロジェクト: シートを 1 枚ずつ別のファイルに保存し、タブを閉じたシートはプロジェクトから外す
+                {
+                    var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                    var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"civilcad_{Guid.NewGuid():N}");
+                    System.IO.Directory.CreateDirectory(dir);
+                    try
+                    {
+                        var project = System.IO.Path.Combine(dir, "工事.ccp");
+                        typeof(CivilCad.App.MainWindow).GetField("_projectPath", bf)!.SetValue(main, project);
+                        var sheets = (System.Collections.IList)typeof(CivilCad.App.MainWindow).GetField("_sheets", bf)!.GetValue(main)!;
+                        Assert.True((bool)typeof(CivilCad.App.MainWindow).GetMethod("SaveProject", bf)!.Invoke(main, [false])!);
+                        var files = System.IO.Directory.GetFiles(CivilCad.App.IO.ProjectFile.SheetFolder(project), "*.ccs");
+                        Assert.Equal(sheets.Count, files.Length);
+                        Assert.Equal(sheets.Count, CivilCad.App.IO.ProjectFile.Load(project).Sheets.Count);
+                        var first = (CivilCad.App.Sheet)sheets[0]!;
+                        typeof(CivilCad.App.MainWindow).GetMethod("CloseSheet", bf)!.Invoke(main, [first]); // 保存済みなので確認は出ない
+                        var after = CivilCad.App.IO.ProjectFile.Load(project);
+                        Assert.Equal(sheets.Count, after.Sheets.Count);
+                        Assert.DoesNotContain(after.Sheets, s => s.SheetFile == first.ProjectSheetPath);
+                        Assert.True(System.IO.File.Exists(first.ProjectSheetPath)); // ファイルは消さない
+                        typeof(CivilCad.App.MainWindow).GetField("_projectPath", bf)!.SetValue(main, null);
+                    }
+                    finally
+                    {
+                        System.IO.Directory.Delete(dir, true);
+                    }
+                }
                 // 「座標管理」タブを開くと座標の一覧も開く
                 var coordHost = (System.Windows.FrameworkElement)main.FindName("CoordHost");
                 Assert.Equal(System.Windows.Visibility.Collapsed, coordHost.Visibility);

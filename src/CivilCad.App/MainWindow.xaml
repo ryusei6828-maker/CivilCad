@@ -28,7 +28,7 @@
                 <MenuItem Header="開く(_O)... (DXF・DWG・JWW・SFC・P21)" Command="Open"><MenuItem.Icon><Image Source="{StaticResource IconOpen}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="名前を付けて保存(_S)... (DXF・DWG・JWW・SFC・P21)" Command="Save"><MenuItem.Icon><Image Source="{StaticResource IconSave}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
-                <MenuItem Header="プロジェクトを開く(_J)... (CivilCad プロジェクト .ccp)" Tag="PJO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconOpen}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="プロジェクト・シートを開く(_J)... (CivilCad プロジェクト .ccp・シート .ccs)" Tag="PJO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconOpen}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="プロジェクトを保存(_V)" Tag="PJS" Click="Tool_Click" InputGestureText="Ctrl+Shift+S"><MenuItem.Icon><Image Source="{StaticResource IconSave}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="名前を付けてプロジェクトを保存..." Tag="PJA" Click="Tool_Click"/>
                 <Separator/>

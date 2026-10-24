@@ -952,18 +952,24 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// シートを閉じる。未保存なら終了時と同じ確認 (このファイルの変更内容をプロジェクトファイルに保存しますか？ [保存] [保存しない] [キャンセル]) を出す。
-    /// 保存: プロジェクトに保存してから閉じる (まだなら保存先を聞き、保存をやめたら閉じない)。最後の 1 枚を閉じたら空のシートを作る。
+    /// 保存: そのシートだけをプロジェクトに保存してから閉じる (まだプロジェクトにしていなければ保存先を聞き、保存をやめたら閉じない)。
+    /// 閉じたシートはプロジェクトから外す (シートファイルは消さない)。最後の 1 枚を閉じたら空のシートを作る。
     /// </summary>
     private void CloseSheet(Sheet sheet)
     {
         if (sheet.IsModified)
         {
             var answer = SaveChangesWindow.Ask(this, [sheet.FileName]);
-            if (answer == SaveChangesAnswer.Cancel || answer == SaveChangesAnswer.Save && !SaveProject(saveAs: false)) return;
+            if (answer == SaveChangesAnswer.Cancel || answer == SaveChangesAnswer.Save && !SaveSheetToProject(sheet)) return;
         }
         var index = _sheets.IndexOf(sheet);
         var next = _sheets.Count > 1 ? _sheets[index == _sheets.Count - 1 ? index - 1 : index + 1] : null;
         RemoveSheet(sheet, next);
+        if (_projectPath != null && sheet.ProjectSheetPath != null)
+        {
+            UpdateProjectList();
+            Log($"シート「{SheetName(sheet)}」をプロジェクトから外しました (シートのファイル {Path.GetFileName(sheet.ProjectSheetPath)} は残っています。シートを開く で戻せます)。");
+        }
     }
 
     private void RemoveSheet(Sheet sheet, Sheet? next)
@@ -2058,7 +2064,7 @@ public partial class MainWindow : Window
 
     // ---- ドラッグ＆ドロップ ----
 
-    private static readonly string[] DrawingExtensions = [".dxf", ".dwg", ".jww", ".sfc", ".p21", ".p2z", ".ccp"];
+    private static readonly string[] DrawingExtensions = [".dxf", ".dwg", ".jww", ".sfc", ".p21", ".p2z", ".ccp", ".ccs"];
     private static readonly string[] ImageExtensions = [".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif", ".pdf"];
 
     /// <summary>ドロップで開けるファイルか (図面・プロジェクト・画像・PDF)。</summary>
@@ -2088,7 +2094,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// ドロップしたファイルを開く: 図面 (DXF・DWG・JWW・SFC・P21) は新しいシートに、プロジェクト (.ccp) はシートごと、
+    /// ドロップしたファイルを開く: 図面 (DXF・DWG・JWW・SFC・P21) は新しいシートに、プロジェクト (.ccp) はシートごと、シート (.ccs) はその 1 枚を、
     /// 画像・PDF は今のシートに配置する。開けない種類のファイルはメッセージを出す。
     /// </summary>
     public void OpenDroppedFiles(IEnumerable<string> files)
@@ -2118,17 +2124,25 @@ public partial class MainWindow : Window
 
     private void OpenProjectDialog()
     {
-        var dlg = new OpenFileDialog { Title = "CivilCad プロジェクトを開く", Filter = ProjectFile.Filter };
+        var dlg = new OpenFileDialog { Title = "CivilCad プロジェクト・シートを開く", Filter = ProjectFile.OpenFilter };
         if (dlg.ShowDialog(this) == true) OpenProject(dlg.FileName);
     }
 
     /// <summary>
-    /// プロジェクトを開く: プロジェクトのシートをタブに加える (何も描いていない空のシートは閉じる)。
+    /// プロジェクト (*.ccp) を開く: プロジェクトのシートをタブに加える (何も描いていない空のシートは閉じる)。
+    /// シートファイル (*.ccs) を開いたときは、そのシートだけをタブに加える (次にプロジェクトを保存すると、そのプロジェクトに入る)。
     /// 路線の入力 (IP 表など) も戻し、作図済みだった路線は計算し直して測点照会などに使えるようにする。
     /// </summary>
     public void OpenProject(string path)
     {
-        if (_projectPath != null && string.Equals(Path.GetFullPath(path), Path.GetFullPath(_projectPath), StringComparison.OrdinalIgnoreCase)
+        var isSheet = ProjectFile.IsSheet(path);
+        if (isSheet && _sheets.FirstOrDefault(s => s.ProjectSheetPath != null && SamePath(s.ProjectSheetPath, path)) is { } opened)
+        {
+            ActivateSheet(opened);
+            Log($"{Path.GetFileName(path)} は既に開いています。");
+            return;
+        }
+        if (!isSheet && _projectPath != null && SamePath(path, _projectPath)
             && MessageBox.Show(this, "このプロジェクトは既に開いています。もう一度読み込んで、シートを追加しますか?", "プロジェクトを開く",
                 MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
             return;
@@ -2146,7 +2160,12 @@ public partial class MainWindow : Window
         var added = new List<Sheet>();
         foreach (var ps in data.Sheets)
         {
-            var sheet = new Sheet(ps.Doc) { DisplayName = ps.Name, AlignmentInput = ps.Alignment, ViewCenter = ps.ViewCenter, ViewScale = ps.ViewScale };
+            // 同じシートファイルが既に開いていれば、もう一度は開かない
+            if (ps.SheetFile != null && _sheets.Any(s => s.ProjectSheetPath != null && SamePath(s.ProjectSheetPath, ps.SheetFile))) continue;
+            var sheet = new Sheet(ps.Doc)
+            {
+                DisplayName = ps.Name, AlignmentInput = ps.Alignment, ViewCenter = ps.ViewCenter, ViewScale = ps.ViewScale, ProjectSheetPath = ps.SheetFile,
+            };
             if (ps.HasAlignment)
             {
                 try
@@ -2162,19 +2181,36 @@ public partial class MainWindow : Window
             _sheets.Add(sheet);
             added.Add(sheet);
         }
-        ActivateSheet(added[data.ActiveIndex]);
-        foreach (var b in blanks) _sheets.Remove(b);
-        _projectPath = path;
+        if (added.Count > 0)
+        {
+            ActivateSheet(added[Math.Clamp(data.ActiveIndex, 0, added.Count - 1)]);
+            foreach (var b in blanks) _sheets.Remove(b);
+        }
+        if (!isSheet) _projectPath = path;
         UpdateTitle();
         var points = added.Sum(s => CoordinateRegistry.Rows(s.Doc).Count);
         var routes = added.Count(s => s.Alignment != null);
-        Log($"プロジェクトを開きました: {path}  (シート {added.Count} 枚、図形 {added.Sum(s => s.Doc.Entities.Count)} 個、登録座標 {points} 点" +
+        Log($"{(isSheet ? "シート" : "プロジェクト")}を開きました: {path}  (シート {added.Count} 枚、図形 {added.Sum(s => s.Doc.Entities.Count)} 個、登録座標 {points} 点" +
             (routes > 0 ? $"、路線 {routes} 本" : "") + ")" +
             (data.SkippedEntities > 0 ? $"  読めなかった図形が {data.SkippedEntities} 個あります。" : "") +
+            (data.Missing is { Count: > 0 } m ? $"  見つからないシートのファイルがあります: {string.Join("、", m.Select(Path.GetFileName))}" : "") +
             (added.SelectMany(s => s.Doc.Entities).OfType<ImageEntity>().Any(i => !File.Exists(i.Path)) ? "  見つからない画像があります (画像はプロジェクトに入らないので、画像ファイルも一緒に移してください)。" : ""));
     }
 
-    /// <summary>開いているシートすべてをプロジェクトファイルに保存する。saveAs か、まだ保存していなければ保存先を選ぶ。</summary>
+    private static bool SamePath(string a, string b) => string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+
+    private static string? AppVersion => typeof(MainWindow).Assembly.GetName().Version?.ToString(3);
+
+    private static string SheetName(Sheet s) => s.DisplayName ?? (s.FilePath != null ? Path.GetFileNameWithoutExtension(s.FilePath) : s.FileName);
+
+    private static ProjectSheet ToProjectSheet(Sheet s) =>
+        new(SheetName(s), s.Doc, s.AlignmentInput, s.Alignment != null, s.ViewCenter, s.ViewScale, s.FilePath, s.ProjectSheetPath);
+
+    /// <summary>
+    /// プロジェクトを保存する: 開いているシートを 1 枚ずつシートファイル (*.ccs、プロジェクトと同じ名前のフォルダの中) に書き、
+    /// プロジェクトファイル (*.ccp) にシートの一覧を書く。saveAs か、まだ保存していなければ保存先を選ぶ
+    /// (別の場所に保存したときは、シートファイルもその場所のフォルダに作り直す)。
+    /// </summary>
     private bool SaveProject(bool saveAs)
     {
         var path = _projectPath;
@@ -2191,24 +2227,80 @@ public partial class MainWindow : Window
         }
         _active.ViewCenter = Canvas.ViewCenter;
         _active.ViewScale = Canvas.Scale;
-        var sheets = _sheets.Select(s => new ProjectSheet(
-            s.DisplayName ?? (s.FilePath != null ? Path.GetFileNameWithoutExtension(s.FilePath) : s.FileName),
-            s.Doc, s.AlignmentInput, s.Alignment != null, s.ViewCenter, s.ViewScale, s.FilePath)).ToList();
+        // シートファイルの場所: 別のプロジェクトとして保存するなら全部、そうでなければまだ無いシートだけ新しく決める
+        var moving = _projectPath == null || !SamePath(path, _projectPath);
+        var files = new Dictionary<Sheet, string>();
+        foreach (var s in _sheets)
+        {
+            if (!moving && s.ProjectSheetPath != null) files[s] = s.ProjectSheetPath;
+        }
+        foreach (var s in _sheets.Where(s => !files.ContainsKey(s)))
+            files[s] = ProjectFile.NewSheetPath(path, SheetName(s), files.Values);
         try
         {
-            ProjectFile.Save(path, sheets, _sheets.IndexOf(_active), typeof(MainWindow).Assembly.GetName().Version?.ToString(3));
+            foreach (var s in _sheets) ProjectFile.SaveSheet(files[s], ToProjectSheet(s), AppVersion);
+            ProjectFile.SaveProjectList(path, [.. _sheets.Select(s => files[s])], _sheets.IndexOf(_active), AppVersion);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             MessageBox.Show(this, ex.Message, "プロジェクトの保存", MessageBoxButton.OK, MessageBoxImage.Error);
             return false;
         }
-        foreach (var s in _sheets) s.MarkSaved();
+        foreach (var s in _sheets)
+        {
+            s.ProjectSheetPath = files[s];
+            s.MarkSaved();
+        }
         _projectPath = path;
         UpdateTitle();
         var points = _sheets.Sum(s => CoordinateRegistry.Rows(s.Doc).Count);
-        Log($"プロジェクトを保存しました: {path}  (シート {_sheets.Count} 枚、登録座標 {points} 点、路線 {_sheets.Count(s => s.Alignment != null)} 本)");
+        Log($"プロジェクトを保存しました: {path}  (シート {_sheets.Count} 枚を {ProjectFile.SheetFolder(path)} に 1 枚ずつ保存、" +
+            $"登録座標 {points} 点、路線 {_sheets.Count(s => s.Alignment != null)} 本)");
         return true;
+    }
+
+    /// <summary>
+    /// シート 1 枚だけをプロジェクトに保存する (他のシートの変更は保存しない)。まだプロジェクトにしていなければ、
+    /// 保存先を聞いてプロジェクト全体を保存する。
+    /// </summary>
+    private bool SaveSheetToProject(Sheet sheet)
+    {
+        if (_projectPath == null) return SaveProject(saveAs: false);
+        if (sheet == _active)
+        {
+            sheet.ViewCenter = Canvas.ViewCenter;
+            sheet.ViewScale = Canvas.Scale;
+        }
+        var file = sheet.ProjectSheetPath ?? ProjectFile.NewSheetPath(_projectPath, SheetName(sheet),
+            _sheets.Where(s => s != sheet && s.ProjectSheetPath != null).Select(s => s.ProjectSheetPath!));
+        try
+        {
+            ProjectFile.SaveSheet(file, ToProjectSheet(sheet), AppVersion);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, ex.Message, "シートの保存", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+        sheet.ProjectSheetPath = file;
+        sheet.MarkSaved();
+        Log($"シート「{SheetName(sheet)}」を保存しました: {file}");
+        return true;
+    }
+
+    /// <summary>プロジェクトファイルのシートの一覧を、今開いているシートに合わせて書き直す (タブを閉じたシートはプロジェクトから外れる)。</summary>
+    private void UpdateProjectList()
+    {
+        if (_projectPath == null) return;
+        var inProject = _sheets.Where(s => s.ProjectSheetPath != null).ToList();
+        try
+        {
+            ProjectFile.SaveProjectList(_projectPath, [.. inProject.Select(s => s.ProjectSheetPath!)], Math.Max(0, inProject.IndexOf(_active)), AppVersion);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log($"プロジェクトのシートの一覧を書き直せませんでした: {ex.Message}");
+        }
     }
 
     private static T? FindParent<T>(DependencyObject d) where T : DependencyObject

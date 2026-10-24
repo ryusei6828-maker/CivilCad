@@ -8,7 +8,7 @@ using CivilCad.Core.Model;
 
 namespace CivilCad.App.IO;
 
-/// <summary>プロジェクトの 1 シート分 (読み書きの受け渡し用)。</summary>
+/// <summary>プロジェクトの 1 シート分 (読み書きの受け渡し用)。SheetFile はシートのファイル (*.ccs) の場所。</summary>
 public sealed record ProjectSheet(
     string Name,
     CadDocument Doc,
@@ -16,24 +16,31 @@ public sealed record ProjectSheet(
     bool HasAlignment,
     Vec2? ViewCenter = null,
     double? ViewScale = null,
-    string? SourcePath = null);
+    string? SourcePath = null,
+    string? SheetFile = null);
 
-/// <summary>読み込んだプロジェクト。</summary>
-public sealed record ProjectData(List<ProjectSheet> Sheets, int ActiveIndex, int SkippedEntities);
+/// <summary>読み込んだプロジェクト。Missing は見つからなかったシートのファイル。</summary>
+public sealed record ProjectData(List<ProjectSheet> Sheets, int ActiveIndex, int SkippedEntities, IReadOnlyList<string>? Missing = null);
 
 /// <summary>
-/// CivilCad のプロジェクトファイル (*.ccp)。開いているシートすべてを、CivilCad の図形のまま (分解せずに) 1 つのファイルに保存する。
-/// 図形 (プリセット・引き出し線・寸法・画像の配置やトリミングも含む)、レイヤ、登録した座標 (点名・標高・タグ)、
-/// 路線の入力 (IP 表・測点間隔・幅など)、縮尺・座標系・座標設定の向き、表示位置を持つ。
-/// 中身は UTF-8 の JSON。画像は埋め込まず、画像ファイルの場所 (絶対パスと、プロジェクトからの相対パス) を書く。
+/// CivilCad のプロジェクト。シートごとに別のファイルに保存する:
+/// プロジェクトファイル (*.ccp) にはシートの一覧だけを書き、シートは 1 枚ずつ、プロジェクトと同じ名前のフォルダの中の
+/// シートファイル (*.ccs) に、CivilCad の図形のまま (分解せずに) 保存する。シートファイルは 1 枚だけでも開ける。
+/// シートファイルには 図形 (プリセット・引き出し線・寸法・画像の配置やトリミングも含む)、レイヤ、登録した座標 (点名・標高・タグ)、
+/// 路線の入力 (IP 表・測点間隔・幅など)、縮尺・座標系・座標設定の向き、表示位置が入る。
+/// 中身は UTF-8 の JSON。画像は埋め込まず、画像ファイルの場所 (絶対パスと、シートファイルからの相対パス) を書く。
 /// 使っている登録プリセットの形も入れるので、プリセットを登録していない PC でも同じように表示できる。
+/// 前の版の、全部のシートを 1 つのファイルに入れたプロジェクトも読める。
 /// </summary>
 public static class ProjectFile
 {
     public const string Extension = ".ccp";
+    public const string SheetExtension = ".ccs";
     public const string Filter = "CivilCad プロジェクト (*.ccp)|*.ccp";
+    public const string OpenFilter = "CivilCad プロジェクト・シート (*.ccp;*.ccs)|*.ccp;*.ccs|CivilCad プロジェクト (*.ccp)|*.ccp|CivilCad シート (*.ccs)|*.ccs";
     private const string Format = "CivilCadProject";
-    private const int CurrentVersion = 1;
+    private const string SheetFormat = "CivilCadSheet";
+    private const int CurrentVersion = 2;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -43,28 +50,87 @@ public static class ProjectFile
         Converters = { new JsonStringEnumConverter(), new Vec2Converter(), new ColorConverter() },
     };
 
-    public static bool IsProject(string path) => Path.GetExtension(path).Equals(Extension, StringComparison.OrdinalIgnoreCase);
+    /// <summary>プロジェクトファイル (*.ccp) かシートファイル (*.ccs)。</summary>
+    public static bool IsProject(string path) => IsProjectList(path) || IsSheet(path);
+
+    public static bool IsProjectList(string path) => Path.GetExtension(path).Equals(Extension, StringComparison.OrdinalIgnoreCase);
+    public static bool IsSheet(string path) => Path.GetExtension(path).Equals(SheetExtension, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>シートファイルを入れるフォルダ (プロジェクトファイルと同じ場所の、同じ名前のフォルダ)。</summary>
+    public static string SheetFolder(string projectPath) =>
+        Path.Combine(Path.GetDirectoryName(Path.GetFullPath(projectPath))!, Path.GetFileNameWithoutExtension(projectPath));
+
+    /// <summary>
+    /// 新しいシートファイルの場所: シートフォルダの「シート名.ccs」。ファイル名に使えない文字は _ にし、
+    /// 既にあるファイル・taken (他のシートが使う場所) と重なれば「シート名 (2).ccs」…。
+    /// </summary>
+    public static string NewSheetPath(string projectPath, string sheetName, IEnumerable<string> taken)
+    {
+        var used = taken.Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var invalid = Path.GetInvalidFileNameChars();
+        var name = new string([.. sheetName.Trim().Select(c => invalid.Contains(c) ? '_' : c)]).TrimEnd('.', ' ');
+        if (name.Length == 0) name = "シート";
+        var dir = SheetFolder(projectPath);
+        for (var n = 1; ; n++)
+        {
+            var path = Path.Combine(dir, (n == 1 ? name : $"{name} ({n})") + SheetExtension);
+            if (!used.Contains(path) && !File.Exists(path)) return path;
+        }
+    }
 
     // ---- 保存 ----
 
+    /// <summary>シート 1 枚をシートファイル (*.ccs) に保存する (フォルダが無ければ作る)。</summary>
+    public static void SaveSheet(string sheetPath, ProjectSheet sheet, string? appVersion = null)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(sheetPath))!;
+        Directory.CreateDirectory(dir);
+        var dto = NewDto(SheetFormat, appVersion);
+        dto.Sheets = [ToDto(sheet, dir)];
+        dto.Presets = Presets([sheet]);
+        Write(sheetPath, dto);
+    }
+
+    /// <summary>プロジェクトファイル (*.ccp) に、シートファイルの一覧 (プロジェクトからの相対の場所) と開いていたシートを書く。</summary>
+    public static void SaveProjectList(string projectPath, IReadOnlyList<string> sheetFiles, int activeIndex, string? appVersion = null)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(projectPath))!;
+        var dto = NewDto(Format, appVersion);
+        dto.ActiveSheet = Math.Clamp(activeIndex, 0, Math.Max(0, sheetFiles.Count - 1));
+        dto.SheetFiles = [.. sheetFiles.Select(f => Relative(dir, Path.GetFullPath(f)) ?? f)];
+        Write(projectPath, dto);
+    }
+
+    /// <summary>全部のシートを 1 つのファイルにまとめて保存する (前の版の形。シートファイルは作らない)。</summary>
     public static void Save(string path, IReadOnlyList<ProjectSheet> sheets, int activeIndex, string? appVersion = null)
     {
         var dir = Path.GetDirectoryName(Path.GetFullPath(path))!;
-        var dto = new ProjectDto
-        {
-            Format = Format,
-            Version = CurrentVersion,
-            Application = "CivilCad " + (appVersion ?? ""),
-            Saved = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-            ActiveSheet = Math.Clamp(activeIndex, 0, Math.Max(0, sheets.Count - 1)),
-            Sheets = [.. sheets.Select(s => ToDto(s, dir))],
-        };
-        // 使っている登録プリセット (組み込みの方位記号などは入れない)
-        var kinds = sheets.SelectMany(s => s.Doc.Entities).OfType<SymbolEntity>().Select(e => e.Kind).ToHashSet();
-        dto.Presets = [.. kinds.Where(k => SymbolLibrary.BuiltIn.All(b => b.Kind != k)).Select(SymbolLibrary.Get).Where(d => d.Kind != SymbolLibrary.BuiltIn[0].Kind)];
-        if (dto.Presets.Count == 0) dto.Presets = null;
+        var dto = NewDto(Format, appVersion);
+        dto.ActiveSheet = Math.Clamp(activeIndex, 0, Math.Max(0, sheets.Count - 1));
+        dto.Sheets = [.. sheets.Select(s => ToDto(s, dir))];
+        dto.Presets = Presets(sheets);
+        Write(path, dto);
+    }
 
-        // 書きかけで壊れないよう、一時ファイルに書いてから置き換える
+    private static ProjectDto NewDto(string format, string? appVersion) => new()
+    {
+        Format = format,
+        Version = CurrentVersion,
+        Application = "CivilCad " + (appVersion ?? ""),
+        Saved = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+    };
+
+    /// <summary>使っている登録プリセット (組み込みの方位記号などは入れない)。無ければ null。</summary>
+    private static List<SymbolDefinition>? Presets(IReadOnlyList<ProjectSheet> sheets)
+    {
+        var kinds = sheets.SelectMany(s => s.Doc.Entities).OfType<SymbolEntity>().Select(e => e.Kind).ToHashSet();
+        List<SymbolDefinition> list = [.. kinds.Where(k => SymbolLibrary.BuiltIn.All(b => b.Kind != k)).Select(SymbolLibrary.Get).Where(d => d.Kind != SymbolLibrary.BuiltIn[0].Kind)];
+        return list.Count > 0 ? list : null;
+    }
+
+    /// <summary>書きかけで壊れないよう、一時ファイルに書いてから置き換える。</summary>
+    private static void Write(string path, ProjectDto dto)
+    {
         var temp = path + ".tmp";
         File.WriteAllText(temp, JsonSerializer.Serialize(dto, JsonOptions), new UTF8Encoding(false));
         File.Move(temp, path, overwrite: true);
@@ -153,7 +219,49 @@ public static class ProjectFile
 
     // ---- 読み込み ----
 
+    /// <summary>
+    /// プロジェクトファイル (*.ccp) かシートファイル (*.ccs) を読む。プロジェクトは一覧のシートファイルを読み、
+    /// 見つからないシートファイルは Missing に入れて飛ばす。前の版の 1 ファイルのプロジェクトも読める (シートの SheetFile は null)。
+    /// </summary>
     public static ProjectData Load(string path)
+    {
+        var dto = ReadDto(path);
+        if (dto.Format == SheetFormat)
+        {
+            var one = LoadSheets(dto, path, sheetFile: path, out var skippedOne);
+            if (one.Count == 0) throw new InvalidDataException("シートファイルにシートがありません。");
+            return new ProjectData(one, 0, skippedOne);
+        }
+
+        if (dto.SheetFiles == null)
+        {
+            // 前の版: 全部のシートが 1 つのファイルに入っている
+            var all = LoadSheets(dto, path, sheetFile: null, out var skippedAll);
+            if (all.Count == 0) throw new InvalidDataException("プロジェクトにシートがありません。");
+            return new ProjectData(all, Math.Clamp(dto.ActiveSheet, 0, all.Count - 1), skippedAll);
+        }
+
+        var dir = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        var sheets = new List<ProjectSheet>();
+        var missing = new List<string>();
+        var skipped = 0;
+        var active = 0;
+        for (var i = 0; i < dto.SheetFiles.Count; i++)
+        {
+            var file = Path.GetFullPath(Path.Combine(dir, dto.SheetFiles[i]));
+            if (!File.Exists(file))
+            {
+                missing.Add(file);
+                continue;
+            }
+            if (i == dto.ActiveSheet) active = sheets.Count;
+            sheets.AddRange(LoadSheets(ReadDto(file), file, file, out var s));
+            skipped += s;
+        }
+        return new ProjectData(sheets, sheets.Count > 0 ? Math.Clamp(active, 0, sheets.Count - 1) : 0, skipped, missing);
+    }
+
+    private static ProjectDto ReadDto(string path)
     {
         ProjectDto? dto;
         try
@@ -164,25 +272,30 @@ public static class ProjectFile
         {
             throw new InvalidDataException($"CivilCad のプロジェクトファイルとして読めませんでした ({ex.Message})。", ex);
         }
-        if (dto == null || dto.Format != Format) throw new InvalidDataException("CivilCad のプロジェクトファイルではありません。");
+        if (dto == null || dto.Format is not (Format or SheetFormat)) throw new InvalidDataException("CivilCad のプロジェクトファイルではありません。");
         if (dto.Version > CurrentVersion)
             throw new InvalidDataException($"新しい版の CivilCad で保存されたプロジェクトです (形式 {dto.Version})。CivilCad を更新してください。");
+        return dto;
+    }
 
+    /// <summary>ファイルに入っているシートを読む (画像の相対の場所は path のフォルダから)。</summary>
+    private static List<ProjectSheet> LoadSheets(ProjectDto dto, string path, string? sheetFile, out int skipped)
+    {
         // 入っている登録プリセットのうち、この PC に無いものは表示用に登録する
         foreach (var def in dto.Presets ?? []) SymbolLibrary.RegisterForDisplay(def);
 
         var dir = Path.GetDirectoryName(Path.GetFullPath(path))!;
-        var skipped = 0;
+        skipped = 0;
         var sheets = new List<ProjectSheet>();
         foreach (var s in dto.Sheets ?? [])
         {
             var doc = new CadDocument();
             skipped += Fill(doc, s, dir);
-            sheets.Add(new ProjectSheet(s.Name ?? $"シート{sheets.Count + 1}", doc, s.Alignment ?? AlignmentInput.Sample(), s.HasAlignment,
-                s.ViewCenter, s.ViewScale, s.SourcePath));
+            var name = s.Name ?? (sheetFile != null ? Path.GetFileNameWithoutExtension(sheetFile) : $"シート{sheets.Count + 1}");
+            sheets.Add(new ProjectSheet(name, doc, s.Alignment ?? AlignmentInput.Sample(), s.HasAlignment,
+                s.ViewCenter, s.ViewScale, s.SourcePath, sheetFile));
         }
-        if (sheets.Count == 0) throw new InvalidDataException("プロジェクトにシートがありません。");
-        return new ProjectData(sheets, Math.Clamp(dto.ActiveSheet, 0, sheets.Count - 1), skipped);
+        return sheets;
     }
 
     /// <summary>シートの中身を図面に入れる。読めなかった図形の数を返す。</summary>
@@ -283,6 +396,7 @@ public static class ProjectFile
         public string? Saved { get; set; }
         public int ActiveSheet { get; set; }
         public List<SheetDto>? Sheets { get; set; }
+        public List<string>? SheetFiles { get; set; }
         public List<SymbolDefinition>? Presets { get; set; }
     }
 

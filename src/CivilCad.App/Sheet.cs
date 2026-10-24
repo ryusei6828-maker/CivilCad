@@ -104,6 +104,9 @@ public sealed class Sheet : INotifyPropertyChanged
     public Vec2? ViewCenter { get; set; }
     public double? ViewScale { get; set; }
 
+    /// <summary>プロジェクトのシートファイル (*.ccs) の場所。まだプロジェクトに保存していなければ null。</summary>
+    public string? ProjectSheetPath { get; set; }
+
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
 }
