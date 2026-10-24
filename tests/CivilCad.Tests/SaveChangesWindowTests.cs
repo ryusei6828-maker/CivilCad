@@ -4,7 +4,7 @@ using CivilCad.App.Views;
 
 namespace CivilCad.Tests;
 
-/// <summary>終了時の確認 (Excel と同じ「このファイルの変更内容を保存しますか?」[保存] [保存しない] [キャンセル])。</summary>
+/// <summary>終了時の確認 (Excel と同じ「このファイルの変更内容をプロジェクトファイルに保存しますか？」[保存] [保存しない] [キャンセル])。</summary>
 public class SaveChangesWindowTests
 {
     private static void RunSta(Action action)
@@ -41,7 +41,7 @@ public class SaveChangesWindowTests
     [Fact]
     public void Wording_MatchesExcel() => RunSta(() =>
     {
-        Assert.Equal("このファイルの変更内容を保存しますか?", SaveChangesWindow.Message);
+        Assert.Equal("このファイルの変更内容をプロジェクトファイルに保存しますか？", SaveChangesWindow.Message);
         var w = new SaveChangesWindow(["Sheet1"]);
         Assert.Equal(["保存", "保存しない", "キャンセル"], new[] { w.SaveButton, w.DontSaveButton, w.CancelButton }.Select(b => (string)b.Content));
         Assert.True(w.SaveButton.IsDefault);   // Enter は保存

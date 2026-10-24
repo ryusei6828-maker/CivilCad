@@ -149,7 +149,7 @@ public partial class MainWindow : Window
         };
         Closing += (_, e) =>
         {
-            // 保存していないシートがあれば Excel と同じ確認を出す: [保存] プロジェクトに保存して終了 (まだなら保存先を聞く)、
+            // 保存していないシートがあれば確認を出す (ボタンは Excel と同じ): [保存] プロジェクトに保存して終了 (まだなら保存先を聞く)、
             // [保存しない] そのまま終了、[キャンセル] (Esc・×) 終了しない
             var unsaved = _sheets.Where(s => s.IsModified).ToList();
             if (unsaved.Count > 0)
@@ -950,12 +950,17 @@ public partial class MainWindow : Window
         UpdateTitle();
     }
 
-    /// <summary>シートを閉じる。未保存なら確認する。最後の 1 枚を閉じたら空のシートを作る。</summary>
+    /// <summary>
+    /// シートを閉じる。未保存なら終了時と同じ確認 (このファイルの変更内容をプロジェクトファイルに保存しますか？ [保存] [保存しない] [キャンセル]) を出す。
+    /// 保存: プロジェクトに保存してから閉じる (まだなら保存先を聞き、保存をやめたら閉じない)。最後の 1 枚を閉じたら空のシートを作る。
+    /// </summary>
     private void CloseSheet(Sheet sheet)
     {
-        if (sheet.IsModified && MessageBox.Show(this, $"「{sheet.FileName}」は保存していません。閉じますか?", "確認",
-                MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
-            return;
+        if (sheet.IsModified)
+        {
+            var answer = SaveChangesWindow.Ask(this, [sheet.FileName]);
+            if (answer == SaveChangesAnswer.Cancel || answer == SaveChangesAnswer.Save && !SaveProject(saveAs: false)) return;
+        }
         var index = _sheets.IndexOf(sheet);
         var next = _sheets.Count > 1 ? _sheets[index == _sheets.Count - 1 ? index - 1 : index + 1] : null;
         RemoveSheet(sheet, next);

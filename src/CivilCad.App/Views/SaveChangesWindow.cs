@@ -13,13 +13,13 @@ public enum SaveChangesAnswer
 }
 
 /// <summary>
-/// 終了時の確認 (Excel (Microsoft 365) と同じ文言・ボタン):
-/// 「このファイルの変更内容を保存しますか?」 [保存] [保存しない] [キャンセル]。Enter は保存、Esc と × はキャンセル。
+/// 終了時・シートを閉じるときの確認 (Excel (Microsoft 365) と同じボタン):
+/// 「このファイルの変更内容をプロジェクトファイルに保存しますか？」 [保存] [保存しない] [キャンセル]。Enter は保存、Esc と × はキャンセル。
 /// 下に保存していないシートの名前を出す。
 /// </summary>
 public sealed class SaveChangesWindow : Window
 {
-    public const string Message = "このファイルの変更内容を保存しますか?";
+    public const string Message = "このファイルの変更内容をプロジェクトファイルに保存しますか？";
 
     public SaveChangesAnswer Answer { get; private set; } = SaveChangesAnswer.Cancel;
 
