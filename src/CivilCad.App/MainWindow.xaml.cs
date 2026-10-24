@@ -149,27 +149,17 @@ public partial class MainWindow : Window
         };
         Closing += (_, e) =>
         {
-            // 保存していないシートがあれば確認する
+            // 保存していないシートがあれば Excel と同じ確認を出す: [保存] プロジェクトに保存して終了 (まだなら保存先を聞く)、
+            // [保存しない] そのまま終了、[キャンセル] (Esc・×) 終了しない
             var unsaved = _sheets.Where(s => s.IsModified).ToList();
-            if (unsaved.Count > 0 && _projectPath != null)
+            if (unsaved.Count > 0)
             {
-                // プロジェクトを開いているときは、プロジェクトに保存して終われるようにする
-                var answer = MessageBox.Show(this,
-                    $"保存していないシートがあります:\n{string.Join("\n", unsaved.Select(s => "・" + s.FileName))}\n\n" +
-                    $"プロジェクト「{Path.GetFileName(_projectPath)}」に保存して終了しますか?\n(いいえ: 保存せずに終了)",
-                    "確認", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-                if (answer == MessageBoxResult.Cancel || answer == MessageBoxResult.Yes && !SaveProject(saveAs: false))
+                var answer = SaveChangesWindow.Ask(this, [.. unsaved.Select(s => s.FileName)]);
+                if (answer == SaveChangesAnswer.Cancel || answer == SaveChangesAnswer.Save && !SaveProject(saveAs: false))
                 {
                     e.Cancel = true;
                     return;
                 }
-            }
-            else if (unsaved.Count > 0 && MessageBox.Show(this,
-                    $"保存していないシートがあります:\n{string.Join("\n", unsaved.Select(s => "・" + s.FileName))}\n\n保存せずに終了しますか?",
-                    "確認", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
-            {
-                e.Cancel = true;
-                return;
             }
             _propsDock.ShuttingDown = _layerDock.ShuttingDown = _coordDock.ShuttingDown = _routeDock.ShuttingDown = true;
             SaveSettingsQuietly();
