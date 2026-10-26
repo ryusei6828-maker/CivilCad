@@ -153,13 +153,22 @@ public sealed class CadCanvas : FrameworkElement
         {
             var e = Document.Entities[i];
             if (!Document.IsEditable(e) || !e.Bounds.Inflate(tol).Contains(world)) continue;
-            var d = e.DistanceTo(world);
+            // 塗りつぶしは、ここでは外形の線の近くだけ (塗りの上に描いた線を先に選べるように)
+            var d = e is HatchEntity { Solid: true } solid ? solid.BoundarySegments.Select(s => GeoMath.DistanceToSegment(world, s.A, s.B)).DefaultIfEmpty(double.PositiveInfinity).Min()
+                : e.DistanceTo(world);
             if (d <= bestD) (best, bestD) = (e, d);
         }
         if (best != null) return best;
-        // 近くに線などが無ければ、クリックした所に見えている画像 (上に描いてあるもの) を選ぶ
+        // 近くに線などが無ければ、クリックした所に見えている最前面の画像を選ぶ
         for (var i = Document.Entities.Count - 1; i >= 0; i--)
             if (Document.Entities[i] is ImageEntity { InFront: true } front && Document.IsEditable(front) && front.Contains(world)) return front;
+        // 次に、クリックした所の塗りつぶし (上に描いてあるもの。最前面でない画像より上に描くので画像より先)
+        for (var i = Document.Entities.Count - 1; i >= 0; i--)
+        {
+            var e = Document.Entities[i];
+            if (Document.IsEditable(e) && (e is HatchEntity { Solid: true } h && h.Contains(world) || e is PolylineEntity { Filled: true } pl && pl.ContainsFill(world)))
+                return e;
+        }
         for (var i = Document.Entities.Count - 1; i >= 0; i--)
             if (Document.Entities[i] is ImageEntity img && Document.IsEditable(img) && img.Contains(world)) return img;
         return null;

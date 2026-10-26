@@ -45,7 +45,10 @@ public sealed class PolylineEntity(Layer layer, IEnumerable<Vec2> points, bool i
     }
 
     public override bool IntersectsBox(Box2 box) =>
-        Segments.Any(s => GeoMath.SegmentIntersectsBox(s.A, s.B, box));
+        Segments.Any(s => GeoMath.SegmentIntersectsBox(s.A, s.B, box)) || Filled && ContainsFill(box.Center);
+
+    /// <summary>塗りつぶしの折れ線で、点が塗られた内側にあるか (塗りつぶしでなければ false)。</summary>
+    public bool ContainsFill(Vec2 p) => Filled && Points.Count >= 3 && HatchEntity.IsInside(Points, p);
 
     public override void Translate(Vec2 delta)
     {
