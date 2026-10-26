@@ -170,7 +170,7 @@ public sealed class PropertiesPanel : UserControl
             Apply(x => x.LineType = t, $"線種変更 → {LineTypes.Name(t)}");
         }, Brushes.Black));
         AddTextSizeRows(sel.OfType<TextEntity>().ToList());
-        AddTransparencyRow([.. sel.Where(e => e is HatchEntity or ImageEntity)]);
+        AddTransparencyRow([.. sel.Where(e => e is HatchEntity or ImageEntity or PolylineEntity { Filled: true })]);
         var lengths = sel.Select(LengthOf).Where(l => l != null).Select(l => l!.Value).ToList();
         if (sel.Count > 1 && lengths.Count > 0) AddReadOnly("長さ合計", $"{lengths.Sum():F3} m  ({lengths.Count} 個)");
 
@@ -518,20 +518,47 @@ public sealed class PropertiesPanel : UserControl
             "文字の横幅の倍率 (1 = 標準、0.8 = 細め)");
     }
 
-    /// <summary>ハッチング・塗りつぶし・画像の透明度 (複数選択なら、選んだものすべてに)。</summary>
+    /// <summary>透明度 (%) を読む: ハッチング・塗りつぶし・画像。</summary>
+    public static double GetTransparency(Entity e) => e switch
+    {
+        HatchEntity h => h.TransparencyPercent,
+        ImageEntity i => i.TransparencyPercent,
+        PolylineEntity p => p.FillTransparencyPercent,
+        _ => 0,
+    };
+
+    public static void SetTransparency(Entity e, double percent)
+    {
+        percent = Math.Clamp(percent, 0, 100);
+        switch (e)
+        {
+            case HatchEntity h: h.TransparencyPercent = percent; break;
+            case ImageEntity i: i.TransparencyPercent = percent; break;
+            case PolylineEntity p: p.FillTransparencyPercent = percent; break;
+        }
+    }
+
+    /// <summary>
+    /// ハッチング・塗りつぶし・画像の透明度 (複数選択なら、選んだものすべてに)。スライダーと数字の欄。
+    /// スライダーを動かしている間は図面にすぐ映し、離したところで 1 回の変更 (元に戻すで一度に戻る) にする。
+    /// </summary>
     private void AddTransparencyRow(List<Entity> targets)
     {
         if (targets.Count == 0) return;
-        static double Get(Entity e) => e switch { HatchEntity h => h.TransparencyPercent, ImageEntity i => i.TransparencyPercent, _ => 0 };
-        var values = targets.Select(h => Math.Round(Get(h), 1)).Distinct().ToList();
-        AddEditable("透明度 (%)", values.Count == 1 ? values[0].ToString("0.#", CultureInfo.InvariantCulture) : "", s =>
-            double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var pct) && pct is >= 0 and <= 100 &&
-            Apply(x =>
+        var originals = targets.ToDictionary(e => e, GetTransparency);
+        var values = originals.Values.Select(v => Math.Round(v, 1)).Distinct().ToList();
+        AddRow("透明度 (%)", new TransparencySlider(values.Count == 1 ? values[0] : null,
+            preview: v =>
             {
-                if (x is HatchEntity h) h.TransparencyPercent = pct;
-                else if (x is ImageEntity i) i.TransparencyPercent = pct;
-            }, "透明度変更"),
-            "0 = 不透明、50 = 半透明、100 = 透明。下の線や文字を透かして見せたいときに");
+                foreach (var e in targets) SetTransparency(e, v);
+                _canvas?.RedrawScene();
+            },
+            commit: v =>
+            {
+                // 試しに変えた値を元に戻してから、1 回の変更 (元に戻すで一度に戻る) として入れる
+                foreach (var (e, o) in originals) SetTransparency(e, o);
+                Apply(x => SetTransparency(x, v), $"透明度 {v:0}%");
+            }));
     }
 
     /// <summary>何も選択していないとき: これから描く図形の設定。</summary>

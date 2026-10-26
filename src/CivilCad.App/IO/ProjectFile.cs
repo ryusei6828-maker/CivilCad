@@ -168,7 +168,7 @@ public static class ProjectFile
         EntityDto? dto = e switch
         {
             LineEntity l => new LineDto { Start = l.Start, End = l.End },
-            PolylineEntity p => new PolylineDto { Points = [.. p.Points], Closed = p.IsClosed, Filled = p.Filled },
+            PolylineEntity p => new PolylineDto { Points = [.. p.Points], Closed = p.IsClosed, Filled = p.Filled, FillOpacity = p.FillOpacity < 1 ? p.FillOpacity : null },
             CircleEntity c => new CircleDto { Center = c.Center, Radius = c.Radius },
             ArcEntity a => new ArcDto { Center = a.Center, Radius = a.Radius, StartAngle = a.StartAngle, EndAngle = a.EndAngle },
             PointEntity p => new PointDto { Position = p.Position, Name = p.Name, Z = p.Z, Tags = p.Tags },
@@ -357,7 +357,7 @@ public static class ProjectFile
     private static Entity? FromDto(EntityDto e, Layer layer, string projectDir) => e switch
     {
         LineDto l => new LineEntity(layer, l.Start, l.End),
-        PolylineDto p when p.Points is { Count: > 0 } => new PolylineEntity(layer, p.Points, p.Closed) { Filled = p.Filled },
+        PolylineDto p when p.Points is { Count: > 0 } => new PolylineEntity(layer, p.Points, p.Closed) { Filled = p.Filled, FillOpacity = p.FillOpacity ?? 1 },
         CircleDto c => new CircleEntity(layer, c.Center, c.Radius),
         ArcDto a => new ArcEntity(layer, a.Center, a.Radius, a.StartAngle, a.EndAngle),
         PointDto p => new PointEntity(layer, p.Position) { Name = p.Name ?? "", Z = p.Z, Tags = p.Tags ?? "" },
@@ -467,6 +467,7 @@ public static class ProjectFile
         public List<Vec2>? Points { get; set; }
         public bool Closed { get; set; }
         public bool Filled { get; set; }
+        public double? FillOpacity { get; set; }
     }
 
     private sealed class CircleDto : EntityDto

@@ -10,6 +10,22 @@ public sealed class PolylineEntity(Layer layer, IEnumerable<Vec2> points, bool i
     /// <summary>内部を色で塗りつぶす (SXF の塗りつぶし領域など)。</summary>
     public bool Filled { get; set; }
 
+    /// <summary>塗りの不透明度 (0〜1。1 = 不透明)。塗りつぶし (Filled) のときだけ効く。</summary>
+    public double FillOpacity
+    {
+        get => _fillOpacity;
+        set => _fillOpacity = Math.Clamp(value, 0, 1);
+    }
+
+    private double _fillOpacity = 1;
+
+    /// <summary>塗りの透明度 (%)。0 = 不透明、100 = 透明。</summary>
+    public double FillTransparencyPercent
+    {
+        get => Math.Round((1 - FillOpacity) * 100, 6);
+        set => FillOpacity = 1 - value / 100;
+    }
+
     public IEnumerable<(Vec2 A, Vec2 B)> Segments
     {
         get
@@ -67,7 +83,7 @@ public sealed class PolylineEntity(Layer layer, IEnumerable<Vec2> points, bool i
 
     public override IEnumerable<Curve> Curves => Segments.Select(s => (Curve)new SegmentCurve(s.A, s.B));
 
-    public override Entity Clone() => CopyPropertiesTo(new PolylineEntity(Layer, Points, IsClosed) { Filled = Filled });
+    public override Entity Clone() => CopyPropertiesTo(new PolylineEntity(Layer, Points, IsClosed) { Filled = Filled, FillOpacity = FillOpacity });
 
     /// <summary>開いたポリラインの始点・終点は端点、途中の点 (閉じたものは全点) は頂点。</summary>
     public override IEnumerable<SnapPoint> SnapPoints =>

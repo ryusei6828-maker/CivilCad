@@ -308,7 +308,7 @@ public static class PdfExport
                 builder.Close();
             }
             var color = Color(e, fill: true);
-            var opacity = e is HatchEntity he ? he.Opacity : 1;
+            var opacity = e switch { HatchEntity he => he.Opacity, PolylineEntity pe => pe.FillOpacity, _ => 1 };
             using var path = builder.Detach();
             path.FillType = SKPathFillType.EvenOdd; // 中抜き (2 つ目以降の輪郭) は塗らない
             using var paint = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Color = color.WithAlpha((byte)Math.Round(255 * Math.Clamp(opacity, 0, 1))) };

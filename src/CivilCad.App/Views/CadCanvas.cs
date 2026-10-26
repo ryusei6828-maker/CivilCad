@@ -590,7 +590,17 @@ public sealed class CadCanvas : FrameworkElement
                 dc.DrawLine(pen, WorldToScreen(l.Start), WorldToScreen(l.End));
                 break;
             case PolylineEntity pl when pl.Points.Count > 1:
-                dc.DrawGeometry(pl.Filled ? GetBrush(color) : null, pen, PolylineGeometry(pl.Points, pl.IsClosed || pl.Filled));
+                if (pl.Filled && pl.FillOpacity < 1)
+                {
+                    // 透かす塗りは塗りだけ薄くして、外形の線はそのまま
+                    var geometry = PolylineGeometry(pl.Points, true);
+                    dc.PushOpacity(pl.FillOpacity);
+                    dc.DrawGeometry(GetBrush(color), null, geometry);
+                    dc.Pop();
+                    dc.DrawGeometry(null, pen, geometry);
+                }
+                else
+                    dc.DrawGeometry(pl.Filled ? GetBrush(color) : null, pen, PolylineGeometry(pl.Points, pl.IsClosed || pl.Filled));
                 break;
             case CircleEntity c:
                 dc.DrawEllipse(null, pen, WorldToScreen(c.Center), c.Radius * Scale, c.Radius * Scale);
