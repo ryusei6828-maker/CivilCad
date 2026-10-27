@@ -16,7 +16,7 @@ public static class UserPresetStore
     };
 
     public static string DefaultPath { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CivilCad", "presets.json");
+        Path.Combine(AppDataFolder.Folder, "presets.json");
 
     /// <summary>読み書きするファイル (テストでは一時ファイルに替える)。</summary>
     public static string FilePath { get; set; } = DefaultPath;

@@ -11,7 +11,7 @@ public sealed class AppSettings
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public static string DefaultPath { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CivilCad", "settings.json");
+        Path.Combine(AppDataFolder.Folder, "settings.json");
 
     /// <summary>コマンド名 → キー ("" は割り当てなし)。</summary>
     public Dictionary<string, string> KeyBindings { get; set; } = new(CommandRegistry.DefaultBindings);

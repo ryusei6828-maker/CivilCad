@@ -14,8 +14,13 @@ public class DragSelectTests
         Exception? error = null;
         var t = new Thread(() =>
         {
+            // 範囲選択の方法は全体で共有していて、本体のウィンドウを作ると使う人の設定 (一部選択など) に変わる。
+            // このクラスのテストは初期値 (全体選択) の前提で書いてあるので、ここで固定して、終わったら元に戻す
+            var savedMode = BoxDrag.Mode;
+            BoxDrag.Mode = BoxSelectMode.Inside;
             try { action(); }
             catch (Exception ex) { error = ex; }
+            finally { BoxDrag.Mode = savedMode; }
         });
         t.SetApartmentState(ApartmentState.STA);
         t.Start();

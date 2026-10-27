@@ -10,7 +10,7 @@ namespace CivilCad.App;
 public partial class App : Application
 {
     public static string ErrorLogPath { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CivilCad", "error.log");
+        Path.Combine(Settings.AppDataFolder.Folder, "error.log");
 
     protected override void OnStartup(StartupEventArgs e)
     {
