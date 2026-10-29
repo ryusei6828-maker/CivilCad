@@ -10,7 +10,10 @@ public sealed class SectionScaleWindow : Window
     /// <summary>前に使った縮尺。</summary>
     public static SectionScales Last { get; private set; } = new();
 
-    private readonly TextBox _h = Box(), _v = Box(), _s = Box(), _cols = Box(), _dl = Box();
+    /// <summary>外 (CivilCadPoint) から渡された縮尺・並べ方を、次に開いたときの初期値にする。</summary>
+    public static void Remember(SectionScales scales) => Last = scales;
+
+    private readonly TextBox _h = Box(), _v = Box(), _s = Box(), _cols = Box(), _rows = Box(), _dl = Box();
 
     public SectionScales? Result { get; private set; }
 
@@ -35,6 +38,12 @@ public sealed class SectionScaleWindow : Window
             panel.Children.Add(Header("横断図"));
             panel.Children.Add(Row("縦横  1 :", _s, Last.Section));
             panel.Children.Add(Row("横に並べる数", _cols, Last.Columns));
+            panel.Children.Add(Row("縦に並べる数", _rows, Last.Rows));
+            panel.Children.Add(new TextBlock
+            {
+                Text = "1 枚のシートに 横 × 縦 の数まで並べ、残りは次のシートへ (縦が 0 なら 1 枚に全部)",
+                Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(0, 0, 0, 2),
+            });
             panel.Children.Add(Row("DL の刻み (m)", _dl, Last.DatumStep));
         }
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
@@ -42,13 +51,14 @@ public sealed class SectionScaleWindow : Window
         var cancel = new Button { Content = "キャンセル", Width = 80, IsCancel = true };
         ok.Click += (_, _) =>
         {
-            double h = Last.ProfileHorizontal, v = Last.ProfileVertical, s = Last.Section, c = Last.Columns, dl = Last.DatumStep;
-            if (hasProfile && (!Pos(_h, out h) || !Pos(_v, out v)) || hasSections && (!Pos(_s, out s) || !Pos(_cols, out c) || !Pos(_dl, out dl)))
+            double h = Last.ProfileHorizontal, v = Last.ProfileVertical, s = Last.Section, c = Last.Columns, rows = Last.Rows, dl = Last.DatumStep;
+            if (hasProfile && (!Pos(_h, out h) || !Pos(_v, out v)) ||
+                hasSections && (!Pos(_s, out s) || !Pos(_cols, out c) || !Num(_rows, out rows) || rows < 0 || !Pos(_dl, out dl)))
             {
-                MessageBox.Show(this, "0 より大きい数を入れてください。", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, "0 より大きい数を入れてください (縦に並べる数は 0 でも可)。", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            Result = Last = new SectionScales(h, v, s, Math.Max(1, (int)Math.Round(c)), dl);
+            Result = Last = new SectionScales(h, v, s, Math.Max(1, (int)Math.Round(c)), dl, (int)Math.Round(rows));
             DialogResult = true;
         };
         buttons.Children.Add(ok);
@@ -70,6 +80,8 @@ public sealed class SectionScaleWindow : Window
         return row;
     }
 
-    private static bool Pos(TextBox box, out double v) =>
-        double.TryParse(box.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out v) && v > 0;
+    private static bool Num(TextBox box, out double v) =>
+        double.TryParse(box.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out v) && double.IsFinite(v);
+
+    private static bool Pos(TextBox box, out double v) => Num(box, out v) && v > 0;
 }

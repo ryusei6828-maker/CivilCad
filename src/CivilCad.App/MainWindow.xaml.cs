@@ -862,9 +862,18 @@ public partial class MainWindow : Window
     /// <summary>
     /// 起動時の引数や、ほかの CivilCad・CivilCadPoint から渡されたファイルを開く。
     /// 「--sections ファイル」は LandXML の縦断・横断から縦横断図を作る。そのほかは図面ファイルとして開く。
+    /// 「--section-layout=…」があれば、その縮尺・並べ方で縦横断図を作る (無ければ前に使った値)。
     /// </summary>
     public void OpenFromArgs(string[] args)
     {
+        SectionScales? layout = null;
+        foreach (var a in args)
+            if (a.StartsWith(SectionScales.ArgumentPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                if (SectionScales.TryParseArgument(a[SectionScales.ArgumentPrefix.Length..], out var s)) layout = s;
+                else Log($"縦横断図の縮尺・並べ方を読めませんでした: {a}");
+            }
+
         // 窓を前に出す (最小化していれば戻す)
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
@@ -876,7 +885,7 @@ public partial class MainWindow : Window
             var a = args[i];
             if (a.Equals("--sections", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
-                ImportRouteSections(args[++i], askScales: false);
+                ImportRouteSections(args[++i], askScales: false, layout);
                 continue;
             }
             if (a.StartsWith("--", StringComparison.Ordinal)) continue;
@@ -892,9 +901,10 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// LandXML の縦断 (地盤線 ProfSurf・計画縦断 ProfAlign) と横断 (CrossSects) から、縦断図・横断図を新しいシートに作る。
-    /// path が null ならファイルを選ばせる。askScales = false なら前に使った縮尺のまま作る (CivilCadPoint から開いたとき)。
+    /// path が null ならファイルを選ばせる。askScales = false なら given (無ければ前に使った縮尺) で作る (CivilCadPoint から開いたとき)。
+    /// 横断図は 1 枚に 横 × 縦 の数まで並べ、残りは次のシートに作る。
     /// </summary>
-    private void ImportRouteSections(string? path, bool askScales)
+    private void ImportRouteSections(string? path, bool askScales, SectionScales? given = null)
     {
         if (path == null)
         {
@@ -931,7 +941,8 @@ public partial class MainWindow : Window
 
         var hasProfile = route.GroundProfiles.Count > 0 || route.Design != null;
         var hasSections = route.Sections.Any(s => s.Lines.Count > 0);
-        var scales = SectionScaleWindow.Last;
+        var scales = given ?? SectionScaleWindow.Last;
+        if (given != null) SectionScaleWindow.Remember(given);
         if (askScales)
         {
             var w = new SectionScaleWindow(route.Name, hasProfile, hasSections) { Owner = this };
@@ -951,11 +962,17 @@ public partial class MainWindow : Window
             }
             if (hasSections)
             {
-                var sheet = NewSheetForDrawing($"横断図_{route.Name}");
-                var n = SectionDrawing.DrawSections(sheet.Doc, route, scales);
-                FinishDrawnSheet(sheet);
-                first ??= sheet;
-                Log($"横断図: {n} 測点を 1:{scales.Section:0} で並べました。");
+                var sheets = SectionDrawing.SectionSheetCount(route, scales);
+                var n = 0;
+                for (var k = 0; k < sheets; k++)
+                {
+                    var sheet = NewSheetForDrawing(sheets > 1 ? $"横断図_{route.Name}_{k + 1}" : $"横断図_{route.Name}");
+                    n += SectionDrawing.DrawSections(sheet.Doc, route, scales, k);
+                    FinishDrawnSheet(sheet);
+                    first ??= sheet;
+                }
+                Log($"横断図: {n} 測点を 1:{scales.Section:0} で並べました" +
+                    (sheets > 1 ? $" (1 枚に 横 {scales.Columns} × 縦 {scales.Rows}、{sheets} 枚のシート)。" : "。"));
             }
         }
         catch (InvalidOperationException ex)

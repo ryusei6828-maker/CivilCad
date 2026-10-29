@@ -11,9 +11,30 @@ namespace CivilCad.App.Sections;
 /// <param name="Section">横断図の縮尺の分母 (縦横同じ)。</param>
 /// <param name="Columns">横断図を横に並べる数。</param>
 /// <param name="DatumStep">横断図の基準高 (DL) の刻み (m)。DL はこの倍数に切り下げる。</param>
+/// <param name="Rows">横断図を縦に並べる数。1 枚のシートに 横 × 縦 の数まで並べ、残りは次のシートへ。0 なら 1 枚に全部。</param>
 public sealed record SectionScales(double ProfileHorizontal = 1000, double ProfileVertical = 100, double Section = 100, int Columns = 3,
-    double DatumStep = 5)
+    double DatumStep = 5, int Rows = 0)
 {
+    /// <summary>コマンドライン引数の名前 (「--section-layout=横,縦,横断,DL の刻み,横に並べる数,縦に並べる数」)。CivilCadPoint から渡す。</summary>
+    public const string ArgumentPrefix = "--section-layout=";
+
+    /// <summary>1 枚のシートに並べる横断の数 (0 は全部)。</summary>
+    public int PerSheet => Rows > 0 ? Math.Max(1, Columns) * Rows : 0;
+
+    /// <summary>「横,縦,横断,DL の刻み,横に並べる数,縦に並べる数」(小数点は .) を読む。数がおかしければ false。</summary>
+    public static bool TryParseArgument(string value, out SectionScales scales)
+    {
+        scales = new SectionScales();
+        var parts = value.Split(',');
+        if (parts.Length != 6) return false;
+        var v = new double[6];
+        for (var i = 0; i < 6; i++)
+            if (!double.TryParse(parts[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out v[i]) || !double.IsFinite(v[i])) return false;
+        if (v[0] <= 0 || v[1] <= 0 || v[2] <= 0 || v[3] <= 0 || v[4] < 1 || v[5] < 0) return false;
+        scales = new SectionScales(v[0], v[1], v[2], (int)Math.Round(v[4]), v[3], (int)Math.Round(v[5]));
+        return true;
+    }
+
     /// <summary>横断図の基準高: いちばん低い所より 1m 以上下の、刻みの倍数。</summary>
     public double SectionDatum(double minElevation)
     {
@@ -147,11 +168,19 @@ public static class SectionDrawing
 
     // ───────────────────────────── 横断図 ─────────────────────────────
 
+    /// <summary>横断図のシートの数 (1 枚に 横 × 縦 の数まで)。</summary>
+    public static int SectionSheetCount(RouteSections r, SectionScales scales)
+    {
+        var n = r.Sections.Count(s => s.Lines.Count > 0);
+        return scales.PerSheet > 0 && n > 0 ? (n + scales.PerSheet - 1) / scales.PerSheet : 1;
+    }
+
     /// <summary>
     /// 空のシート doc に横断図を並べて描く (上から下、左から右)。描いた横断の数。
+    /// 縦に並べる数があれば、sheet 枚目 (0 から) の分 (横 × 縦 の数) だけを描く。枠の大きさはどのシートも同じ (全部の横断から決める)。
     /// 横断ごとに 基準線 (DL は刻みの倍数)・中心線・地盤線・計画線・計画高 (FH)・見出し (測点と中心の地盤高 GH) を描く。
     /// </summary>
-    public static int DrawSections(CadDocument doc, RouteSections r, SectionScales scales)
+    public static int DrawSections(CadDocument doc, RouteSections r, SectionScales scales, int sheet = 0)
     {
         doc.ScaleDenominator = scales.Section;
         var th = doc.PaperMmToMeters(2.5);
@@ -172,7 +201,11 @@ public static class SectionDrawing
         var heights = sections.Select(s => Range(s, r)).Max(x => x.Max + 2 - scales.SectionDatum(x.Min));
         var cellW = left + right + doc.PaperMmToMeters(40);
         var cellH = Math.Ceiling(heights) + doc.PaperMmToMeters(20);
-        var perColumn = (int)Math.Ceiling(sections.Count / (double)Math.Max(1, scales.Columns));
+        var sheets = SectionSheetCount(r, scales);
+        var all = sections.Count;
+        if (scales.PerSheet > 0) sections = sections.Skip(sheet * scales.PerSheet).Take(scales.PerSheet).ToList();
+        if (sections.Count == 0) throw new InvalidOperationException($"横断図の {sheet + 1} 枚目に入る横断がありません。");
+        var perColumn = scales.Rows > 0 ? scales.Rows : (int)Math.Ceiling(sections.Count / (double)Math.Max(1, scales.Columns));
         var topY = 0.0;
 
         for (var k = 0; k < sections.Count; k++)
@@ -214,8 +247,9 @@ public static class SectionDrawing
         }
 
         var lines = sections.SelectMany(s => s.Lines).Select(l => l.Name).Distinct();
+        var page = sheets > 1 ? $"   ({sheet + 1}/{sheets}、全 {all} 測点)" : "";
         doc.Entities.Add(Text(lText, new Vec2(0, topY + th * 3),
-            $"横断図  {r.Name}   S=1:{scales.Section:0}   線: {string.Join("・", lines)}", th * 2, TextHAlign.Left, TextVAlign.Bottom));
+            $"横断図  {r.Name}   S=1:{scales.Section:0}   線: {string.Join("・", lines)}{page}", th * 2, TextHAlign.Left, TextVAlign.Bottom));
         return sections.Count;
     }
 

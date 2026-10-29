@@ -145,6 +145,42 @@ public class SectionDrawingTests
         Assert.True(cl[2].Start.X > cl[0].Start.X + 20);
     }
 
+    [Fact]
+    public void Sections_SplitIntoSheetsByColumnsAndRows()
+    {
+        var r = Read();
+        // 3 測点を 1 枚に 横 1 × 縦 2 まで → 2 枚 (2 + 1)
+        var scales = new SectionScales(Section: 100, Columns: 1, Rows: 2);
+        Assert.Equal(2, SectionDrawing.SectionSheetCount(r, scales));
+        var first = new CadDocument();
+        var second = new CadDocument();
+        Assert.Equal(2, SectionDrawing.DrawSections(first, r, scales, 0));
+        Assert.Equal(1, SectionDrawing.DrawSections(second, r, scales, 1));
+        var texts1 = first.Entities.OfType<TextEntity>().Select(t => t.Text).ToList();
+        var texts2 = second.Entities.OfType<TextEntity>().Select(t => t.Text).ToList();
+        Assert.Contains(texts1, t => t.StartsWith("No.0 (BP)"));
+        Assert.DoesNotContain(texts1, t => t.StartsWith("No.2"));
+        Assert.Contains(texts2, t => t.StartsWith("No.2"));
+        Assert.Contains(texts2, t => t.Contains("(2/2、全 3 測点)"));
+        // 縦に 2 つ: 1 枚目の 2 つは同じ列 (x が同じ)
+        var cl = first.Entities.OfType<LineEntity>().Where(l => l.Layer.Name == "中心線").ToList();
+        Assert.Equal(cl[0].Start.X, cl[1].Start.X, 6);
+
+        // 縦が 0 なら 1 枚に全部
+        Assert.Equal(1, SectionDrawing.SectionSheetCount(r, new SectionScales(Columns: 1)));
+    }
+
+    [Fact]
+    public void SectionLayoutArgument_Parses()
+    {
+        Assert.True(SectionScales.TryParseArgument("500,50,200,2.5,3,4", out var s));
+        Assert.Equal(new SectionScales(500, 50, 200, 3, 2.5, 4), s);
+        Assert.Equal(12, s.PerSheet);
+        Assert.False(SectionScales.TryParseArgument("500,50,200,2.5,0,4", out _));
+        Assert.False(SectionScales.TryParseArgument("500,50,200", out _));
+        Assert.False(SectionScales.TryParseArgument("a,50,200,2.5,3,4", out _));
+    }
+
     [Theory]
     [InlineData(5, 19.0, 15)]
     [InlineData(5, 21.0, 20)]   // ちょうど 1m 下が刻みの倍数
