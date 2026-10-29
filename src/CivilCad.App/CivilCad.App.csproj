@@ -20,7 +20,7 @@
     <AssemblyName>CivilCad</AssemblyName>
     <ApplicationIcon>civilcad.ico</ApplicationIcon>
     <Product>CivilCad</Product>
-    <Version>0.14.0</Version>
+    <Version>0.15.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
