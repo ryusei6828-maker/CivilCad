@@ -540,6 +540,19 @@ public partial class MainWindow : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // ホーム: Esc で閉じる、Alt+F で開く・閉じる
+        if (BackstageKey(e))
+        {
+            e.Handled = true;
+            return;
+        }
+        // ホームが開いている間は、ボタンを選ぶキー (Tab・Enter・Space・上下) のほかは図面に送らない (コマンドの入力など)
+        if (BackstageOpen)
+        {
+            if (e.Key is not (Key.Tab or Key.Enter or Key.Space or Key.Up or Key.Down)) e.Handled = true;
+            return;
+        }
+
         // Ctrl+Tab / Ctrl+Shift+Tab でシート切り替え
         if (e.Key == Key.Tab && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {

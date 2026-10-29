@@ -10,6 +10,65 @@
             <Border Width="28" Height="12" BorderBrush="Gray" BorderThickness="1"
                     Background="{Binding Converter={StaticResource ColorBrush}}"/>
         </DataTemplate>
+
+        <!-- ホーム: メニューの左端の「ホーム」と、開いたときの左の帯の項目 (Excel のファイルメニューのように、濃い青の帯に白い文字) -->
+        <Style x:Key="HomeTab" TargetType="ToggleButton">
+            <Setter Property="Foreground" Value="#1D4ED8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="10,1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="0,0,0,2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#DBEAFE"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#1D4ED8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="BackstageItem" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="Padding" Value="20,9"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="30" VerticalAlignment="Center"
+                                           Foreground="{TemplateBinding Foreground}" Text="{TemplateBinding Tag}"/>
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#55FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Window.CommandBindings>
@@ -21,24 +80,13 @@
         <CommandBinding Command="SelectAll" Executed="SelectAll_Executed"/>
     </Window.CommandBindings>
 
+    <Grid>
     <DockPanel>
-        <Menu x:Name="MainMenu" DockPanel.Dock="Top">
-            <MenuItem Header="ファイル(_F)">
-                <MenuItem Header="新規(_N)" Command="New"><MenuItem.Icon><Image Source="{StaticResource IconNew}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
-                <MenuItem Header="開く(_O)... (DXF・DWG・JWW・SFC・P21)" Command="Open"><MenuItem.Icon><Image Source="{StaticResource IconOpen}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
-                <MenuItem Header="名前を付けて保存(_S)... (DXF・DWG・JWW・SFC・P21)" Command="Save"><MenuItem.Icon><Image Source="{StaticResource IconSave}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
-                <Separator/>
-                <MenuItem Header="プロジェクト・シートを開く(_J)... (CivilCad プロジェクト .ccp・シート .ccs)" Tag="PJO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconOpen}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
-                <MenuItem Header="プロジェクトを保存(_V)" Tag="PJS" Click="Tool_Click" InputGestureText="Ctrl+Shift+S"><MenuItem.Icon><Image Source="{StaticResource IconSave}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
-                <MenuItem Header="名前を付けてプロジェクトを保存..." Tag="PJA" Click="Tool_Click"/>
-                <Separator/>
-                <MenuItem Header="PDF に印刷(_P)... (PDF)" Tag="PDF" Click="Tool_Click"/>
-                <Separator/>
-                <MenuItem Header="座標読込 SIMA / CSV (PI)..." Tag="PI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconPoints}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
-                <MenuItem Header="画像 読込・トリミング・2点位置合わせ (IMG)..." Tag="IMG" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconImage}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
-                <Separator/>
-                <MenuItem Header="終了(_X)" Click="Exit_Click"/>
-            </MenuItem>
+        <!-- メニューの行: 左端に「ホーム」(ファイルの操作)。「ファイル」メニューは無くした -->
+        <DockPanel x:Name="MenuRow" DockPanel.Dock="Top" Background="{DynamicResource {x:Static SystemColors.MenuBarBrushKey}}">
+        <ToggleButton x:Name="HomeTab" DockPanel.Dock="Left" Style="{StaticResource HomeTab}" Content="ホーム" Click="Home_Click"
+                      ToolTip="新規・開く・保存・プロジェクト・PDF・読込・終了 (ファイルの操作)  Alt+F"/>
+        <Menu x:Name="MainMenu">
             <MenuItem Header="編集(_E)">
                 <MenuItem Header="元に戻す(_U)" Command="Undo"><MenuItem.Icon><Image Source="{StaticResource IconUndo}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="やり直し(_R)" Command="Redo"><MenuItem.Icon><Image Source="{StaticResource IconRedo}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
@@ -124,6 +172,7 @@
                 </MenuItem>
             </MenuItem>
         </Menu>
+        </DockPanel>
 
         <!-- ツールバー: 左はいつも出すボタン (ファイル・元に戻す)、右は種類ごとのタブ -->
         <DockPanel x:Name="RibbonArea" DockPanel.Dock="Top" Background="#FFEEF0F3">
@@ -480,4 +529,66 @@
             </Grid>
         </DockPanel>
     </DockPanel>
+
+    <!-- ===== ホーム (ファイルの操作): 「ホーム」の下に、窓の 1/4 ほどの大きさで出す。外をクリックするか Esc か「戻る」で閉じる ===== -->
+    <Grid x:Name="Backstage" Visibility="Collapsed" Background="Transparent" MouseDown="BackstageOutside_MouseDown">
+    <Border x:Name="BackstagePanel" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="2,22,0,0" Width="760" Height="470"
+            Background="White" BorderBrush="#B8C2D0" BorderThickness="1" CornerRadius="6">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.28" Color="#1E2430"/>
+        </Border.Effect>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Border Grid.Column="0" Background="#1E3A8A" CornerRadius="5,0,0,5">
+            <DockPanel>
+                <Button x:Name="BackstageBack" DockPanel.Dock="Top" Style="{StaticResource BackstageItem}" Tag="&#xE72B;" Content="戻る" Margin="0,6,0,8"
+                        ToolTip="ホームを閉じる  Esc" Click="BackstageBack_Click"/>
+                <Button DockPanel.Dock="Bottom" Style="{StaticResource BackstageItem}" Tag="&#xE7E8;" Content="終了" Margin="0,0,0,6"
+                        ToolTip="CivilCad を終了する" Click="BackstageExit_Click"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE8A5;" Content="新規" ToolTip="新しいシート  Ctrl+N" Click="BackstageNew_Click"/>
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE838;" Content="開く" ToolTip="図面を開く (DXF・DWG・JWW・SFC・P21)  Ctrl+O" Click="BackstageOpen_Click"/>
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE792;" Content="名前を付けて保存" ToolTip="図面を保存 (DXF・DWG・JWW・SFC・P21)  Ctrl+S" Click="BackstageSave_Click"/>
+                    <Rectangle Height="1" Fill="#33FFFFFF" Margin="18,6"/>
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE8B7;" Content="プロジェクト・シートを開く" ToolTip="CivilCad プロジェクト (.ccp)・シート (.ccs) を開く (PJO)"
+                            CommandParameter="PJO" Click="BackstageTool_Click"/>
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE74E;" Content="プロジェクトを保存" ToolTip="プロジェクトを上書き保存 (PJS)  Ctrl+Shift+S"
+                            CommandParameter="PJS" Click="BackstageTool_Click"/>
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE792;" Content="名前を付けてプロジェクトを保存" ToolTip="プロジェクトを名前を付けて保存 (PJA)"
+                            CommandParameter="PJA" Click="BackstageTool_Click"/>
+                    <Rectangle Height="1" Fill="#33FFFFFF" Margin="18,6"/>
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE749;" Content="PDF に印刷" ToolTip="PDF に印刷 (PDF)"
+                            CommandParameter="PDF" Click="BackstageTool_Click"/>
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE707;" Content="座標読込 (SIMA / CSV)" ToolTip="座標を読み込む (PI)"
+                            CommandParameter="PI" Click="BackstageTool_Click"/>
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xEB9F;" Content="画像 読込" ToolTip="画像を読み込み、トリミング・2 点で位置合わせ (IMG)"
+                            CommandParameter="IMG" Click="BackstageTool_Click"/>
+                </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+        <StackPanel Grid.Column="1" Margin="32,22,24,16">
+            <TextBlock Text="ホーム" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock Text="図面の情報" FontWeight="SemiBold" Foreground="#475569" Margin="0,18,0,4"/>
+            <TextBlock x:Name="BackstageName" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+            <TextBlock x:Name="BackstagePath" Foreground="#64748B" FontSize="12.5" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="BackstageLabels" Grid.Column="0" LineHeight="26" FontSize="13" Foreground="#64748B"/>
+                <TextBlock x:Name="BackstageInfo" Grid.Column="1" LineHeight="26" FontSize="13" TextTrimming="CharacterEllipsis"/>
+            </Grid>
+            <TextBlock Foreground="#64748B" FontSize="12" Margin="0,16,0,0" TextWrapping="Wrap"
+                       Text="Ctrl+N: 新規 / Ctrl+O: 開く / Ctrl+S: 保存 / Alt+F: ホーム。「戻る」か Esc、外をクリックで閉じます。"/>
+        </StackPanel>
+    </Grid>
+    </Border>
+    </Grid>
+    </Grid>
 </Window>

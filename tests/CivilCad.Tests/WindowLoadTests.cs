@@ -42,6 +42,37 @@ public class WindowLoadTests
                 var settings = new SettingsWindow(new AppSettings());
                 var frame = new CivilCad.App.Drawing.FrameWindow(new CivilCad.App.Drawing.DrawingFrameOptions(), new CivilCad.Core.Geometry.Box2(new(0, 0), new(8, 4)));
                 Assert.NotNull(main.Content);
+                {
+                    // ホーム: メニューの左端。「ファイル」メニューは無い。押すと出て、図面の情報が入り、Esc で閉じる
+                    var menu = (System.Windows.Controls.Menu)main.FindName("MainMenu");
+                    Assert.DoesNotContain(menu.Items.OfType<System.Windows.Controls.MenuItem>(), m => ((string)m.Header).StartsWith("ファイル"));
+                    var home = (System.Windows.Controls.Primitives.ToggleButton)main.FindName("HomeTab");
+                    var backstage = (System.Windows.FrameworkElement)main.FindName("Backstage");
+                    var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                    Assert.Equal(System.Windows.Visibility.Collapsed, backstage.Visibility);
+                    home.IsChecked = true;
+                    typeof(CivilCad.App.MainWindow).GetMethod("Home_Click", flags)!.Invoke(main, [home, new System.Windows.RoutedEventArgs()]);
+                    Assert.Equal(System.Windows.Visibility.Visible, backstage.Visibility);
+                    Assert.StartsWith("無題", ((System.Windows.Controls.TextBlock)main.FindName("BackstageName")).Text);
+                    Assert.Contains("図形", ((System.Windows.Controls.TextBlock)main.FindName("BackstageLabels")).Text);
+                    // 項目: 新規・開く・保存・プロジェクト (PJO・PJS・PJA)・PDF・座標読込 (PI)・画像 (IMG)・戻る・終了
+                    static IEnumerable<T> All<T>(System.Windows.DependencyObject root) where T : System.Windows.DependencyObject
+                    {
+                        foreach (var child in System.Windows.LogicalTreeHelper.GetChildren(root).OfType<System.Windows.DependencyObject>())
+                        {
+                            if (child is T t) yield return t;
+                            foreach (var c in All<T>(child)) yield return c;
+                        }
+                    }
+                    var homeItems = All<System.Windows.Controls.Button>(backstage).ToList();
+                    Assert.Equal(["PJO", "PJS", "PJA", "PDF", "PI", "IMG"], homeItems.Select(b => b.CommandParameter).OfType<string>());
+                    Assert.Contains(homeItems, b => (string)b.Content == "新規");
+                    Assert.Contains(homeItems, b => (string)b.Content == "終了");
+                    // 「戻る」で閉じる (Esc も同じ処理)
+                    typeof(CivilCad.App.MainWindow).GetMethod("BackstageBack_Click", flags)!.Invoke(main, [home, new System.Windows.RoutedEventArgs()]);
+                    Assert.Equal(System.Windows.Visibility.Collapsed, backstage.Visibility);
+                    Assert.False(home.IsChecked);
+                }
                 // レイヤパネルは既定で閉じ、プロパティは開いている
                 Assert.Equal(System.Windows.Visibility.Collapsed, ((System.Windows.FrameworkElement)main.FindName("LayerHost")).Visibility);
                 Assert.Equal(System.Windows.Visibility.Visible, ((System.Windows.FrameworkElement)main.FindName("PropsHost")).Visibility);
