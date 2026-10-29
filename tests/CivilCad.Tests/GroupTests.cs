@@ -104,6 +104,52 @@ public class GroupTests
     });
 
     [Fact]
+    public void DoubleClick_EntersGroupEdit_OnlyMembersEditable_EscExits() => RunSta((doc, canvas) =>
+    {
+        var (a, b, other) = Sample(doc);
+        var group = a.GroupId!.Value;
+        var select = new SelectTool();
+        canvas.SetTool(select);
+        var changes = 0;
+        canvas.GroupEditChanged += (_, _) => changes++;
+
+        select.OnDoubleClick(new Vec2(5, 0)); // グループの線をダブルクリック
+        Assert.True(canvas.IsGroupEditing);
+        Assert.Equal(1, changes);
+        Assert.Empty(canvas.Selection);
+
+        // グループの中は 1 つずつ選べ、グループの外は選べない
+        canvas.SetSelection([canvas.HitTest(new Vec2(5, 0))!]);
+        Assert.Equal([a], canvas.Selection);
+        Assert.Null(canvas.HitTest(new Vec2(5, 20)));
+        Assert.False(doc.IsEditable(other));
+        Assert.Equal([a, b], BoxDrag.Hits(doc, new Vec2(-50, -50), new Vec2(50, 50)));
+
+        // 編集中に描いた図形はグループに入る
+        var added = new LineEntity(doc.CurrentLayer, new Vec2(0, 2), new Vec2(10, 2));
+        doc.History.Execute(new AddEntitiesCommand([added]));
+        Assert.Equal(group, added.GroupId);
+
+        // Esc で終了。終えるとグループごと選ぶに戻る
+        select.OnCancel();
+        Assert.False(canvas.IsGroupEditing);
+        Assert.Equal(2, changes);
+        canvas.SetSelection([a]);
+        Assert.Equal([a, b, added], canvas.Selection.OrderBy(doc.Entities.IndexOf));
+        Assert.True(doc.IsEditable(other));
+    });
+
+    [Fact]
+    public void SwitchingDocument_EndsGroupEdit() => RunSta((doc, canvas) =>
+    {
+        var (a, _, _) = Sample(doc);
+        canvas.EnterGroupEdit(a.GroupId!.Value);
+        canvas.Document = new CadDocument();
+        Assert.Null(doc.EditingGroupId);
+        Assert.False(canvas.IsGroupEditing);
+    });
+
+    [Fact]
     public void Paste_MakesNewGroupEachTime()
     {
         var doc = new CadDocument();

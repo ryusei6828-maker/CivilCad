@@ -54,6 +54,11 @@ public partial class MainWindow : Window
         Canvas.ToolChanged += (_, _) => UpdateToolbarHighlight();
         Canvas.PromptChanged += (_, _) => PromptText.Text = $"[{Canvas.Tool.Name}] {Canvas.Tool.Prompt}:";
         Canvas.Message += (_, msg) => Log(msg);
+        Canvas.GroupEditChanged += (_, _) =>
+        {
+            GroupEditBadge.Visibility = Canvas.IsGroupEditing ? Visibility.Visible : Visibility.Collapsed;
+            Canvas.Tool.RefreshPrompt();
+        };
         Canvas.CursorMoved += (_, _) => UpdateCoordinates();
         Canvas.SelectionChanged += (_, _) =>
         {
@@ -204,6 +209,13 @@ public partial class MainWindow : Window
             case "J": JoinSelection(); break;
             case "G": GroupSelection(); break;
             case "UG": UngroupSelection(); break;
+            case "GE": EditSelectedGroup(); break;
+            case "GX":
+                if (!Canvas.IsGroupEditing) { Log("グループ編集中ではありません。"); break; }
+                Canvas.ExitGroupEdit();
+                Canvas.SetTool(new SelectTool());
+                Log("グループ編集を終了しました。");
+                break;
             case "CB": CopySelection(cut: false); break;
             case "CUT": CopySelection(cut: true); break;
             case "PA": PasteInPlace(); break;
@@ -319,6 +331,11 @@ public partial class MainWindow : Window
     /// <summary>グループ化: 選択中の図形を 1 つのグループにまとめる (グループを含んでいれば、それごとまとめ直す)。</summary>
     private void GroupSelection()
     {
+        if (Canvas.IsGroupEditing)
+        {
+            Log("グループ化: グループ編集中はできません (Esc で終えてから)。");
+            return;
+        }
         var targets = _doc.Entities.Where(Canvas.Selection.Contains).ToList();
         if (targets.Count < 2)
         {
@@ -332,6 +349,11 @@ public partial class MainWindow : Window
     /// <summary>グループ解除: 選択中のグループを解いて、1 つずつ選べるようにする。</summary>
     private void UngroupSelection()
     {
+        if (Canvas.IsGroupEditing)
+        {
+            Log("グループ解除: グループ編集中はできません (Esc で終えてから)。");
+            return;
+        }
         var targets = _doc.Entities.Where(e => Canvas.Selection.Contains(e) && e.GroupId != null).ToList();
         if (targets.Count == 0)
         {
@@ -341,6 +363,20 @@ public partial class MainWindow : Window
         var groups = Grouping.CountGroups(targets);
         _doc.History.Execute(new SetGroupCommand(targets, null, "グループ解除"));
         Log($"グループ {groups} 個を解除しました ({targets.Count} 個の図形)。");
+    }
+
+    /// <summary>グループ編集: 選択中のグループの中だけを編集する (グループの図形のダブルクリックと同じ)。</summary>
+    private void EditSelectedGroup()
+    {
+        if (Canvas.IsGroupEditing) { Log("すでにグループ編集中です (Esc で終了)。"); return; }
+        var groups = Canvas.Selection.Where(e => e.GroupId != null).Select(e => e.GroupId!.Value).Distinct().ToList();
+        if (groups.Count != 1)
+        {
+            Log(groups.Count == 0 ? "グループ編集: グループを 1 つ選択してください (グループの図形をダブルクリックでも入れます)。"
+                                  : "グループ編集: グループを 1 つだけ選択してください。");
+            return;
+        }
+        SelectTool.EnterGroupEdit(Canvas, groups[0]);
     }
 
     /// <summary>結合: 選択中の線をつなぎ直す (同じ直線上・同じ円上のものはまとめ、端点がつながるものは 1 本のポリラインに)。</summary>
@@ -394,8 +430,17 @@ public partial class MainWindow : Window
             Item("2 点指示 (位置合わせ)", () => RunCommand("AL"), hasSel, "AL");
             Item("削除", DeleteSelection, hasSel, "Delete");
             menu.Items.Add(new Separator());
-            Item("グループ化", () => RunCommand("G"), Canvas.Selection.Count >= 2, "G");
-            Item("グループ解除", () => RunCommand("UG"), Canvas.Selection.Any(e => e.GroupId != null), "UG");
+            if (Canvas.IsGroupEditing)
+            {
+                Item("グループ編集を終了", () => RunCommand("GX"), true, "Esc");
+            }
+            else
+            {
+                var hasGroup = Canvas.Selection.Any(e => e.GroupId != null);
+                Item("グループ化", () => RunCommand("G"), Canvas.Selection.Count >= 2, "G");
+                Item("グループ解除", () => RunCommand("UG"), hasGroup, "UG");
+                Item("グループ編集 (中だけ編集)", () => RunCommand("GE"), hasGroup, "GE");
+            }
             menu.Items.Add(new Separator());
             Item("コピー", () => CopySelection(cut: false), hasSel, "Ctrl+C");
             Item("切り取り", () => CopySelection(cut: true), hasSel, "Ctrl+X");

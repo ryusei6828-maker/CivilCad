@@ -466,6 +466,11 @@
             <v:DrawInputBar x:Name="InputBar" DockPanel.Dock="Top"/>
             <Grid>
                 <v:CadCanvas x:Name="Canvas"/>
+                <!-- グループ編集中の表示 (右上。クリックは下の作図領域へ通す) -->
+                <Border x:Name="GroupEditBadge" Visibility="Collapsed" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="0,8,10,0" Padding="10,4" CornerRadius="3" Background="#E0D9822B" BorderBrush="#FFFFC37A" BorderThickness="1">
+                    <TextBlock Text="グループ編集中 (Esc で終了)" Foreground="White" FontWeight="Bold"/>
+                </Border>
                 <!-- 文字コマンドで、クリックした位置にその場で文字を打つ欄 (背景なしの Canvas なのでクリックは下の作図領域へ通る) -->
                 <Canvas x:Name="CanvasOverlay" ClipToBounds="True">
                     <TextBox x:Name="InlineTextBox" Visibility="Collapsed" MinWidth="60" BorderThickness="1" Padding="1,0"

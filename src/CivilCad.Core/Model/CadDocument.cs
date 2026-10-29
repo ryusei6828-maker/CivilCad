@@ -258,8 +258,15 @@ public sealed class CadDocument : INotifyPropertyChanged
 
     public bool IsVisible(Entity e) => e.Layer.IsVisible;
 
+    /// <summary>
+    /// グループ編集中のグループ (null なら通常)。編集中はこのグループの図形だけを選べ、
+    /// 新しく描いた図形・複写した図形はこのグループに入る。保存はしない。
+    /// </summary>
+    public Guid? EditingGroupId { get; set; }
+
     public bool IsEditable(Entity e) =>
-        e.Layer.IsVisible && !e.Layer.IsLocked && (!OnlyCurrentLayerEditable || e.Layer == CurrentLayer);
+        e.Layer.IsVisible && !e.Layer.IsLocked && (!OnlyCurrentLayerEditable || e.Layer == CurrentLayer) &&
+        (EditingGroupId == null || e.GroupId == EditingGroupId);
 
     public Layer? FindLayer(string name) =>
         Layers.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -338,6 +345,7 @@ public sealed class CadDocument : INotifyPropertyChanged
         foreach (var l in Layers.Where(l => l != layer0).ToList()) Layers.Remove(l);
         if (!Layers.Contains(layer0)) Layers.Add(layer0);
         OnlyCurrentLayerEditable = false;
+        EditingGroupId = null;
         PlaneZone = null;
         VerticalScaleDenominator = null;
         SurveyRotation = 0;

@@ -7,6 +7,7 @@ public static class Grouping
     public static List<Entity> Expand(CadDocument doc, IEnumerable<Entity> entities)
     {
         var set = entities.ToHashSet();
+        if (doc.EditingGroupId != null) return [.. set]; // グループ編集中は 1 つずつ選ぶ
         var groups = set.Where(e => e.GroupId != null).Select(e => e.GroupId).ToHashSet();
         if (groups.Count == 0) return [.. set];
         var result = doc.Entities.Where(e => set.Contains(e) || groups.Contains(e.GroupId) && doc.IsEditable(e)).ToList();

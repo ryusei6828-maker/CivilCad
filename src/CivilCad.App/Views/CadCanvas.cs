@@ -55,14 +55,45 @@ public sealed class CadCanvas : FrameworkElement
         set
         {
             _document.Changed -= OnDocumentChanged;
+            var wasGroupEditing = _document.EditingGroupId != null;
+            _document.EditingGroupId = null; // シートを切り替えたらグループ編集は終える
             _document = value;
             _document.Changed += OnDocumentChanged;
             _snapIndex = null;
             Selection.Clear();
             DocumentReplaced?.Invoke(this, EventArgs.Empty);
             SelectionChanged?.Invoke(this, EventArgs.Empty);
+            if (wasGroupEditing || value.EditingGroupId != null) GroupEditChanged?.Invoke(this, EventArgs.Empty);
             RedrawAll();
         }
+    }
+
+    /// <summary>グループ編集中か (グループ以外は薄く表示し、グループの中だけ選べる)。</summary>
+    public bool IsGroupEditing => Document.EditingGroupId != null;
+
+    /// <summary>グループ編集に入った・終えた。</summary>
+    public event EventHandler? GroupEditChanged;
+
+    /// <summary>グループ編集に入る: 選択を外し、このグループの図形だけを 1 つずつ選べるようにする。</summary>
+    public void EnterGroupEdit(Guid groupId)
+    {
+        Document.EditingGroupId = groupId;
+        Selection.Clear();
+        _snapIndex = null;
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+        GroupEditChanged?.Invoke(this, EventArgs.Empty);
+        RedrawScene();
+    }
+
+    /// <summary>グループ編集を終える (選択は外す)。</summary>
+    public void ExitGroupEdit()
+    {
+        if (!IsGroupEditing) return;
+        Document.EditingGroupId = null;
+        Selection.Clear();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+        GroupEditChanged?.Invoke(this, EventArgs.Empty);
+        RedrawScene();
     }
 
     /// <summary>表示する図面が別の図面に替わった (シートタブの切り替え)。</summary>
@@ -77,6 +108,9 @@ public sealed class CadCanvas : FrameworkElement
     }
 
     public HashSet<Entity> Selection { get; } = [];
+
+    /// <summary>グループ編集中に、グループ以外の図形を描く濃さ。</summary>
+    public const double GroupEditOutsideOpacity = 0.25;
     public CadTool Tool => _tool;
 
     /// <summary>ビュー中心のワールド座標と拡大率 (1m あたりのピクセル数)。</summary>
@@ -557,7 +591,11 @@ public sealed class CadCanvas : FrameworkElement
                 if (DrawPass(e) != pass || !Document.IsVisible(e) || !e.Bounds.Intersects(view)) continue;
                 var dim = Document.OnlyCurrentLayerEditable && e.Layer != Document.CurrentLayer;
                 var color = dim ? DimColor : e.EffectiveColor;
+                // グループ編集中は、グループ以外の図形を薄く
+                var outside = Document.EditingGroupId is Guid g && e.GroupId != g;
+                if (outside) dc.PushOpacity(GroupEditOutsideOpacity);
                 DrawEntity(dc, e, color, Selection.Contains(e));
+                if (outside) dc.Pop();
             }
         }
         // 拡大していて縮小版では粗い画像は、止まってから見えている範囲を細かく読み直す

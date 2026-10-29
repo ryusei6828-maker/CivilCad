@@ -7,7 +7,13 @@ public sealed class AddEntitiesCommand(IEnumerable<Entity> entities, string name
 {
     private readonly List<Entity> _entities = [.. entities];
     public string Name => name;
-    public void Do(CadDocument doc) => doc.Entities.AddRange(_entities);
+
+    public void Do(CadDocument doc)
+    {
+        // グループ編集中に描いた・複写した図形は、そのグループに入れる
+        if (doc.EditingGroupId is Guid g) _entities.ForEach(e => e.GroupId = g);
+        doc.Entities.AddRange(_entities);
+    }
 
     public void Undo(CadDocument doc)
     {

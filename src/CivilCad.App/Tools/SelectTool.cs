@@ -22,15 +22,30 @@ public sealed class SelectTool : CadTool
     public override bool IsDragging => _drag.IsMouseDrag;
 
     protected override void OnActivated() =>
-        SetPrompt($"図形をクリックで選択 (Shift+クリックで追加・解除) / ドラッグで範囲選択 ({BoxDrag.ModeText}、Shift+ドラッグで追加)、またはコマンドを入力");
+        SetPrompt((Canvas.IsGroupEditing ? "[グループ編集中: Esc で終了] " : "") + $"図形をクリックで選択 (Shift+クリックで追加・解除) / ドラッグで範囲選択 ({BoxDrag.ModeText}、Shift+ドラッグで追加)、またはコマンドを入力");
 
     public override void OnPress(Vec2 p) => _drag.Press(p);
 
-    /// <summary>文字をダブルクリックすると中身を変えられる。</summary>
+    /// <summary>
+    /// グループの図形をダブルクリックするとグループ編集に入る。文字をダブルクリックすると中身を変えられる。
+    /// グループ編集中にグループの外 (何も無い所) をダブルクリックすると、グループ編集を終える。
+    /// </summary>
     public override void OnDoubleClick(Vec2 p)
     {
-        if (Canvas.HitTest(p) is TextEntity text) TextEditing.Edit(Canvas, text);
+        var hit = Canvas.HitTest(p);
+        if (!Canvas.IsGroupEditing && hit?.GroupId is Guid group) EnterGroupEdit(Canvas, group);
+        else if (hit is TextEntity text) TextEditing.Edit(Canvas, text);
+        else if (hit == null && Canvas.IsGroupEditing) Canvas.ExitGroupEdit();
         else OnPress(p);
+    }
+
+    /// <summary>グループ編集に入る (選択モードにして、プロンプトも替える)。</summary>
+    public static void EnterGroupEdit(CadCanvas canvas, Guid group)
+    {
+        canvas.EnterGroupEdit(group);
+        canvas.ShowMessage("グループ編集: グループの中の図形だけを選んで編集できます (描いた図形はグループに入ります)。Esc で終了。");
+        if (canvas.Tool is SelectTool select) select.OnActivated();
+        else canvas.SetTool(new SelectTool());
     }
 
     public override void OnRelease(Vec2 p)
@@ -79,6 +94,12 @@ public sealed class SelectTool : CadTool
         if (_drag.IsActive)
         {
             _drag.Reset();
+            OnActivated();
+        }
+        else if (Canvas.IsGroupEditing)
+        {
+            Canvas.ExitGroupEdit();
+            Canvas.ShowMessage("グループ編集を終了しました。");
             OnActivated();
         }
         else
