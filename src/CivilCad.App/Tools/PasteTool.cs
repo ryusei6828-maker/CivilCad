@@ -34,7 +34,7 @@ public sealed class PasteTool : CadTool
     {
         if (_items.Count == 0) return;
         var delta = p - _base;
-        var pasted = _items.Select(e => e.Clone()).ToList();
+        var pasted = Grouping.RenewGroups(_items.Select(e => e.Clone()).ToList());
         pasted.ForEach(e => e.Translate(delta));
         Execute(new AddEntitiesCommand(pasted, "貼り付け"));
         _last = pasted;

@@ -49,7 +49,7 @@ public static class EntityClipboard
             if (e is SymbolEntity s) s.Size = target.PaperMmToMeters(s.SizeMm);
             result.Add(e);
         }
-        return result;
+        return Grouping.RenewGroups(result);
     }
 
     /// <summary>テスト用: 中身を空にする。</summary>

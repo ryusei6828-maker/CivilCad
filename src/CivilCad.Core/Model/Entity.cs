@@ -18,6 +18,9 @@ public abstract class Entity(Layer layer)
     /// <summary>生成元の識別用 (例: 路線作図で生成した図形は "ALIGN:路線名")。</summary>
     public string? Tag { get; set; }
 
+    /// <summary>グループ (G) の識別子。同じ値の図形はまとめて選ばれ、まとめて移動・複写される。null ならグループなし。</summary>
+    public Guid? GroupId { get; set; }
+
     /// <summary>線幅 (印刷時の mm)。null なら既定 (細線)。</summary>
     public double? LineWeight { get; set; }
 
@@ -56,6 +59,7 @@ public abstract class Entity(Layer layer)
     {
         e.Color = Color;
         e.Tag = Tag;
+        e.GroupId = GroupId;
         e.LineWeight = LineWeight;
         e.LineType = LineType;
         return e;

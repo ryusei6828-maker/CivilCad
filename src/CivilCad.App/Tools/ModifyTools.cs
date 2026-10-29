@@ -368,7 +368,7 @@ public sealed class RotateTool : CadTool
         var name = $"回転 ({deg:0.###}°)";
         if (_copy)
         {
-            var copies = _targets.Select(e => e.Clone()).ToList();
+            var copies = Grouping.RenewGroups(_targets.Select(e => e.Clone()).ToList());
             copies.ForEach(e => e.Rotate(origin, rad));
             Execute(new AddEntitiesCommand(copies, name));
         }

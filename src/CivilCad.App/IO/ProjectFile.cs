@@ -202,6 +202,7 @@ public static class ProjectFile
         dto.Layer = e.Layer.Name;
         dto.Color = e.Color;
         dto.Tag = e.Tag;
+        dto.Group = e.GroupId;
         dto.LineWeight = e.LineWeight;
         dto.LineType = e.LineType == LineType.Continuous ? null : e.LineType;
         return dto;
@@ -338,6 +339,7 @@ public static class ProjectFile
             }
             made.Color = e.Color;
             made.Tag = e.Tag;
+            made.GroupId = e.Group;
             made.LineWeight = e.LineWeight;
             made.LineType = e.LineType ?? LineType.Continuous;
             doc.Entities.Add(made);
@@ -452,6 +454,7 @@ public static class ProjectFile
         public string? Layer { get; set; }
         public RgbColor? Color { get; set; }
         public string? Tag { get; set; }
+        public Guid? Group { get; set; }
         public double? LineWeight { get; set; }
         public LineType? LineType { get; set; }
     }

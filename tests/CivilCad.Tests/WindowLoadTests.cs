@@ -52,14 +52,14 @@ public class WindowLoadTests
                 Assert.Equal(0, tabs.SelectedIndex);
                 Assert.Equal(["L", "PL", "C", "A", "REC", "PO", "PE", "DIM", "H", "FI", "PS", "PSR"],
                     ((System.Windows.Controls.Panel)draw.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
-                // 「文字」タブに文字・文字変更・引き出し線・旗揚げ、「修正」タブに移動〜結合 (削除は左のいつも出すボタン)
+                // 「文字」タブに文字・文字変更・引き出し線・旗揚げ、「修正」タブに移動〜結合・グループ (削除は左のいつも出すボタン)
                 var text = (System.Windows.Controls.TabItem)tabs.Items[1];
                 Assert.Equal("文字", text.Header);
                 Assert.Equal(["T", "ED", "LD", "HA"],
                     ((System.Windows.Controls.Panel)text.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
                 var modify = (System.Windows.Controls.TabItem)tabs.Items[2];
                 Assert.Equal("修正", modify.Header);
-                Assert.Equal(["M", "CO", "RO", "SCL", "AL", "O", "TR", "EX", "J"],
+                Assert.Equal(["M", "CO", "RO", "SCL", "AL", "O", "TR", "EX", "J", "G", "UG"],
                     ((System.Windows.Controls.Panel)modify.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
                 Assert.NotNull(settings.Content);
                 Assert.NotNull(frame.Content);

@@ -134,6 +134,15 @@ public sealed class SetPlaneZoneCommand(int? zone) : IUndoableCommand
     public void Undo(CadDocument doc) => doc.PlaneZone = _old;
 }
 
+/// <summary>グループ化 (groupId を付ける) / グループ解除 (null)。元のグループは Undo で戻す。</summary>
+public sealed class SetGroupCommand(IEnumerable<Entity> entities, Guid? groupId, string name) : IUndoableCommand
+{
+    private readonly List<(Entity Entity, Guid? Old)> _items = entities.Select(e => (e, e.GroupId)).ToList();
+    public string Name => name;
+    public void Do(CadDocument doc) => _items.ForEach(x => x.Entity.GroupId = groupId);
+    public void Undo(CadDocument doc) => _items.ForEach(x => x.Entity.GroupId = x.Old);
+}
+
 /// <summary>複数コマンドを 1 回の Undo 単位にまとめる。</summary>
 public sealed class CompositeCommand(string name, params IUndoableCommand[] commands) : IUndoableCommand
 {

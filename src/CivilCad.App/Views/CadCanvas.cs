@@ -116,17 +116,19 @@ public sealed class CadCanvas : FrameworkElement
     internal void RaisePromptChanged() => PromptChanged?.Invoke(this, EventArgs.Empty);
     public void ShowMessage(string text) => Message?.Invoke(this, text);
 
+    /// <summary>図形を選ぶ。グループの図形は、同じグループの図形もまとめて選ぶ。</summary>
     public void SetSelection(IEnumerable<Entity> entities)
     {
         Selection.Clear();
-        Selection.UnionWith(entities);
+        Selection.UnionWith(Grouping.Expand(Document, entities));
         OnSelectionChanged();
     }
 
     public void AddToSelection(IEnumerable<Entity> entities, bool remove = false)
     {
-        if (remove) Selection.ExceptWith(entities);
-        else Selection.UnionWith(entities);
+        var expanded = Grouping.Expand(Document, entities);
+        if (remove) Selection.ExceptWith(expanded);
+        else Selection.UnionWith(expanded);
         OnSelectionChanged();
     }
 

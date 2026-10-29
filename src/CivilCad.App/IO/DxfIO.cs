@@ -41,7 +41,8 @@ public static class DxfIO
 
         var images = new Dictionary<string, netDxf.Objects.ImageDefinition>(StringComparer.OrdinalIgnoreCase);
         // プリセット (記号)・引き出し線は線・塗り・円・文字に展開して書く (他の CAD でも表示できるように)
-        foreach (var e in doc.Entities.SelectMany(x => x.ExplodeForOutput()))
+        var groups = new Dictionary<Guid, List<EntityObject>>();
+        foreach (var (source, e) in doc.Entities.SelectMany(x => x.ExplodeForOutput().Select(o => (x, o))))
         {
             EntityObject? de = e switch
             {
@@ -65,7 +66,15 @@ public static class DxfIO
             if (e is HatchEntity { TransparencyPercent: > 0 } th) de.Transparency = new Transparency((short)Math.Clamp(Math.Round(th.TransparencyPercent), 0, 90));
             if (e is ImageEntity { TransparencyPercent: > 0 } ti) de.Transparency = new Transparency((short)Math.Clamp(Math.Round(ti.TransparencyPercent), 0, 90));
             dxf.Entities.Add(de);
+            if (source.GroupId is Guid g)
+            {
+                if (!groups.TryGetValue(g, out var members)) groups[g] = members = [];
+                members.Add(de);
+            }
         }
+        // グループ (G) は DXF のグループに
+        var groupNo = 1;
+        foreach (var members in groups.Values) dxf.Groups.Add(new netDxf.Objects.Group($"CIVILCAD{groupNo++}", members));
         // 図面の縮尺は AutoCAD 等と同じく DIMSCALE (寸法スタイルの全体尺度, ヘッダの $DIMSCALE) に入れる
         dxf.DimensionStyles[dxf.DrawingVariables.DimStyle].DimScaleOverall = doc.ScaleDenominator;
         dxf.DrawingVariables.InsUnits = netDxf.Units.DrawingUnits.Meters; // 座標は実寸 m
@@ -122,9 +131,11 @@ public static class DxfIO
             layers.TryGetValue(o.Layer.Name, out var l) ? l : layers[o.Layer.Name] = doc.GetOrCreateLayer(o.Layer.Name, RgbColor.White);
 
         var list = new List<Entity>();
+        var made = new Dictionary<EntityObject, Entity[]>();
         var converted = 0;
         void Add(EntityObject o, params Entity[] entities)
         {
+            made[o] = entities;
             foreach (var e in entities)
             {
                 e.Color = o.Color.IsByLayer || o.Color.IsByBlock ? null : ToRgb(o.Color);
@@ -162,6 +173,15 @@ public static class DxfIO
                 if (!o.Transparency.IsByLayer && !o.Transparency.IsByBlock && o.Transparency.Value > 0) image.TransparencyPercent = o.Transparency.Value;
                 Add(o, image);
             }
+
+        // DXF のグループは、まとめて選べるグループ (G) に
+        foreach (var group in dxf.Groups)
+        {
+            var id = Guid.NewGuid();
+            foreach (var o in group.Entities)
+                if (made.TryGetValue(o, out var members))
+                    foreach (var e in members) e.GroupId = id;
+        }
 
         doc.Entities.AddRange(list);
         doc.NotifyChanged();

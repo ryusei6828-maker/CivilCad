@@ -47,7 +47,7 @@ public sealed class EraseTool : CadTool
     /// <summary>ダブルクリック: その図形も含めて、選んだ図形を削除する (1 回目のクリックで解除されていても消す)。</summary>
     public override void OnDoubleClick(Vec2 p)
     {
-        if (Canvas.HitTest(p) is { } hit && !_marked.Contains(hit)) _marked.Add(hit);
+        if (Canvas.HitTest(p) is { } hit && !_marked.Contains(hit)) _marked.AddRange(Grouping.Expand(Doc, [hit]).Where(x => !_marked.Contains(x)));
         Confirm();
     }
 
@@ -66,15 +66,18 @@ public sealed class EraseTool : CadTool
         _drag.TypedCorner = null;
     }
 
+    /// <summary>グループの図形は、同じグループの図形もまとめて選ぶ・外す。</summary>
     private void Toggle(Entity e)
     {
-        if (!_marked.Remove(e)) _marked.Add(e);
+        var group = Grouping.Expand(Doc, [e]);
+        if (_marked.Contains(e)) _marked.RemoveAll(group.Contains);
+        else _marked.AddRange(group.Where(x => !_marked.Contains(x)));
         OnActivated();
     }
 
     private void Mark(List<Entity> hits)
     {
-        foreach (var e in hits)
+        foreach (var e in Grouping.Expand(Doc, hits))
             if (!_marked.Contains(e)) _marked.Add(e);
         OnActivated();
     }
@@ -169,7 +172,7 @@ public sealed class MoveCopyTool(bool copy) : CadTool
         var delta = p - b;
         if (copy)
         {
-            var clones = _targets.Select(e => e.Clone()).ToList();
+            var clones = Grouping.RenewGroups(_targets.Select(e => e.Clone()).ToList());
             clones.ForEach(e => e.Translate(delta));
             Execute(new AddEntitiesCommand(clones, "複写"));
         }

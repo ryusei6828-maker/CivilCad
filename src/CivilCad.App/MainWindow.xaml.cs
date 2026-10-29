@@ -202,6 +202,8 @@ public partial class MainWindow : Window
                               : "北に合わせる方位記号がありません (手動にした方位記号は無く、方位記号も選択されていません)。");
                 break;
             case "J": JoinSelection(); break;
+            case "G": GroupSelection(); break;
+            case "UG": UngroupSelection(); break;
             case "CB": CopySelection(cut: false); break;
             case "CUT": CopySelection(cut: true); break;
             case "PA": PasteInPlace(); break;
@@ -314,6 +316,33 @@ public partial class MainWindow : Window
         CommandBox.Focus();
     }
 
+    /// <summary>グループ化: 選択中の図形を 1 つのグループにまとめる (グループを含んでいれば、それごとまとめ直す)。</summary>
+    private void GroupSelection()
+    {
+        var targets = _doc.Entities.Where(Canvas.Selection.Contains).ToList();
+        if (targets.Count < 2)
+        {
+            Log("グループ化: 先に図形を 2 つ以上選択してください。");
+            return;
+        }
+        _doc.History.Execute(new SetGroupCommand(targets, Guid.NewGuid(), $"グループ化 ({targets.Count} 個)"));
+        Log($"{targets.Count} 個の図形をグループにしました。どれか 1 つをクリックすると全部選ばれます (解除は UG)。");
+    }
+
+    /// <summary>グループ解除: 選択中のグループを解いて、1 つずつ選べるようにする。</summary>
+    private void UngroupSelection()
+    {
+        var targets = _doc.Entities.Where(e => Canvas.Selection.Contains(e) && e.GroupId != null).ToList();
+        if (targets.Count == 0)
+        {
+            Log("グループ解除: グループの図形を選択してください。");
+            return;
+        }
+        var groups = Grouping.CountGroups(targets);
+        _doc.History.Execute(new SetGroupCommand(targets, null, "グループ解除"));
+        Log($"グループ {groups} 個を解除しました ({targets.Count} 個の図形)。");
+    }
+
     /// <summary>結合: 選択中の線をつなぎ直す (同じ直線上・同じ円上のものはまとめ、端点がつながるものは 1 本のポリラインに)。</summary>
     private void JoinSelection() => Log(JoinCommand.Run(Canvas));
 
@@ -364,6 +393,9 @@ public partial class MainWindow : Window
             Item("拡大縮小", () => RunCommand("SCL"), hasSel, "SCL");
             Item("2 点指示 (位置合わせ)", () => RunCommand("AL"), hasSel, "AL");
             Item("削除", DeleteSelection, hasSel, "Delete");
+            menu.Items.Add(new Separator());
+            Item("グループ化", () => RunCommand("G"), Canvas.Selection.Count >= 2, "G");
+            Item("グループ解除", () => RunCommand("UG"), Canvas.Selection.Any(e => e.GroupId != null), "UG");
             menu.Items.Add(new Separator());
             Item("コピー", () => CopySelection(cut: false), hasSel, "Ctrl+C");
             Item("切り取り", () => CopySelection(cut: true), hasSel, "Ctrl+X");
