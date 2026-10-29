@@ -96,4 +96,24 @@ public class ClipboardTests
         Assert.Single(b.Entities);
         Assert.Single(a.Entities); // コピー元はそのまま
     });
+
+    [Fact]
+    public void Paste_GroupGetsNewIdEachTime()
+    {
+        // グループ (G) の図形は、貼り付けるたびに新しいグループになる
+        var doc = new CadDocument();
+        var a = new LineEntity(doc.CurrentLayer, new Vec2(0, 0), new Vec2(10, 0)) { GroupId = Guid.NewGuid() };
+        var b = new CircleEntity(doc.CurrentLayer, new Vec2(5, 5), 2) { GroupId = a.GroupId };
+        doc.Entities.AddRange([a, b]);
+        EntityClipboard.Copy(doc, [a, b]);
+        try
+        {
+            var first = EntityClipboard.CreateFor(doc);
+            var second = EntityClipboard.CreateFor(doc);
+            Assert.Equal(first[0].GroupId, first[1].GroupId);
+            Assert.NotEqual(a.GroupId, first[0].GroupId);
+            Assert.NotEqual(first[0].GroupId, second[0].GroupId);
+        }
+        finally { EntityClipboard.Clear(); }
+    }
 }

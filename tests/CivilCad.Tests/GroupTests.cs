@@ -150,23 +150,6 @@ public class GroupTests
     });
 
     [Fact]
-    public void Paste_MakesNewGroupEachTime()
-    {
-        var doc = new CadDocument();
-        var (a, b, _) = Sample(doc);
-        EntityClipboard.Copy(doc, [a, b]);
-        try
-        {
-            var first = EntityClipboard.CreateFor(doc);
-            var second = EntityClipboard.CreateFor(doc);
-            Assert.Equal(first[0].GroupId, first[1].GroupId);
-            Assert.NotEqual(a.GroupId, first[0].GroupId);
-            Assert.NotEqual(first[0].GroupId, second[0].GroupId);
-        }
-        finally { EntityClipboard.Clear(); }
-    }
-
-    [Fact]
     public void Group_SurvivesProjectAndDxf()
     {
         var doc = new CadDocument();
