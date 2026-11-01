@@ -361,8 +361,10 @@ public sealed class PropertiesPanel : UserControl
                 break;
 
             case TextEntity t:
-                AddEditable("文字", t.Text, s =>
-                    s.Length > 0 && Apply(x => ((TextEntity)x).Text = s, "文字変更"));
+                if (t.IsMultiLine) AddReadOnly("文字", $"{t.Lines[0]}… ({t.Lines.Length} 行。変えるときは ED)");
+                else
+                    AddEditable("文字", t.Text, s =>
+                        s.Length > 0 && Apply(x => ((TextEntity)x).Text = s, "文字変更"));
                 AddReadOnly("文字高 (図面上)", $"{t.Height:F3} m");
                 AddReadOnly("位置", Xy(t.Position));
                 AddReadOnly("回転角", $"{Deg(t.Rotation):F2}°");

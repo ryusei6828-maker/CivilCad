@@ -124,7 +124,7 @@ public class WindowLoadTests
                     new CivilCad.Core.Geometry.Box2(new(0, 0), new(38000, 25700)), 500);
                 Assert.NotNull(importWin.Content);
                 importWin.Close();
-                var textEdit = new CivilCad.App.Views.TextEditWindow("No.1");
+                var textEdit = new CivilCad.App.Views.TextEditWindow(new CivilCad.Core.Model.TextEntity(new CivilCad.Core.Model.CadDocument().CurrentLayer, CivilCad.Core.Geometry.Vec2.Zero, "No.1", 2), new CivilCad.Core.Model.CadDocument());
                 Assert.NotNull(textEdit.Content);
                 textEdit.Close();
                 // 文字を選ぶと、閉じていたプロパティ (右側) が開く

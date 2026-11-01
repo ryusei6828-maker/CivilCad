@@ -391,7 +391,7 @@ public sealed class TextTool : CadTool, IStyledDrawTool
         return (t.Height * Canvas.Scale, t.EffectiveFontName);
     }
 
-    public void SubmitText(string text) => OnText(text.Replace("\r", "").Replace("\n", " "));
+    public void SubmitText(string text) => OnText(text.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n'));
 
     public void CancelText()
     {

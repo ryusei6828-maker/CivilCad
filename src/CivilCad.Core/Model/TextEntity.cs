@@ -46,14 +46,33 @@ public sealed class TextEntity(Layer layer, Vec2 position, string text, double h
         if (ScreenHeightPx is double px && pixelsPerMeter > 0) Height = px / pixelsPerMeter;
     }
 
-    /// <summary>文字幅の概算 (等幅フォント想定: 全角 1.0H、半角 0.5H)。</summary>
-    public double ApproxWidth => FitWidth ?? Text.Sum(c => c < 0x80 || c is >= '｡' and <= 'ﾟ' ? 0.5 : 1.0) * Height * WidthFactor;
+    /// <summary>行間 (行の基準線どうしの間隔) = 文字高 × この値 (DXF の MTEXT と同じ 5/3)。</summary>
+    public const double LinePitchFactor = 5.0 / 3.0;
 
-    /// <summary>配置基準を考慮した文字列の左下 (ベースライン左端)。width は実際の文字列幅。</summary>
+    /// <summary>行ごとに分けた文字列 (改行は '\n')。</summary>
+    public string[] Lines => Text.Split('\n');
+
+    /// <summary>改行を含む複数行の文字か。</summary>
+    public bool IsMultiLine => Text.Contains('\n');
+
+    /// <summary>行間 (m)。</summary>
+    public double LinePitch => Height * LinePitchFactor;
+
+    /// <summary>文字全体 (ブロック) の高さ。1 行なら文字高。</summary>
+    public double BlockHeight => Height + (Lines.Length - 1) * LinePitch;
+
+    private double WidthOfLine(string line) => line.Sum(c => c < 0x80 || c is >= '｡' and <= 'ﾟ' ? 0.5 : 1.0) * Height * WidthFactor;
+
+    /// <summary>
+    /// 文字幅の概算 (等幅フォント想定: 全角 1.0H、半角 0.5H)。複数行は一番長い行の幅 (幅指定は 1 行のときだけ効く)。
+    /// </summary>
+    public double ApproxWidth => IsMultiLine ? Lines.Max(WidthOfLine) : FitWidth ?? WidthOfLine(Text);
+
+    /// <summary>配置基準を考慮した文字全体の左下 (最終行のベースライン左端)。width は実際の文字列幅 (複数行は一番長い行)。</summary>
     public Vec2 BaselineStart(double width)
     {
         var dx = HAlign switch { TextHAlign.Center => -width / 2, TextHAlign.Right => -width, _ => 0 };
-        var dy = VAlign switch { TextVAlign.Top => -Height, TextVAlign.Middle => -Height / 2, _ => 0 };
+        var dy = VAlign switch { TextVAlign.Top => -BlockHeight, TextVAlign.Middle => -BlockHeight / 2, _ => 0 };
         var u = Vec2.FromAngle(Rotation);
         return Position + u * dx + u.LeftNormal * dy;
     }
@@ -65,12 +84,45 @@ public sealed class TextEntity(Layer layer, Vec2 position, string text, double h
             var u = Vec2.FromAngle(Rotation);
             var v = u.LeftNormal;
             var w = ApproxWidth;
+            var h = BlockHeight;
             var p = BaselineStart(w);
             yield return p;
             yield return p + u * w;
-            yield return p + u * w + v * Height;
-            yield return p + v * Height;
+            yield return p + u * w + v * h;
+            yield return p + v * h;
         }
+    }
+
+    /// <summary>文字全体の枠の 4 隅 (左下から反時計回り)。</summary>
+    public Vec2[] BoxCorners => [.. Corners];
+
+    /// <summary>
+    /// 複数行は行ごとの 1 行の文字に分ける (横の揃えは行ごと、縦はベースライン基準)。1 行ならそのまま。
+    /// 空の行は出さない。DXF・SFC・JWW・PDF への出力と画面の描画に使う。
+    /// </summary>
+    public override IEnumerable<Entity> ExplodeForOutput()
+    {
+        if (!IsMultiLine) return [this];
+        var lines = Lines;
+        var u = Vec2.FromAngle(Rotation);
+        var v = u.LeftNormal;
+        var w = ApproxWidth;
+        var start = BaselineStart(w);
+        var result = new List<Entity>();
+        for (var i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].Length == 0) continue;
+            var lw = WidthOfLine(lines[i]);
+            var left = HAlign switch { TextHAlign.Center => (w - lw) / 2, TextHAlign.Right => w - lw, _ => 0 };
+            var anchor = HAlign switch { TextHAlign.Center => left + lw / 2, TextHAlign.Right => left + lw, _ => left };
+            var line = (TextEntity)Clone();
+            line.Text = lines[i];
+            line.FitWidth = null;
+            line.VAlign = TextVAlign.Baseline;
+            line.Position = start + u * anchor + v * ((lines.Length - 1 - i) * LinePitch);
+            result.Add(line);
+        }
+        return result;
     }
 
     public override Box2 Bounds => Box2.FromPoints(Corners);
@@ -99,7 +151,7 @@ public sealed class TextEntity(Layer layer, Vec2 position, string text, double h
         var w = ApproxWidth;
         var d = (p - BaselineStart(w)).Rotate(-Rotation);
         var dx = Math.Max(0, Math.Max(-d.X, d.X - w));
-        var dy = Math.Max(0, Math.Max(-d.Y, d.Y - Height));
+        var dy = Math.Max(0, Math.Max(-d.Y, d.Y - BlockHeight));
         return Math.Sqrt(dx * dx + dy * dy);
     }
 

@@ -24,7 +24,11 @@ public class TextEditTests
         if (error != null) ExceptionDispatchInfo.Capture(error).Throw();
     }
 
-    private static void WithAnswer(Func<string, string?> answer, Action action)
+    /// <summary>文字だけ答える (大きさ・揃えはそのまま、幅指定も残す)。</summary>
+    private static void WithAnswer(Func<string, string?> answer, Action action) =>
+        WithResult(t => answer(t.Text) is string s ? new TextEditResult(s, t.Height, t.HAlign, t.VAlign, true) : null, action);
+
+    private static void WithResult(Func<TextEntity, TextEditResult?> answer, Action action)
     {
         var original = TextEditing.Ask;
         TextEditing.Ask = (_, current) => answer(current);
@@ -105,6 +109,89 @@ public class TextEditTests
             var line = new LineEntity(doc.CurrentLayer, new Vec2(20, 0), new Vec2(30, 0));
             doc.Entities.Add(line);
             WithAnswer(_ => throw new InvalidOperationException("文字以外で尋ねてはいけない"), () => canvas.Tool.OnDoubleClick(new Vec2(25, 0)));
+        });
+    }
+
+    [Fact]
+    public void FitWidthCenterText_NewText_IsNotStretched_WhenKeepFitOff()
+    {
+        OnSta(() =>
+        {
+            var canvas = new CadCanvas();
+            var doc = canvas.Document;
+            var t = new TextEntity(doc.CurrentLayer, new Vec2(0, 0), "古い文字", 2) { HAlign = TextHAlign.Center, FitWidth = 20 };
+            doc.Entities.Add(t);
+            WithResult(x => new TextEditResult("ABCD", x.Height, x.HAlign, x.VAlign, false), () => Assert.True(TextEditing.Edit(canvas, t)));
+            var c = Assert.Single(doc.Entities.OfType<TextEntity>());
+            Assert.Null(c.FitWidth);
+            Assert.Equal(4, c.ApproxWidth); // 元の幅 20 には伸ばさない
+            Assert.Equal(new Vec2(0, 0), c.Position); // 揃えを変えなければ位置もそのまま
+
+            // 幅指定を残すにしたときは残る
+            var t2 = new TextEntity(doc.CurrentLayer, new Vec2(0, 5), "古い", 2) { FitWidth = 20 };
+            doc.Entities.Add(t2);
+            WithResult(x => new TextEditResult("新しい", x.Height, x.HAlign, x.VAlign, true), () => Assert.True(TextEditing.Edit(canvas, t2)));
+            Assert.Equal(20, doc.Entities.OfType<TextEntity>().Last().FitWidth);
+        });
+    }
+
+    [Fact]
+    public void ChangingAlignment_KeepsTextInTheOldBox()
+    {
+        OnSta(() =>
+        {
+            var canvas = new CadCanvas();
+            var doc = canvas.Document;
+            var t = new TextEntity(doc.CurrentLayer, new Vec2(0, 0), "ABCDEFGHIJ", 2); // 幅 10、左下
+            doc.Entities.Add(t);
+            WithResult(x => new TextEditResult(x.Text, x.Height, TextHAlign.Right, TextVAlign.Top, false), () => Assert.True(TextEditing.Edit(canvas, t)));
+            var c = Assert.Single(doc.Entities.OfType<TextEntity>());
+            Assert.Equal(10, c.Position.X, 9); // 元の枠の右上
+            Assert.Equal(2, c.Position.Y, 9);
+            Assert.Equal((0, 0, 10, 2), (c.Bounds.Min.X, c.Bounds.Min.Y, c.Bounds.Max.X, c.Bounds.Max.Y));
+
+            // 回転した文字でも枠の中で動く
+            var r = new TextEntity(doc.CurrentLayer, new Vec2(100, 0), "ABCDEFGHIJ", 2, Math.PI / 2);
+            doc.Entities.Add(r);
+            WithResult(x => new TextEditResult(x.Text, x.Height, TextHAlign.Center, TextVAlign.Middle, false), () => Assert.True(TextEditing.Edit(canvas, r)));
+            var rc = doc.Entities.OfType<TextEntity>().Last();
+            Assert.Equal(99, rc.Position.X, 9);
+            Assert.Equal(5, rc.Position.Y, 9);
+        });
+    }
+
+    [Fact]
+    public void MultiLineEdit_AndHeightChange_UndoInOneStep()
+    {
+        OnSta(() =>
+        {
+            var canvas = new CadCanvas();
+            var doc = canvas.Document;
+            var t = new TextEntity(doc.CurrentLayer, new Vec2(0, 0), "AB", 2);
+            doc.Entities.Add(t);
+            WithResult(x => new TextEditResult("一行目\r\n二行目\r\n", 3, TextHAlign.Left, TextVAlign.Bottom, false), () => Assert.True(TextEditing.Edit(canvas, t)));
+            var c = Assert.Single(doc.Entities.OfType<TextEntity>());
+            Assert.Equal("一行目\n二行目", c.Text);
+            Assert.Equal(3, c.Height);
+            doc.History.Undo();
+            Assert.Same(t, Assert.Single(doc.Entities.OfType<TextEntity>()));
+            Assert.Equal("AB", t.Text);
+            Assert.False(doc.History.CanUndo);
+        });
+    }
+
+    [Fact]
+    public void WhitespaceOnly_IsRejected_And_NoChange_ReturnsFalse()
+    {
+        OnSta(() =>
+        {
+            var canvas = new CadCanvas();
+            var doc = canvas.Document;
+            var t = new TextEntity(doc.CurrentLayer, new Vec2(0, 0), "AB", 2);
+            doc.Entities.Add(t);
+            WithAnswer(_ => " \n \n", () => Assert.False(TextEditing.Edit(canvas, t)));
+            WithResult(x => new TextEditResult(x.Text, x.Height, x.HAlign, TextVAlign.Baseline, false), () => Assert.False(TextEditing.Edit(canvas, t)));
+            Assert.False(doc.History.CanUndo);
         });
     }
 }

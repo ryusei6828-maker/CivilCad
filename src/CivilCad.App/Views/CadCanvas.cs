@@ -930,6 +930,13 @@ public sealed class CadCanvas : FrameworkElement
 
     private void DrawText(DrawingContext dc, TextEntity t, RgbColor color, bool selected)
     {
+        if (t.IsMultiLine)
+        {
+            // 複数行は行ごとの 1 行の文字にして描き、選択の枠は全体に付ける
+            foreach (var line in t.ExplodeForOutput().OfType<TextEntity>()) DrawText(dc, line, color, false);
+            if (selected) DrawWorldPolyline(dc, GetPen(color, true), t.BoxCorners, true);
+            return;
+        }
         var em = t.Height * Scale;
         if (em < 2)
         {

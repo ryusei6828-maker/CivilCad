@@ -80,6 +80,7 @@ public partial class MainWindow : Window
         InlineTextBox.TextChanged += (_, _) =>
         {
             if (Canvas.Tool is TextTool tt) tt.DraftText = InlineTextBox.Text;
+            PlaceInlineText(); // 行が増えたら上へ伸ばす
         };
         InlineTextBox.PreviewKeyDown += InlineTextBox_PreviewKeyDown;
         // 文字を入れるコマンドでは、入力欄を出すプロパティ (右側) を開く
@@ -1339,7 +1340,17 @@ public partial class MainWindow : Window
     private void InlineTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (Canvas.Tool is not TextTool tt) return;
-        if (e.Key == Key.Enter)
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.Enter && (Keyboard.Modifiers & (ModifierKeys.Alt | ModifierKeys.Shift)) != 0)
+        {
+            // Alt+Enter・Shift+Enter は改行 (Enter だけなら置く)
+            var at = InlineTextBox.SelectionStart;
+            InlineTextBox.SelectedText = "\n";
+            InlineTextBox.CaretIndex = at + 1;
+            e.Handled = true;
+            return;
+        }
+        if (key == Key.Enter)
         {
             tt.SubmitText(InlineTextBox.Text);
             e.Handled = true;

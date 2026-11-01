@@ -522,9 +522,9 @@
                 </Border>
                 <!-- 文字コマンドで、クリックした位置にその場で文字を打つ欄 (背景なしの Canvas なのでクリックは下の作図領域へ通る) -->
                 <Canvas x:Name="CanvasOverlay" ClipToBounds="True">
-                    <TextBox x:Name="InlineTextBox" Visibility="Collapsed" MinWidth="60" BorderThickness="1" Padding="1,0"
+                    <TextBox x:Name="InlineTextBox" Visibility="Collapsed" MinWidth="60" BorderThickness="1" Padding="1,0" AcceptsReturn="True" TextWrapping="NoWrap"
                              BorderBrush="#FF66CCFF" Background="#E01E1E1E" Foreground="White" CaretBrush="White"
-                             ToolTip="文字を入力して Enter で置く / Esc でやめる / 別の場所をクリックすると、入れた文字を置いて次の位置へ"/>
+                             ToolTip="文字を入力して Enter で置く / Alt+Enter で改行 / Esc でやめる / 別の場所をクリックすると、入れた文字を置いて次の位置へ"/>
                 </Canvas>
             </Grid>
         </DockPanel>
