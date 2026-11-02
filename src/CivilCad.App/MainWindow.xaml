@@ -525,6 +525,9 @@
                     <TextBox x:Name="InlineTextBox" Visibility="Collapsed" MinWidth="60" BorderThickness="1" Padding="1,0" AcceptsReturn="True" TextWrapping="NoWrap"
                              BorderBrush="#FF66CCFF" Background="#E01E1E1E" Foreground="White" CaretBrush="White"
                              ToolTip="文字を入力して Enter で置く / Alt+Enter で改行 / Esc でやめる / 別の場所をクリックすると、入れた文字を置いて次の位置へ"/>
+                    <!-- 文字変更: 図面の文字の上に重ねて、その場で直す欄 (位置・大きさ・向きは MainWindow.PlaceTextEdit が文字に合わせる) -->
+                    <TextBox x:Name="EditTextBox" Visibility="Collapsed" BorderThickness="1" Padding="0" AcceptsReturn="True" TextWrapping="NoWrap"
+                             BorderBrush="#FF66CCFF" Background="#D81E1E1E" Foreground="White" CaretBrush="White" SelectionBrush="#FF3399FF"/>
                 </Canvas>
             </Grid>
         </DockPanel>

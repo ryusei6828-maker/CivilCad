@@ -34,7 +34,7 @@ public sealed class SelectTool : CadTool
     {
         var hit = Canvas.HitTest(p);
         if (!Canvas.IsGroupEditing && hit?.GroupId is Guid group) EnterGroupEdit(Canvas, group);
-        else if (hit is TextEntity text) TextEditing.Edit(Canvas, text);
+        else if (hit is TextEntity text) TextEditing.Begin(Canvas, text);
         else if (hit == null && Canvas.IsGroupEditing) Canvas.ExitGroupEdit();
         else OnPress(p);
     }

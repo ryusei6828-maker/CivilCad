@@ -72,7 +72,7 @@ public partial class MainWindow : Window
             // 文字を選んだら、閉じているプロパティ (右側) を開いて文字の内容・大きさを見せる
             if (_propsDock != null && !_propsDock.IsOpen && Canvas.Selection.Any(x => x is TextEntity)) SetPanelOpen(_propsDock, true);
         };
-        Canvas.PreviewMouseDown += (_, _) => CommandBox.Focus();
+        Canvas.PreviewMouseDown += (_, _) => { if (Canvas.TextEdit == null) CommandBox.Focus(); }; // 文字を直している間は入力欄から外さない
         // 文字コマンド: クリックした位置に、その場で文字を打つ入力欄を出す
         Canvas.PromptChanged += (_, _) => UpdateInlineText();
         Canvas.ToolChanged += (_, _) => UpdateInlineText();
@@ -83,6 +83,15 @@ public partial class MainWindow : Window
             PlaceInlineText(); // 行が増えたら上へ伸ばす
         };
         InlineTextBox.PreviewKeyDown += InlineTextBox_PreviewKeyDown;
+        // 文字変更: 図面の文字の上で、その場で直す
+        Canvas.TextEditChanged += (_, _) => UpdateTextEdit();
+        Canvas.ViewChanged += (_, _) => PlaceTextEdit();
+        EditTextBox.TextChanged += (_, _) =>
+        {
+            if (_updatingEdit || Canvas.TextEdit is not { } ed) return;
+            ed.Text = EditTextBox.Text;
+        };
+        EditTextBox.PreviewKeyDown += EditTextBox_PreviewKeyDown;
         // 文字を入れるコマンドでは、入力欄を出すプロパティ (右側) を開く
         Canvas.ToolChanged += (_, _) =>
         {
@@ -113,7 +122,7 @@ public partial class MainWindow : Window
         PropsPanel.Attach(Canvas);
         PropsPanel.Committed += (_, _) => FocusCommandBox();
         InputBar.Attach(Canvas);
-        InputBar.Committed += (_, _) => FocusCommandBox();
+        InputBar.Committed += (_, _) => { if (Canvas.TextEdit != null) EditTextBox.Focus(); else FocusCommandBox(); };
 
         // パネル: 右 = プロパティ (既定で表示)、左 = レイヤ (既定で閉じる)。どちらもフロート可能
         _propsDock = new DockablePanel(this, PropsHost, PropsPanel, "プロパティ", _settings.PropertiesPanel, open: true,
@@ -1363,6 +1372,109 @@ public partial class MainWindow : Window
         else return;
         Canvas.RedrawOverlay();
         CommandBox.Focus();
+    }
+
+    // ---- 文字変更: 図面の文字の上に重ねる入力欄 ----
+
+    private bool _updatingEdit;
+    private InPlaceTextEdit? _editBound;
+
+    /// <summary>文字を直し始めた・終えた: 入力欄を出す・しまう。</summary>
+    private void UpdateTextEdit()
+    {
+        if (_editBound != null) _editBound.Changed -= TextEdit_Changed;
+        _editBound = null;
+        if (Canvas.TextEdit is { } ed)
+        {
+            _editBound = ed;
+            ed.Changed += TextEdit_Changed;
+            var t = ed.Original;
+            var color = Canvas.ForDisplay(t.EffectiveColor);
+            var fore = new SolidColorBrush(Color.FromRgb(color.R, color.G, color.B));
+            EditTextBox.Foreground = fore;
+            EditTextBox.CaretBrush = fore;
+            EditTextBox.Background = new SolidColorBrush(Canvas.IsLightBackground ? Color.FromArgb(0xD8, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xD8, 0x1E, 0x1E, 0x1E));
+            EditTextBox.FontFamily = new FontFamily(t.EffectiveFontName + ", MS Gothic");
+            _updatingEdit = true;
+            EditTextBox.Text = ed.Text;
+            _updatingEdit = false;
+            EditTextBox.Visibility = Visibility.Visible;
+            PlaceTextEdit();
+            PromptText.Text = "[文字変更] 文字を直して Enter で確定 (Alt+Enter で改行、Esc でやめる):";
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (EditTextBox.Visibility != Visibility.Visible) return;
+                EditTextBox.Focus();
+                Keyboard.Focus(EditTextBox);
+                EditTextBox.SelectAll(); // 打てば置き換わる (矢印キーで続きを直せる)
+            }, System.Windows.Threading.DispatcherPriority.Input);
+        }
+        else if (EditTextBox.Visibility == Visibility.Visible)
+        {
+            EditTextBox.Visibility = Visibility.Collapsed;
+            _updatingEdit = true;
+            EditTextBox.Text = "";
+            _updatingEdit = false;
+            Canvas.RaisePromptChanged();
+            FocusCommandBox();
+        }
+    }
+
+    private void TextEdit_Changed(object? sender, EventArgs e) => PlaceTextEdit();
+
+    /// <summary>入力欄を図面の文字に重ねる: 文字の大きさ・フォント・向き。揃えの基準点は動かさない。</summary>
+    private void PlaceTextEdit()
+    {
+        if (EditTextBox.Visibility != Visibility.Visible || Canvas.TextEdit is not { } ed) return;
+        var t = ed.Original;
+        var em = Math.Clamp(ed.HeightM * Canvas.Scale, 2, 2000);
+        EditTextBox.FontSize = em;
+        // 複数行は図面と同じ行間 (文字高の 5/3)
+        TextBlock.SetLineStackingStrategy(EditTextBox, ed.IsMultiLine ? LineStackingStrategy.BlockLineHeight : LineStackingStrategy.MaxHeight);
+        TextBlock.SetLineHeight(EditTextBox, ed.IsMultiLine ? em * TextEntity.LinePitchFactor : double.NaN);
+        EditTextBox.TextAlignment = ed.HAlign switch { TextHAlign.Center => TextAlignment.Center, TextHAlign.Right => TextAlignment.Right, _ => TextAlignment.Left };
+        EditTextBox.MinWidth = em * 0.5;
+        EditTextBox.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var w = EditTextBox.DesiredSize.Width;
+        var h = EditTextBox.DesiredSize.Height;
+        const double border = 1;
+        var cw = Math.Max(w - 2 * border, 1e-6);
+        var ch = Math.Max(h - 2 * border, 1e-6);
+        var hf = ed.HAlign switch { TextHAlign.Center => 0.5, TextHAlign.Right => 1.0, _ => 0.0 };
+        var up = ed.VAlign switch { TextVAlign.Middle => 0.5, TextVAlign.Top => 1.0, _ => 0.0 }; // 基準点が下端から何割の高さか
+        var a = Canvas.WorldToScreen(ed.Anchor);
+        // 基準点 (文字の中の hf, up の点) を図面の位置に置き、そこを中心に幅係数と回転をかける
+        System.Windows.Controls.Canvas.SetLeft(EditTextBox, a.X - border - hf * cw);
+        System.Windows.Controls.Canvas.SetTop(EditTextBox, a.Y - border - (1 - up) * ch);
+        EditTextBox.RenderTransformOrigin = new Point((border + hf * cw) / w, (border + (1 - up) * ch) / h);
+        var sx = ed.EffectiveKeepFit && t.FitWidth is double fit ? fit * Canvas.Scale / cw : t.WidthFactor;
+        var group = new TransformGroup();
+        group.Children.Add(new ScaleTransform(sx, 1));
+        group.Children.Add(new RotateTransform(-t.Rotation * 180 / Math.PI));
+        EditTextBox.RenderTransform = group;
+    }
+
+    private void EditTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.Enter && (Keyboard.Modifiers & (ModifierKeys.Alt | ModifierKeys.Shift)) != 0)
+        {
+            // Alt+Enter・Shift+Enter は改行 (Enter だけなら確定)
+            var at = EditTextBox.SelectionStart;
+            EditTextBox.SelectedText = "\n";
+            EditTextBox.CaretIndex = at + 1;
+            e.Handled = true;
+        }
+        else if (key == Key.Enter)
+        {
+            Canvas.EndTextEdit(true);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            Canvas.EndTextEdit(false);
+            e.Handled = true;
+        }
     }
 
     // ---- 表示 (背景色・グリッド) ----

@@ -55,6 +55,7 @@ public sealed class CadCanvas : FrameworkElement
         set
         {
             _document.Changed -= OnDocumentChanged;
+            EndTextEdit(true); // シートを替えるときは、直している文字を確定する
             var wasGroupEditing = _document.EditingGroupId != null;
             _document.EditingGroupId = null; // シートを切り替えたらグループ編集は終える
             _document = value;
@@ -140,6 +141,7 @@ public sealed class CadCanvas : FrameworkElement
 
     public void SetTool(CadTool tool)
     {
+        EndTextEdit(true); // コマンドを替えるときは、直している文字を確定する
         _tool = tool;
         tool.Attach(this);
         ToolChanged?.Invoke(this, EventArgs.Empty);
@@ -149,6 +151,37 @@ public sealed class CadCanvas : FrameworkElement
 
     internal void RaisePromptChanged() => PromptChanged?.Invoke(this, EventArgs.Empty);
     public void ShowMessage(string text) => Message?.Invoke(this, text);
+
+    // ---- 文字をその場で直す ----
+
+    /// <summary>直している最中の文字 (null なら直していない)。この間、元の文字は図面に描かず、入力欄が重なる。</summary>
+    public InPlaceTextEdit? TextEdit { get; private set; }
+
+    /// <summary>文字を直し始めた・終えた。</summary>
+    public event EventHandler? TextEditChanged;
+
+    /// <summary>文字をその場で直し始める (直している文字があれば先に確定する)。</summary>
+    public void BeginTextEdit(TextEntity text)
+    {
+        EndTextEdit(true);
+        if (!Document.Entities.Contains(text) || !Document.IsEditable(text)) return;
+        TextEdit = new InPlaceTextEdit(text, Document);
+        RedrawScene();
+        RedrawOverlay();
+        TextEditChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>文字を直し終える。commit なら図面に入れる (1 回の元に戻す)、そうでなければ元のまま。変えたら true。</summary>
+    public bool EndTextEdit(bool commit)
+    {
+        if (TextEdit is not { } edit) return false;
+        TextEdit = null;
+        var changed = commit && TextEditing.Apply(this, edit.Original, edit.Result);
+        if (!changed) RedrawScene();
+        RedrawOverlay();
+        TextEditChanged?.Invoke(this, EventArgs.Empty);
+        return changed;
+    }
 
     /// <summary>図形を選ぶ。グループの図形は、同じグループの図形もまとめて選ぶ。</summary>
     public void SetSelection(IEnumerable<Entity> entities)
@@ -273,6 +306,7 @@ public sealed class CadCanvas : FrameworkElement
                 CaptureMouse();
                 break;
             case MouseButton.Left:
+                EndTextEdit(true); // 別の所をクリックしたら、直している文字を確定する
                 UpdateCursor(p);
                 if (e.ClickCount == 2) _tool.OnDoubleClick(CursorWorld);
                 else _tool.OnPress(CursorWorld);
@@ -411,6 +445,7 @@ public sealed class CadCanvas : FrameworkElement
     {
         _snapIndex = null;
         SyncScreenTexts(); // 追加・元に戻した文字も、いまの拡大率の大きさに
+        if (TextEdit != null && !Document.Entities.Contains(TextEdit.Original)) EndTextEdit(false); // 直している文字が消えた (元に戻すなど)
         // 削除・非表示・ロックされた図形は選択から外す
         var before = Selection.Count;
         Selection.RemoveWhere(x => !Document.Entities.Contains(x) || !Document.IsEditable(x));
@@ -588,7 +623,7 @@ public sealed class CadCanvas : FrameworkElement
         {
             foreach (var e in Document.Entities)
             {
-                if (DrawPass(e) != pass || !Document.IsVisible(e) || !e.Bounds.Intersects(view)) continue;
+                if (ReferenceEquals(e, TextEdit?.Original) || DrawPass(e) != pass || !Document.IsVisible(e) || !e.Bounds.Intersects(view)) continue;
                 var dim = Document.OnlyCurrentLayerEditable && e.Layer != Document.CurrentLayer;
                 var color = dim ? DimColor : e.EffectiveColor;
                 // グループ編集中は、グループ以外の図形を薄く

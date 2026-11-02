@@ -53,6 +53,7 @@ public sealed class DrawInputBar : Border
     {
         _canvas = canvas;
         canvas.ToolChanged += (_, _) => Rebuild();
+        canvas.TextEditChanged += (_, _) => Rebuild();
         canvas.DocumentReplaced += (_, _) => WatchDocument();
         canvas.CursorMoved += (_, _) => UpdateLive();
         WatchDocument();
@@ -98,6 +99,15 @@ public sealed class DrawInputBar : Border
     {
         _panel.Children.Clear();
         _fields.Clear();
+        if (_editBound != null) _editBound.Changed -= EditBound_Changed;
+        _editBound = null;
+        _fitCheck = null;
+        if (_canvas?.TextEdit is { } textEdit)
+        {
+            Visibility = Visibility.Visible;
+            BuildTextEditBar(textEdit);
+            return;
+        }
         var tool = _canvas?.Tool;
         if (tool?.CommandCode == ImageTool.Code && _canvas != null)
         {
@@ -301,6 +311,121 @@ public sealed class DrawInputBar : Border
     {
         if (text.Length > 0)
             _guide.Children.Add(new TextBlock { Text = text, Foreground = GuideBrush, FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
+    }
+
+    // ---- 文字をその場で直す (文字変更) ----
+
+    private InPlaceTextEdit? _editBound;
+    private CheckBox? _fitCheck;
+
+    private void EditBound_Changed(object? sender, EventArgs e)
+    {
+        if (_fitCheck != null && _editBound != null) _fitCheck.IsEnabled = _editBound.KeepFitEnabled;
+    }
+
+    /// <summary>文字変更のバー: 文字高・横と縦の揃え・元の幅に合わせる。変えるとすぐ画面の文字に反映される。</summary>
+    private void BuildTextEditBar(InPlaceTextEdit edit)
+    {
+        _guide.Children.Clear();
+        _panel.Children.Add(new TextBlock
+        {
+            Text = "文字変更",
+            Foreground = Brushes.White,
+            FontWeight = FontWeights.Bold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 12, 0),
+        });
+
+        AddLabel("文字高 (mm)");
+        var height = new TextBox
+        {
+            Width = 64,
+            Margin = new Thickness(0, 0, 12, 0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            ToolTip = edit.HeightEditable ? "用紙上の文字の高さ。Enter で文字の入力に戻る" : "画面で一定の大きさの文字は、ここでは変えられません",
+        };
+        if (edit.HeightEditable)
+        {
+            height.Text = edit.HeightMm.ToString("0.###", CultureInfo.InvariantCulture);
+            height.TextChanged += (_, _) =>
+            {
+                var s = height.Text.Trim();
+                if (double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var mm) || double.TryParse(s, out mm)) edit.SetHeightMm(mm);
+            };
+            height.PreviewKeyDown += (_, e) =>
+            {
+                if (e.Key is not (Key.Enter or Key.Escape)) return;
+                e.Handled = true;
+                Committed?.Invoke(this, EventArgs.Empty);
+            };
+        }
+        else
+        {
+            height.Text = "画面で一定";
+            height.IsEnabled = false;
+        }
+        _panel.Children.Add(height);
+
+        AddChoice("横の揃え", ["左", "中央", "右"], (int)edit.HAlign, i => edit.HAlign = (TextHAlign)i, "文字の左端・中央・右端を、元の文字の枠のその位置に合わせる");
+        var vNow = edit.VAlign switch { TextVAlign.Middle => 1, TextVAlign.Top => 2, _ => 0 };
+        AddChoice("縦の揃え", ["下", "中", "上"], vNow, i => edit.SetVAlign(i switch { 1 => TextVAlign.Middle, 2 => TextVAlign.Top, _ => TextVAlign.Bottom }),
+            "文字の下端・中央・上端を、元の文字の枠のその位置に合わせる");
+
+        if (edit.HasFitWidth)
+        {
+            _fitCheck = new CheckBox
+            {
+                Content = "元の幅に合わせる",
+                IsChecked = edit.KeepFit,
+                IsEnabled = edit.KeepFitEnabled,
+                Foreground = LabelBrush,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 14, 0),
+                Focusable = false,
+                ToolTip = "オンなら、文字全体を元の幅に伸ばす・縮める (1 行のときだけ)",
+            };
+            _fitCheck.Click += (_, _) =>
+            {
+                edit.KeepFit = _fitCheck.IsChecked == true;
+                Committed?.Invoke(this, EventArgs.Empty);
+            };
+            _panel.Children.Add(_fitCheck);
+        }
+
+        _editBound = edit;
+        edit.Changed += EditBound_Changed;
+        AddGuide("Enter", "確定");
+        AddGuide("Alt+Enter", "改行");
+        AddGuide("Esc", "やめる");
+        AddGuideText("別の所をクリックしても確定");
+    }
+
+    /// <summary>ラベル付きの択一 (左/中央/右 など)。選ぶと set を呼ぶ。</summary>
+    private void AddChoice(string label, string[] names, int selected, Action<int> set, string tip)
+    {
+        AddLabel(label);
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 12, 0), ToolTip = tip };
+        for (var i = 0; i < names.Length; i++)
+        {
+            var index = i;
+            var b = new RadioButton
+            {
+                Content = names[i],
+                GroupName = label,
+                IsChecked = i == selected,
+                Foreground = LabelBrush,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Focusable = false,
+            };
+            b.Click += (_, _) =>
+            {
+                set(index);
+                Committed?.Invoke(this, EventArgs.Empty);
+            };
+            row.Children.Add(b);
+        }
+        _panel.Children.Add(row);
     }
 
     // ---- 画像コマンド ----

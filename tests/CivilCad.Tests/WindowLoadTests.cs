@@ -124,9 +124,22 @@ public class WindowLoadTests
                     new CivilCad.Core.Geometry.Box2(new(0, 0), new(38000, 25700)), 500);
                 Assert.NotNull(importWin.Content);
                 importWin.Close();
-                var textEdit = new CivilCad.App.Views.TextEditWindow(new CivilCad.Core.Model.TextEntity(new CivilCad.Core.Model.CadDocument().CurrentLayer, CivilCad.Core.Geometry.Vec2.Zero, "No.1", 2), new CivilCad.Core.Model.CadDocument());
-                Assert.NotNull(textEdit.Content);
-                textEdit.Close();
+                // 文字変更: 文字を直し始めると、図面の文字の上に入力欄が出て、終えるとしまう
+                var editCanvas = (CivilCad.App.Views.CadCanvas)main.FindName("Canvas");
+                var editBox = (System.Windows.Controls.TextBox)main.FindName("EditTextBox");
+                var editText = new CivilCad.Core.Model.TextEntity(editCanvas.Document.CurrentLayer, CivilCad.Core.Geometry.Vec2.Zero, "No.1", 2);
+                editCanvas.Document.Entities.Add(editText);
+                Assert.Equal(System.Windows.Visibility.Collapsed, editBox.Visibility);
+                editCanvas.BeginTextEdit(editText);
+                Assert.Equal(System.Windows.Visibility.Visible, editBox.Visibility);
+                Assert.Equal("No.1", editBox.Text);
+                editBox.Text = "No.2";
+                Assert.Equal("No.2", editCanvas.TextEdit!.Text);
+                Assert.True(editCanvas.EndTextEdit(true));
+                Assert.Equal(System.Windows.Visibility.Collapsed, editBox.Visibility);
+                Assert.Equal("No.2", editCanvas.Document.Entities.OfType<CivilCad.Core.Model.TextEntity>().Single().Text);
+                editCanvas.Document.Entities.Clear();
+                editCanvas.Document.History.Clear();
                 // 文字を選ぶと、閉じていたプロパティ (右側) が開く
                 var canvas = (CivilCad.App.Views.CadCanvas)main.FindName("Canvas");
                 // 選択モード (SEL): 実行中のコマンドを終えて選ぶ状態に戻り、ボタンが色付きになる
