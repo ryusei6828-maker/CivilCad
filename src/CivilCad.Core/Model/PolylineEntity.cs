@@ -71,6 +71,11 @@ public sealed class PolylineEntity(Layer layer, IEnumerable<Vec2> points, bool i
         for (var i = 0; i < Points.Count; i++) Points[i] += delta;
     }
 
+    public override void Mirror(Vec2 a, Vec2 b)
+    {
+        for (var i = 0; i < Points.Count; i++) Points[i] = Points[i].ReflectAcross(a, b);
+    }
+
     public override void Rotate(Vec2 origin, double rad)
     {
         for (var i = 0; i < Points.Count; i++) Points[i] = Points[i].RotateAround(origin, rad);

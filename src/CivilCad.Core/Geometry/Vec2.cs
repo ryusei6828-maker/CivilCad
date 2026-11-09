@@ -42,6 +42,16 @@ public readonly record struct Vec2(double X, double Y)
     /// <summary>origin を中心に rad だけ回転した点。</summary>
     public Vec2 RotateAround(Vec2 origin, double rad) => origin + (this - origin).Rotate(rad);
 
+    /// <summary>a・b を通る直線について線対称 (鏡像) の点。a と b が同じ点なら自分のまま。</summary>
+    public Vec2 ReflectAcross(Vec2 a, Vec2 b)
+    {
+        var d = b - a;
+        var len2 = d.LengthSquared;
+        if (len2 <= 0) return this;
+        var foot = a + d * ((this - a).Dot(d) / len2);
+        return foot * 2 - this;
+    }
+
     public static Vec2 FromAngle(double rad) => new(Math.Cos(rad), Math.Sin(rad));
 
     /// <summary>測量座標 (X=北, Y=東) から CAD 座標へ。</summary>

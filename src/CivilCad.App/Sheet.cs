@@ -41,6 +41,9 @@ public sealed class Sheet : INotifyPropertyChanged
     }
 
     public CadDocument Doc { get; }
+
+    /// <summary>「スケッチへ」で送るときにスケッチのカーソルに付ける点 (移動基準点。CAD 座標)。決めていなければ null (図面の原点)。図面を閉じるまで覚える。</summary>
+    public Vec2? MoveReference { get; set; }
     public int UntitledNumber { get; }
 
     public string? FilePath

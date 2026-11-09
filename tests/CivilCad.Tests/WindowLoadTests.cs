@@ -95,7 +95,7 @@ public class WindowLoadTests
                     ((System.Windows.Controls.Panel)text.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
                 var modify = (System.Windows.Controls.TabItem)tabs.Items[2];
                 Assert.Equal("修正", modify.Header);
-                Assert.Equal(["M", "CO", "RO", "SCL", "AL", "O", "TR", "EX", "J", "G", "UG"],
+                Assert.Equal(["M", "CO", "RO", "MI", "SCL", "AL", "O", "TR", "EX", "F", "J", "G", "UG"],
                     ((System.Windows.Controls.Panel)modify.Content).Children.OfType<System.Windows.Controls.Button>().Select(b => (string)b.Tag));
                 Assert.NotNull(settings.Content);
                 Assert.NotNull(frame.Content);

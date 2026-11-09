@@ -20,7 +20,12 @@ using Microsoft.Win32;
 
 namespace CivilCad.App;
 
-public partial class MainWindow : Window
+/// <summary>
+/// CivilCad の画面全体。部品 (UserControl) になっていて、CivilCad.exe では <see cref="ShellWindow"/> が、
+/// CivilCad3D では「図面」タブが載せる。名前は Window だった頃のまま (差分を小さくするため)。
+/// 窓に依存する部分は MainWindow.Hosting.cs に集めてある (窓への変換・Title・Closing・Closed・Close)。
+/// </summary>
+public partial class MainWindow : UserControl
 {
     /// <summary>
     /// 本体を閉じたらアプリ (Application) を終えるか。ふつうは true。
@@ -105,8 +110,10 @@ public partial class MainWindow : Window
         PreviewDrop += Window_PreviewDrop;
         Loaded += (_, _) =>
         {
-            Canvas.SetTool(new SelectTool());
             CommandBox.Focus();
+            if (_welcomed) return; // CivilCad3D のタブでは、タブを切り替えるたびに Loaded が来る
+            _welcomed = true;
+            Canvas.SetTool(new SelectTool());
             Log("CivilCad へようこそ。コマンド例: L=線  PL=ポリライン  C=円  A=円弧  T=文字  M=移動  CO=複写  DI=距離  AA=面積  RC=路線計算  ST=測点照会  ZE=全体表示");
             Log("座標入力: x,y (絶対)  @dx,dy (相対)  @距離<角度 (極座標)  sX,Y (測量座標 X=北, Y=東)。図面の座標は x=東, y=北 (m)。");
         };
@@ -168,6 +175,7 @@ public partial class MainWindow : Window
             _coordDock.Update();
             _routeDock.Update();
         };
+        Unloaded += (_, _) => { _propsDock.Update(); _layerDock.Update(); _coordDock.Update(); _routeDock.Update(); }; // 別のタブへ移るときはフロートのパネルを隠す
         Closing += (_, e) =>
         {
             // 保存していないシートがあれば確認を出す (ボタンは Excel と同じ): [保存] プロジェクトに保存して終了 (まだなら保存先を聞く)、
@@ -193,6 +201,7 @@ public partial class MainWindow : Window
         OnPanelStateChanged();
     }
 
+    private bool _welcomed;
     private readonly DockablePanel _propsDock;
     private readonly DockablePanel _layerDock;
     private readonly DockablePanel _coordDock;
@@ -269,9 +278,11 @@ public partial class MainWindow : Window
             case "AL": StartTool(new AlignTool(), c); break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
             case "RO": StartTool(new RotateTool(), c); break;
+            case "MI": StartTool(new MirrorTool(), c); break;
             case "O": StartTool(new OffsetTool(), c); break;
             case "TR": StartTool(new TrimTool(), c); break;
             case "EX": StartTool(new ExtendTool(), c); break;
+            case "F": StartTool(new FilletTool(), c); break;
             case "ED": StartTool(new TextEditTool(), c); break;
             case "DI": StartTool(new DistanceTool(), c); break;
             case "ID": StartTool(new CoordinateMeasureTool(), c); break;
@@ -502,7 +513,14 @@ public partial class MainWindow : Window
         Log($"{tool.Name}: 最初からやり直します。");
     }
 
-    private static readonly Brush ActiveToolBrush =new SolidColorBrush(Color.FromRgb(0xCC, 0xE4, 0xFF));
+    // 固定 (Freeze) しておく: 複数のスレッドで画面を作っても (テスト・CivilCad3D) 、スレッドの違う部品が同じブラシを使えるように
+    private static readonly Brush ActiveToolBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xCC, 0xE4, 0xFF)));
+
+    private static Brush Frozen(Brush b)
+    {
+        b.Freeze();
+        return b;
+    }
 
     /// <summary>今のモードのコマンド名。コマンドを使っていないとき (選択) は SEL。</summary>
     private string? ActiveCommandCode => Canvas.Tool is SelectTool ? "SEL" : Canvas.Tool.CommandCode;

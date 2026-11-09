@@ -647,10 +647,14 @@ public sealed class CadCanvas : FrameworkElement
 
     private static bool IsFill(Entity e) => e is HatchEntity { Solid: true } or PolylineEntity { Filled: true };
 
+    /// <summary>ツールの下書きのあとに描く、常に出す印 (無ければ null)。</summary>
+    public Action<DrawingContext>? OverlayExtra { get; set; }
+
     public void RedrawOverlay()
     {
         using var dc = _overlay.RenderOpen();
         _tool.DrawPreview(dc);
+        OverlayExtra?.Invoke(dc); // ツールに関わらず出し続ける印 (CivilCad3D に載せたときの移動基準点)
 
         if (CurrentSnap is SnapPoint sp && _mouseScreen != null) DrawSnapMarker(dc, sp);
     }

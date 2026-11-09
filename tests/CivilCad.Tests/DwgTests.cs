@@ -64,4 +64,40 @@ public class DwgTests
             File.Delete(path);
         }
     }
+
+    [Theory]
+    [InlineData(@"\U+6DF1\U+6D45\U+56F3", "深浅図")]
+    [InlineData(@"\U+4EE4\U+548C8\U+5E74", "令和8年")] // 16 進 4 桁の後ろの数字は普通の文字
+    [InlineData(@"\M+1955C", "表")] // Shift_JIS の 2 バイト (2 バイト目が \ の文字)
+    [InlineData(@"\M+28140", @"\M+28140")] // Shift_JIS 以外のコードページはそのまま
+    [InlineData(@"No.1 \P", @"No.1 \P")]
+    [InlineData("測点", "測点")]
+    public void DecodeText_RestoresUnicodeAndShiftJisEscapes(string raw, string expected) =>
+        Assert.Equal(expected, DwgIO.DecodeText(raw));
+
+    /// <summary>AutoCAD 2004 形式 (AC1018) の DWG は日本語を \U+XXXX で持つことがある。読み込むと元の文字・レイヤ名に戻る。</summary>
+    [Fact]
+    public void Load_Ac1018_DecodesUnicodeEscapesInTextAndLayers()
+    {
+        var cad = new ACadSharp.CadDocument(ACadSharp.ACadVersion.AC1018);
+        var layer = new ACadSharp.Tables.Layer(@"\U+7D14\U+571F\U+91CF"); // 純土量
+        cad.Layers.Add(layer);
+        cad.Entities.Add(new ACadSharp.Entities.TextEntity { Value = @"\U+5CB8\U+58C1\U+6CD5\U+7DDA", Height = 2.5, Layer = layer }); // 岸壁法線
+        var path = Path.Combine(Path.GetTempPath(), "civilcad-test-" + Guid.NewGuid().ToString("N") + ".dwg");
+        try
+        {
+            using (var writer = new ACadSharp.IO.DwgWriter(path, cad)) writer.Write();
+            Assert.Equal("AC1018", System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(path), 0, 6));
+
+            var loaded = new CadDocument();
+            DwgIO.Load(loaded, path);
+            var t = Assert.Single(loaded.Entities.OfType<TextEntity>());
+            Assert.Equal("岸壁法線", t.Text);
+            Assert.Equal("純土量", t.Layer.Name);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }

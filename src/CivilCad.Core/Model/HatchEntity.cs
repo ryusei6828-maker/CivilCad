@@ -119,6 +119,14 @@ public sealed class HatchEntity : Entity
         _lines = null;
     }
 
+    public override void Mirror(Vec2 a, Vec2 b)
+    {
+        foreach (var l in Loops)
+            for (var i = 0; i < l.Count; i++) l[i] = l[i].ReflectAcross(a, b);
+        Patterns = [.. Patterns.Select(p => p with { Angle = MirrorAngle(p.Angle, a, b), Origin = p.Origin.ReflectAcross(a, b) })];
+        _lines = null;
+    }
+
     public override void Rotate(Vec2 origin, double rad)
     {
         foreach (var l in Loops)

@@ -1,4 +1,6 @@
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 using ACadSharp;
 using ACadSharp.Entities;
 using ACadSharp.IO;
@@ -21,7 +23,7 @@ namespace CivilCad.App.IO;
 /// 線・ポリライン・円・円弧・文字・ハッチングとレイヤ、縮尺 ($DIMSCALE)、平面直角座標系 ($USERI1)。
 /// ブロック参照は分解して取り込む。保存は DXF を書いてから DWG に変換する。
 /// </summary>
-public static class DwgIO
+public static partial class DwgIO
 {
     /// <summary>保存する DWG の版。AutoCAD 2013 形式 (文字列が Unicode なので日本語がコードページに左右されない)。</summary>
     public const ACadVersion SaveVersion = ACadVersion.AC1027;
@@ -72,6 +74,36 @@ public static class DwgIO
         }
     }
 
+    /// <summary>
+    /// DWG の文字列にある、コードページで表せない文字の表記を戻す。
+    /// AutoCAD 2004 形式 (AC1018) までの DWG は文字列をコードページ (日本語は Shift_JIS) で持ち、
+    /// 日本語などを \U+XXXX (Unicode) や \M+1XXXX (Shift_JIS の 2 バイト) で書くことがあるが、ACadSharp はそのまま返す。
+    /// </summary>
+    public static string DecodeText(string? s)
+    {
+        if (string.IsNullOrEmpty(s) || !s.Contains('\\')) return s ?? "";
+        return EscapeRegex().Replace(s, m =>
+        {
+            if (m.Groups["u"].Success) return ((char)Convert.ToInt32(m.Groups["u"].Value, 16)).ToString();
+            // \M+nXXXX: n はコードページ (1 = Shift_JIS)。それ以外はそのまま残す
+            if (m.Groups["n"].Value != "1") return m.Value;
+            var code = Convert.ToInt32(m.Groups["m"].Value, 16);
+            return ShiftJis.GetString([(byte)(code >> 8), (byte)code]);
+        });
+    }
+
+    private static Encoding ShiftJis
+    {
+        get
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            return Encoding.GetEncoding(932);
+        }
+    }
+
+    [GeneratedRegex(@"\\U\+(?<u>[0-9A-Fa-f]{4})|\\M\+(?<n>[1-5])(?<m>[0-9A-Fa-f]{4})")]
+    private static partial Regex EscapeRegex();
+
     private sealed class Importer(CadDocument doc)
     {
         private readonly Dictionary<string, Layer> _layers = new(StringComparer.OrdinalIgnoreCase);
@@ -89,7 +121,7 @@ public static class DwgIO
             foreach (var al in dwg.Layers)
             {
                 var color = ToRgb(al.Color) ?? RgbColor.White;
-                var l = doc.GetOrCreateLayer(al.Name, color);
+                var l = doc.GetOrCreateLayer(DecodeText(al.Name), color);
                 l.Color = color;
                 l.IsVisible = (al.IsOn && !al.Flags.HasFlag(ACadSharp.Tables.LayerFlags.Frozen)) || l.Name == "0";
                 l.IsLocked = al.Flags.HasFlag(ACadSharp.Tables.LayerFlags.Locked) && l.Name != "0";
@@ -106,7 +138,7 @@ public static class DwgIO
             // ブロックの中の「0」レイヤの図形は、ブロック参照のレイヤに乗る
             var al = e.Layer is { } l && !(l.Name == "0" && inherited != null) ? l : inherited;
             var name = al?.Name ?? "0";
-            return _layers.TryGetValue(name, out var layer) ? layer : _layers[name] = doc.GetOrCreateLayer(name, RgbColor.White);
+            return _layers.TryGetValue(name, out var layer) ? layer : _layers[name] = doc.GetOrCreateLayer(DecodeText(name), RgbColor.White);
         }
 
         /// <summary>壊れた図形が 1 つあっても、ほかの図形は読み込む。</summary>
@@ -204,7 +236,7 @@ public static class DwgIO
         private static string? FontOf(ACadSharp.Tables.TextStyle? style)
         {
             if (style == null) return null;
-            foreach (var name in new[] { Path.GetFileNameWithoutExtension(style.Filename ?? ""), style.Name })
+            foreach (var name in new[] { Path.GetFileNameWithoutExtension(DecodeText(style.Filename ?? "")), DecodeText(style.Name) })
             {
                 if (string.IsNullOrWhiteSpace(name) || name == TextEntity.DefaultFontName) continue;
                 if (Views.FontCombo.Names.Contains(name)) return name;
@@ -218,7 +250,7 @@ public static class DwgIO
             // 左下揃え以外は「配置基準点」(DXF の 11 番) が位置
             var leftBaseline = h == TextHorizontalAlignment.Left && v == TextVerticalAlignmentType.Baseline;
             var pos = leftBaseline ? o.InsertPoint : o.AlignmentPoint;
-            var t = new TextEntity(layer, V(pos), o.Value, o.Height, o.Rotation)
+            var t = new TextEntity(layer, V(pos), DecodeText(o.Value), o.Height, o.Rotation)
             {
                 WidthFactor = o.WidthFactor > 0 ? o.WidthFactor : 1,
                 FontName = FontOf(o.Style),
@@ -249,7 +281,7 @@ public static class DwgIO
         /// <summary>MTEXT は行ごとの文字に分解する (DXF と同じ扱い)。</summary>
         private static IEnumerable<TextEntity> FromMText(MText o, Layer layer)
         {
-            var lines = o.GetPlainTextLines();
+            var lines = o.GetPlainTextLines().Select(DecodeText).ToArray();
             var h = o.Height;
             var spacing = h * 5.0 / 3.0 * (o.LineSpacing > 0 ? o.LineSpacing : 1);
             var total = h + (lines.Length - 1) * spacing;

@@ -159,6 +159,20 @@ public sealed class DimensionEntity(Layer layer, Vec2 p1, Vec2 p2, Vec2 linePoin
         LinePoint += delta;
     }
 
+    /// <summary>計る 2 点を入れ替えて、寸法値が裏返し (逆さ) にならないようにする。向きの決まった寸法は 0〜π に直す。</summary>
+    public override void Mirror(Vec2 a, Vec2 b)
+    {
+        (P1, P2) = (P2.ReflectAcross(a, b), P1.ReflectAcross(a, b));
+        LinePoint = LinePoint.ReflectAcross(a, b);
+        if (Angle is double angle)
+        {
+            var m = MirrorAngle(angle, a, b) % Math.PI;
+            if (m < 0) m += Math.PI;
+            if (Math.PI - m < 1e-12) m = 0;
+            Angle = m;
+        }
+    }
+
     public override void Rotate(Vec2 origin, double rad)
     {
         P1 = P1.RotateAround(origin, rad);

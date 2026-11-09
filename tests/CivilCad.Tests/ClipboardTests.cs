@@ -7,6 +7,7 @@ using CivilCad.Core.Model;
 namespace CivilCad.Tests;
 
 /// <summary>図形のコピー・貼り付け (別のシートへ)。コピーの中身はアプリ全体で 1 つなので、テストは 1 つのクラスにまとめる。</summary>
+[Collection("SharedToolSettings")] // コピーの中身 (EntityClipboard) は全体で 1 つ。WindowLoadTests の貼り付けと取り合わない
 public class ClipboardTests
 {
     private static void RunSta(Action action)

@@ -125,6 +125,12 @@ public sealed class LeaderEntity(Layer layer, IEnumerable<Vec2> points, bool isF
     }
 
     /// <summary>折れ点だけを回す (旗竿と文字は水平のまま)。</summary>
+    /// <summary>線は裏返す。文字・旗竿は水平のまま (旗竿は先端と反対側へ伸びるので、向きは自然に入れ替わる)。</summary>
+    public override void Mirror(Vec2 a, Vec2 b)
+    {
+        for (var i = 0; i < Points.Count; i++) Points[i] = Points[i].ReflectAcross(a, b);
+    }
+
     public override void Rotate(Vec2 origin, double rad)
     {
         for (var i = 0; i < Points.Count; i++) Points[i] = Points[i].RotateAround(origin, rad);

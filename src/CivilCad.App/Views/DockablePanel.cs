@@ -20,7 +20,7 @@ public sealed class PanelState
 /// </summary>
 public sealed class DockablePanel
 {
-    private readonly Window _owner;
+    private readonly FrameworkElement _owner;
     private readonly Border _host;
     private readonly FrameworkElement _content;
     private readonly string _title;
@@ -30,7 +30,7 @@ public sealed class DockablePanel
     private Window? _window;
 
     /// <param name="defaultPosition">初めてフロートするときの位置 (画面座標, DIP)。</param>
-    public DockablePanel(Window owner, Border host, FrameworkElement content, string title, PanelState state,
+    public DockablePanel(FrameworkElement owner, Border host, FrameworkElement content, string title, PanelState state,
         bool open, Size defaultSize, Func<Point> defaultPosition)
     {
         _owner = owner;
@@ -98,7 +98,7 @@ public sealed class DockablePanel
         var w = new Window
         {
             Title = _title,
-            Owner = _owner, // 本体より前に表示され、本体を最小化すると一緒に隠れる
+            Owner = Window.GetWindow(_owner), // 本体より前に表示され、本体を最小化すると一緒に隠れる
             WindowStyle = WindowStyle.ToolWindow,
             ShowInTaskbar = false,
             ShowActivated = false,
@@ -140,7 +140,7 @@ public sealed class DockablePanel
     }
 
     /// <summary>本体ウィンドウ内の点 (DIP) を画面座標 (DIP) にする。既定位置の計算用。</summary>
-    public static Point OwnerPointToScreen(Window owner, Point p)
+    public static Point OwnerPointToScreen(FrameworkElement owner, Point p)
     {
         var px = owner.PointToScreen(p);
         var dpi = VisualTreeHelper.GetDpi(owner);

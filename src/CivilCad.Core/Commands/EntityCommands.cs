@@ -96,6 +96,7 @@ public sealed class ReplaceEntitiesCommand(IEnumerable<(Entity Old, Entity New)>
     private void Swap(CadDocument doc, Func<(Entity Old, Entity New), Entity> from, Func<(Entity Old, Entity New), Entity> to)
     {
         var map = _pairs.ToDictionary(from, to);
+        foreach (var (before, after) in map) after.TrackId = before.TrackId; // 差し替えても同じ図形として追えるようにする
         for (var i = 0; i < doc.Entities.Count; i++)
             if (map.TryGetValue(doc.Entities[i], out var replacement)) doc.Entities[i] = replacement;
     }

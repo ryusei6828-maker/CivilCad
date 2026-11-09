@@ -26,6 +26,7 @@ public sealed class PointEntity(Layer layer, Vec2 position) : Entity(layer)
     public override double DistanceTo(Vec2 p) => p.DistanceTo(Position);
     public override bool IntersectsBox(Box2 box) => box.Contains(Position);
     public override void Translate(Vec2 delta) => Position += delta;
+    public override void Mirror(Vec2 a, Vec2 b) => Position = Position.ReflectAcross(a, b);
     public override void Rotate(Vec2 origin, double rad) => Position = Position.RotateAround(origin, rad);
     public override void Scale(Vec2 origin, double k) => Position = ScalePoint(Position, origin, k);
     public override Entity Clone() => CopyPropertiesTo(new PointEntity(Layer, Position) { Name = Name, Z = Z, Tags = Tags });

@@ -315,6 +315,20 @@
         <GeometryDrawing Pen="{StaticResource IcoInkThick}" Geometry="M15,4 A9,9 0 0 1 21,13 M18,11 L21,13 L22.5,9.5"/>
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
+    <DrawingImage x:Key="IconMirror" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Pen="{StaticResource IcoInkPen}" Geometry="M12,1.5 L12,4 M12,6.5 L12,9 M12,11.5 L12,14 M12,16.5 L12,19 M12,21 L12,22.5"/>
+        <GeometryDrawing Brush="#CFE0F7" Pen="{StaticResource IcoInkPen}" Geometry="M9.5,5 L9.5,19 L2.5,19 Z"/>
+        <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M14.5,5 L14.5,19 L21.5,19 Z"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
+    <DrawingImage x:Key="IconFillet" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Pen="{StaticResource IcoInkPen}" Geometry="M4,11 L4,4 L11,4"/>
+        <GeometryDrawing Pen="{StaticResource IcoInkThick}" Geometry="M4,22 L4,11 M11,4 L22,4"/>
+        <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M4,11 A7,7 0 0 1 11,4"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <DrawingImage x:Key="IconOffset" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
         <GeometryDrawing Pen="{StaticResource IcoInkThick}" Geometry="M3,18 L10,18 L18,6"/>

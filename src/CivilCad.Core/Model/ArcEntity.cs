@@ -79,6 +79,13 @@ public sealed class ArcEntity(Layer layer, Vec2 center, double radius, double st
     }
 
     public override void Translate(Vec2 delta) => Center += delta;
+    /// <summary>裏返すと回る向きが逆になるので、始点と終点を入れ替えて反時計回りのままにする。</summary>
+    public override void Mirror(Vec2 a, Vec2 b)
+    {
+        Center = Center.ReflectAcross(a, b);
+        (StartAngle, EndAngle) = (MirrorAngle(EndAngle, a, b), MirrorAngle(StartAngle, a, b));
+    }
+
     public override void Rotate(Vec2 origin, double rad)
     {
         Center = Center.RotateAround(origin, rad);

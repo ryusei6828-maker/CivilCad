@@ -18,6 +18,12 @@ public abstract class Entity(Layer layer)
     /// <summary>生成元の識別用 (例: 路線作図で生成した図形は "ALIGN:路線名")。</summary>
     public string? Tag { get; set; }
 
+    /// <summary>
+    /// 図形を追う印 (CivilCad3D の「リンク」が、送った図形が今どうなったかを調べるのに使う。保存はしない)。
+    /// 作るたびに新しく付き、複写 (Clone) には引き継がない。<see cref="Commands.ReplaceEntitiesCommand"/> は差し替えた図形に元の印を引き継ぐ。
+    /// </summary>
+    public Guid TrackId { get; set; } = Guid.NewGuid();
+
     /// <summary>グループ (G) の識別子。同じ値の図形はまとめて選ばれ、まとめて移動・複写される。null ならグループなし。</summary>
     public Guid? GroupId { get; set; }
 
@@ -38,6 +44,20 @@ public abstract class Entity(Layer layer)
 
     /// <summary>origin を中心に k 倍に拡大縮小する (k &gt; 0)。</summary>
     public abstract void Scale(Vec2 origin, double k);
+
+    /// <summary>
+    /// a・b を通る直線について線対称 (ミラー) にする。
+    /// 既定は形を変えずに、枠の中心が鏡像の位置に来るよう動かすだけ (文字・記号・画像は裏返すと読めなくなるため)。
+    /// 線・円・円弧・ポリライン・ハッチング・寸法・引き出し線は形ごと裏返す。
+    /// </summary>
+    public virtual void Mirror(Vec2 a, Vec2 b)
+    {
+        var c = Bounds.Center;
+        Translate(c.ReflectAcross(a, b) - c);
+    }
+
+    /// <summary>a→b の直線について線対称にした向き (rad)。</summary>
+    protected static double MirrorAngle(double angle, Vec2 a, Vec2 b) => 2 * (b - a).Angle - angle;
 
     protected static Vec2 ScalePoint(Vec2 p, Vec2 origin, double k) => origin + (p - origin) * k;
 

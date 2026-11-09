@@ -1,10 +1,14 @@
-﻿<Window x:Class="CivilCad.App.MainWindow"
+﻿<UserControl x:Class="CivilCad.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:v="clr-namespace:CivilCad.App.Views"
-        xmlns:m="clr-namespace:CivilCad.Core.Model;assembly=CivilCad.Core"
-        Title="CivilCad" Icon="civilcad.ico" Width="1400" Height="900" WindowStartupLocation="CenterScreen">
-    <Window.Resources>
+        xmlns:m="clr-namespace:CivilCad.Core.Model;assembly=CivilCad.Core">
+    <UserControl.Resources>
+      <ResourceDictionary>
+        <!-- アイコンはこの画面でも持つ (CivilCad3D に載せたとき、アプリ側にアイコンが無くても読めるように) -->
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="Views/Icons.xaml"/>
+        </ResourceDictionary.MergedDictionaries>
         <v:RgbColorToBrushConverter x:Key="ColorBrush"/>
         <DataTemplate x:Key="ColorSwatch" DataType="{x:Type m:RgbColor}">
             <Border Width="28" Height="12" BorderBrush="Gray" BorderThickness="1"
@@ -69,16 +73,17 @@
                 </Setter.Value>
             </Setter>
         </Style>
-    </Window.Resources>
+      </ResourceDictionary>
+    </UserControl.Resources>
 
-    <Window.CommandBindings>
+    <UserControl.CommandBindings>
         <CommandBinding Command="New" Executed="New_Executed"/>
         <CommandBinding Command="Open" Executed="Open_Executed"/>
         <CommandBinding Command="Save" Executed="Save_Executed"/>
         <CommandBinding Command="Undo" Executed="Undo_Executed"/>
         <CommandBinding Command="Redo" Executed="Redo_Executed"/>
         <CommandBinding Command="SelectAll" Executed="SelectAll_Executed"/>
-    </Window.CommandBindings>
+    </UserControl.CommandBindings>
 
     <Grid>
     <DockPanel>
@@ -129,10 +134,12 @@
                 <MenuItem Header="2 点指示 (位置合わせ) (AL)" Tag="AL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconAlign}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="複写 (CO)" Tag="CO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCopy}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="回転 (RO)" Tag="RO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRotate}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="ミラー (MI)" Tag="MI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconMirror}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
                 <MenuItem Header="オフセット (O)" Tag="O" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconOffset}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="トリム (TR)" Tag="TR" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconTrim}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="延長 (EX)" Tag="EX" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconExtend}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="フィレット (F)" Tag="F" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconFillet}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="結合 (J)" Tag="J" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconJoin}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <Separator/>
                 <MenuItem Header="グループ化 (G)" Tag="G" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconGroup}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
@@ -186,6 +193,9 @@
                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="3,4"/>
                 <Button Style="{StaticResource ToolButton}" Command="Undo" ToolTip="元に戻す (Ctrl+Z)"><StackPanel><Image Source="{StaticResource IconUndo}" Width="24" Height="24"/><TextBlock Text="戻す" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                 <Button Style="{StaticResource ToolButton}" Command="Redo" ToolTip="やり直し (Ctrl+Y)"><StackPanel><Image Source="{StaticResource IconRedo}" Width="24" Height="24"/><TextBlock Text="やり直し" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button x:Name="SketchExportButton" Visibility="Collapsed" Style="{StaticResource ToolButton}" Click="SketchExport_Click" ToolTip="スケッチへエクスポート: 選んだ図形 (何も選んでいなければ今のシートの図面全体) を CivilCad3D のスケッチへ送り、置く位置をクリックで決める (CivilCad3D の中でだけ使える)"><StackPanel><Image Source="{StaticResource IconSave}" Width="24" Height="24"/><TextBlock Text="スケッチへ" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button x:Name="MoveReferenceButton" Visibility="Collapsed" Style="{StaticResource ToolButton}" Click="MoveReference_Click" ToolTip="移動基準点: 「スケッチへ」で送ったあと、スケッチで置くときにカーソルに付く点を、図面の上でクリックして決める (吸着が効く。Esc でやめる。もう一度押すと決め直せる。決めていなければ図面の原点)"><StackPanel><Image Source="{StaticResource IconSelect}" Width="24" Height="24"/><TextBlock Text="移動基準点" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button x:Name="LinkButton" Visibility="Collapsed" Style="{StaticResource ToolButton}" Click="SketchLinkButton_Click" ToolTip="リンク: このシートから「スケッチへ」で送った下絵を、今の図面の中身で作り直す (全体で送った下絵は今のシート全体、選んだ図形で送った下絵は同じ図形たちの今の形。置いた位置・表示はそのまま。CivilCad3D の中でだけ使える)"><StackPanel><Image Source="{StaticResource IconRedo}" Width="24" Height="24"/><TextBlock Text="リンク" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
             </StackPanel>
 
             <TabControl x:Name="RibbonTabs" SelectedIndex="0" Padding="2" BorderThickness="0,1,0,0" Background="White" Margin="0,2,0,0">
@@ -223,11 +233,13 @@
                         <Button Style="{StaticResource ToolButton}" Tag="M" Click="Tool_Click" ToolTip="移動 (M) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconMove}" Width="24" Height="24"/><TextBlock Text="移動" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="CO" Click="Tool_Click" ToolTip="複写 (CO) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconCopy}" Width="24" Height="24"/><TextBlock Text="複写" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="RO" Click="Tool_Click" ToolTip="回転 (RO) ※先に図形を選択。中心点 → 基準の方向点 → 回転先の方向点 (角度の入力も可)。C で元を残す"><StackPanel><Image Source="{StaticResource IconRotate}" Width="24" Height="24"/><TextBlock Text="回転" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="MI" Click="Tool_Click" ToolTip="ミラー (MI) ※先に図形を選択。対称軸の 2 点を指定して線対称に写す (既定は元を残す、C で元を消す)"><StackPanel><Image Source="{StaticResource IconMirror}" Width="24" Height="24"/><TextBlock Text="ミラー" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="SCL" Click="Tool_Click" ToolTip="拡大縮小 (SCL) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconResize}" Width="24" Height="24"/><TextBlock Text="拡大縮小" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="AL" Click="Tool_Click" ToolTip="2 点指示 (AL): 画像などの上の 2 点を図面上の 2 点に合わせる (移動・回転・拡大縮小) ※先に図形を選択"><StackPanel><Image Source="{StaticResource IconAlign}" Width="24" Height="24"/><TextBlock Text="2点指示" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="O" Click="Tool_Click" ToolTip="オフセット (O): 距離を入力 → 図形 → ずらす側をクリック"><StackPanel><Image Source="{StaticResource IconOffset}" Width="24" Height="24"/><TextBlock Text="オフセット" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="TR" Click="Tool_Click" ToolTip="トリム (TR): 境界を選んで Enter → 切り取る部分をクリック (Shift+クリックで延長)"><StackPanel><Image Source="{StaticResource IconTrim}" Width="24" Height="24"/><TextBlock Text="トリム" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="EX" Click="Tool_Click" ToolTip="延長 (EX): 境界を選んで Enter → 伸ばす端をクリック (Shift+クリックでトリム)"><StackPanel><Image Source="{StaticResource IconExtend}" Width="24" Height="24"/><TextBlock Text="延長" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="F" Click="Tool_Click" ToolTip="フィレット (F): 半径を入力 → 2 本の線をクリック (残す側) で角を円弧でつなぐ。半径 0 で角を突き合わせる"><StackPanel><Image Source="{StaticResource IconFillet}" Width="24" Height="24"/><TextBlock Text="フィレット" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="J" Click="Tool_Click" ToolTip="結合 (J) ※先に図形を選択。分かれた線を 1 本の線・ポリラインにつなぎ直す"><StackPanel><Image Source="{StaticResource IconJoin}" Width="24" Height="24"/><TextBlock Text="結合" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="G" Click="Tool_Click" ToolTip="グループ化 (G) ※先に図形を選択。どれか 1 つをクリックすると全部が選ばれ、まとめて移動・複写・削除できる"><StackPanel><Image Source="{StaticResource IconGroup}" Width="24" Height="24"/><TextBlock Text="グループ" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="UG" Click="Tool_Click" ToolTip="グループ解除 (UG) ※先にグループを選択。1 つずつ選べるように戻す"><StackPanel><Image Source="{StaticResource IconUngroup}" Width="24" Height="24"/><TextBlock Text="解除" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
@@ -549,7 +561,7 @@
             <DockPanel>
                 <Button x:Name="BackstageBack" DockPanel.Dock="Top" Style="{StaticResource BackstageItem}" Tag="&#xE72B;" Content="戻る" Margin="0,6,0,8"
                         ToolTip="ホームを閉じる  Esc" Click="BackstageBack_Click"/>
-                <Button DockPanel.Dock="Bottom" Style="{StaticResource BackstageItem}" Tag="&#xE7E8;" Content="終了" Margin="0,0,0,6"
+                <Button x:Name="BackstageExitButton" DockPanel.Dock="Bottom" Style="{StaticResource BackstageItem}" Tag="&#xE7E8;" Content="終了" Margin="0,0,0,6"
                         ToolTip="CivilCad を終了する" Click="BackstageExit_Click"/>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
@@ -594,4 +606,4 @@
     </Border>
     </Grid>
     </Grid>
-</Window>
+</UserControl>

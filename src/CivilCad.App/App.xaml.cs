@@ -24,9 +24,10 @@ public partial class App : Application
         DispatcherUnhandledException += OnUnhandledException;
         Settings.UserPresetStore.Load(); // 登録したプリセット
 
-        var main = new MainWindow();
-        MainWindow = main;
-        main.Show();
+        var shell = new ShellWindow();
+        var main = shell.Editor; // 画面は部品。窓 (ShellWindow) に載せている
+        MainWindow = shell;
+        shell.Show();
         if (e.Args.Length > 0) main.Dispatcher.BeginInvoke(() => main.OpenFromArgs(e.Args), DispatcherPriority.ApplicationIdle);
         // ほかから渡されたファイル (CivilCadPoint の「CivilCad で開く」など) をこの窓で開く
         SingleInstance.StartServer(args => main.Dispatcher.BeginInvoke(() => main.OpenFromArgs(args)));

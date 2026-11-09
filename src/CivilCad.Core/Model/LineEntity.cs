@@ -18,6 +18,12 @@ public sealed class LineEntity(Layer layer, Vec2 start, Vec2 end) : Entity(layer
         End += delta;
     }
 
+    public override void Mirror(Vec2 a, Vec2 b)
+    {
+        Start = Start.ReflectAcross(a, b);
+        End = End.ReflectAcross(a, b);
+    }
+
     public override void Rotate(Vec2 origin, double rad)
     {
         Start = Start.RotateAround(origin, rad);
