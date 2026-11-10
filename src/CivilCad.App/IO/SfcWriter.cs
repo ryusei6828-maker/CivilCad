@@ -262,7 +262,7 @@ public static class SfcWriter
                     if (pl.Filled)
                     {
                         // 塗りつぶし = 外形 (複合曲線) + 塗り
-                        Feature($"polyline_feature({Q(0)},{Q(0)},{Q(0)},{Q(0)},{Q(pts.Count)},{List(pts, p => p.X)},{List(pts, p => p.Y)})");
+                        Feature($"polyline_feature({head},{Q(pts.Count)},{List(pts, p => p.X)},{List(pts, p => p.Y)})");
                         Feature($"composite_curve_org_feature({Q(color)},{Q(1)},{Q(width)},{Q(0)})");
                         _compositeCount++;
                         Feature($"fill_area_style_colour_feature({Q(layer)},{Q(color)},{Q(_compositeCount)},{Q(0)},'()')");
@@ -280,7 +280,7 @@ public static class SfcWriter
                     {
                         var lp = loop.Select(map).ToList();
                         lp.Add(lp[0]);
-                        Feature($"polyline_feature({Q(0)},{Q(0)},{Q(0)},{Q(0)},{Q(lp.Count)},{List(lp, p => p.X)},{List(lp, p => p.Y)})");
+                        Feature($"polyline_feature({head},{Q(lp.Count)},{List(lp, p => p.X)},{List(lp, p => p.Y)})");
                         Feature($"composite_curve_org_feature({Q(color)},{Q(1)},{Q(width)},{Q(0)})");
                         ids.Add(++_compositeCount);
                     }

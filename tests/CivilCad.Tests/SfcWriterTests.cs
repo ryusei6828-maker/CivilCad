@@ -68,6 +68,18 @@ public class SfcWriterTests
         Assert.Contains(loaded.Entities, e => e is CircleEntity && e.Layer.Name == "道路 (編集)");
     }
 
+    /// <summary>塗りつぶしの外形の線にも、正しい線幅コード (1〜16) を書く (0 だと他の CAD で「線幅コードに異常」)。</summary>
+    [Fact]
+    public void AllCurves_HaveValidWidthCode()
+    {
+        var (_, text) = RoundTrip(MakeDrawing());
+        var codes = System.Text.RegularExpressions.Regex.Matches(text, @"= (line|polyline|circle|arc)_feature\('\d+','\d+','\d+','(\d+)'")
+            .Select(m => int.Parse(m.Groups[2].Value)).ToList();
+        Assert.Contains("composite_curve_org_feature", text);
+        Assert.NotEmpty(codes);
+        Assert.All(codes, c => Assert.InRange(c, 1, 16));
+    }
+
     private static (CadDocument Loaded, string Text) RoundTrip(CadDocument doc)
     {
         var path = Path.Combine(Path.GetTempPath(), $"civilcad_{Guid.NewGuid():N}.sfc");

@@ -67,7 +67,58 @@ public static partial class SfcIO
         var list = new List<Feature>();
         foreach (Match m in EntityRegex().Matches(text))
             list.Add(new Feature(m.Groups[2].Value, SplitArgs(m.Groups[3].Value.Replace("\r", "").Replace("\n", ""))));
+        MarkCompositeMembers(list);
         return list;
+    }
+
+    /// <summary>
+    /// 複合曲線 (composite_curve_org_feature) の構成要素を「レイヤ0・色0」の印にそろえる。
+    /// 昔の CivilCad は構成要素をレイヤ0・色0 で書いたが、ほかの CAD (と今の CivilCad) は普通のレイヤ・色・線幅で書く。
+    /// そのときは直前の、端どうしがつながって閉じる線・ポリライン・円弧を構成要素とみなす (閉じなければそのまま)。
+    /// </summary>
+    private static void MarkCompositeMembers(List<Feature> list)
+    {
+        const double tol = 1e-3;
+        for (var c = 0; c < list.Count; c++)
+        {
+            if (list[c].Name != "composite_curve_org_feature" || c == 0 || IsMember(list[c - 1])) continue;
+            Vec2? last = null, next = null;
+            for (var i = c - 1; i >= 0; i--)
+            {
+                if (Ends(list[i]) is not var (s, e)) break;
+                if (next is Vec2 n && n.DistanceTo(e) > tol) break;
+                last ??= e;
+                next = s;
+                if (s.DistanceTo(last.Value) > tol) continue;
+                // 複合曲線そのものにはレイヤが無いので、構成要素のレイヤを 5 番目の引数として渡す
+                if (list[c].Args.Count == 4) list[c] = list[c] with { Args = [.. list[c].Args, list[c - 1].Args[0]] };
+                for (var k = i; k < c; k++)
+                    list[k] = list[k] with { Args = ["0", "0", .. list[k].Args.Skip(2)] };
+                break;
+            }
+        }
+
+        static bool IsMember(Feature f) => f.Args.Count > 1 && f.Args[0] == "0" && f.Args[1] == "0";
+
+        static (Vec2 Start, Vec2 End)? Ends(Feature f)
+        {
+            var a = f.Args;
+            try
+            {
+                switch (f.Name)
+                {
+                    case "line_feature" when a.Count >= 8: return (Builder.P(a[4], a[5]), Builder.P(a[6], a[7]));
+                    case "polyline_feature" when a.Count >= 7:
+                        var pts = Builder.Points(a[5], a[6]).ToList();
+                        return pts.Count >= 2 ? (pts[0], pts[^1]) : null;
+                    case "arc_feature" when a.Count >= 10:
+                        var arc = Builder.ArcPoints(Builder.P(a[4], a[5]), Builder.D(a[6]), a[7] == "1", Builder.D(a[8]), Builder.D(a[9])).ToList();
+                        return (arc[0], arc[^1]);
+                    default: return null;
+                }
+            }
+            catch (FormatException) { return null; }
+        }
     }
 
     /// <summary>引数を分割する。文字列は \'…\'、数値は '…' で囲まれている。</summary>
@@ -215,9 +266,9 @@ public static partial class SfcIO
                         top = [];
                         break;
                     case "composite_curve_org_feature":
-                        // 直前の「レイヤ0・色0」の図形がこの複合曲線の構成要素
+                        // 直前の「レイヤ0・色0」の図形がこの複合曲線の構成要素 (読み込みで MarkCompositeMembers がそろえる)
                         _composites.Add((a[0], a[2], a[3], compositeMembers));
-                        if (a[3] == "1") top.Add(new Feature("#composite", [(_composites.Count).ToString()]));
+                        if (a[3] == "1") top.Add(new Feature("#composite", [(_composites.Count).ToString(), a.ElementAtOrDefault(4) ?? ""]));
                         compositeMembers = [];
                         break;
                     default:
@@ -384,7 +435,7 @@ public static partial class SfcIO
                     break;
 
                 case "#composite":
-                    EmitComposite(int.Parse(a[0]), null, null, t);
+                    EmitComposite(int.Parse(a[0]), a.ElementAtOrDefault(1) is { Length: > 0 } lc ? L(lc) : null, null, t);
                     break;
 
                 case "fill_area_style_colour_feature":
@@ -566,7 +617,7 @@ public static partial class SfcIO
             return new ArcEntity(layer, t.Apply(center), r * t.LengthScale, sa, ea);
         }
 
-        private static IEnumerable<Vec2> ArcPoints(Vec2 c, double r, bool clockwise, double startDeg, double endDeg)
+        internal static IEnumerable<Vec2> ArcPoints(Vec2 c, double r, bool clockwise, double startDeg, double endDeg)
         {
             var s = startDeg * Math.PI / 180;
             var sweep = GeoMath.SweepAngle(s, endDeg * Math.PI / 180);
@@ -651,7 +702,7 @@ public static partial class SfcIO
             _skipped[kind] = _skipped.GetValueOrDefault(kind) + 1;
         }
 
-        private static IEnumerable<Vec2> Points(string xs, string ys)
+        internal static IEnumerable<Vec2> Points(string xs, string ys)
         {
             var x = List(xs);
             var y = List(ys);
@@ -661,8 +712,8 @@ public static partial class SfcIO
         private static double[] List(string s) =>
             s.Trim('(', ')', ' ').Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(D).ToArray();
 
-        private static Vec2 P(string x, string y) => new(D(x), D(y));
-        private static double D(string s) => double.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture);
+        internal static Vec2 P(string x, string y) => new(D(x), D(y));
+        internal static double D(string s) => double.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture);
         private static int I(string s) => int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : (int)D(s);
     }
 }

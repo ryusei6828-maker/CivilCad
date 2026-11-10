@@ -37,26 +37,24 @@ public class P21Tests
         var rp = P21IO.Load(fromP21, TestFile("shapes.p21"));
         Assert.Equal(rs.ScaleDenominator, rp.ScaleDenominator);
         Assert.Equal(rs.Sheet, rp.Sheet);
-        Assert.True(fromSfc.Entities.Count > 100);
+        Assert.True(fromSfc.Entities.Count > 90);
         Assert.Equal(fromSfc.Layers.Select(l => (l.Name, l.IsVisible)), fromP21.Layers.Select(l => (l.Name, l.IsVisible)));
 
         // 違いは次のものだけ (P21 は図形が様式を直接参照するので、こちらの方が元の図面どおり):
-        // - この SFC は複合曲線の構成要素を自分のレイヤ・色で書いている。CivilCad の SFC の読み込み (SCADEC の
-        //   書いたファイルに合わせ、構成要素はレイヤ 0・色 0) では構成要素にならず、塗りつぶしの外形が線として残る
+        // - 表示する複合曲線 (線と円弧がつながったもの) は、SFC からは 1 本のポリライン、P21 からは線と円弧のまま
         // - この SFC はユーザー定義の線幅を 11 番から数えている (CivilCad の SFC は 10 番から)
         // - 寸法値・バルーンの文字の一部は、SFC の寸法フィーチャの並びの違いで SFC からは読めない
         var sfc = Signature(fromSfc);
         var p21 = Signature(fromP21);
         var onlySfc = sfc.Except(p21).ToList();
         var onlyP21 = p21.Except(sfc).ToList();
-        Assert.Equal(4, onlySfc.Count);
-        Assert.Equal(3, onlySfc.Count(s => s.StartsWith("PolylineEntity 図形 #FFFFFF")));
+        Assert.Equal(3, onlySfc.Count);
+        Assert.Equal(2, onlySfc.Count(s => s.StartsWith("PolylineEntity 図形 #FFFFFF"))); // 複合曲線 (1 本)
         Assert.Single(onlySfc, s => s.StartsWith("LineEntity 図形 #00A0A0 w=0.18"));
-        Assert.Equal(7, onlyP21.Count);
+        Assert.Equal(8, onlyP21.Count);
+        Assert.Equal(2, onlyP21.Count(s => s.StartsWith("ArcEntity 図形 #FFFFFF")));      // 複合曲線 (線と円弧のまま)
+        Assert.Equal(2, onlyP21.Count(s => s.StartsWith("PolylineEntity 図形 #FFFFFF")));
         Assert.Single(onlyP21, s => s.StartsWith("LineEntity 図形 #00A0A0 w=0.3")); // ユーザー定義の線幅 0.3mm
-        Assert.Single(onlyP21, s => s.StartsWith("PolylineEntity 図形 #00A0A0 w=")); // 塗りつぶし (ユーザー定義色)
-        Assert.Single(onlyP21, s => s.StartsWith("PolylineEntity 図形 #C08040 w=")); // 塗りつぶし (既定義色 brown)
-        Assert.Single(onlyP21, s => s.StartsWith("HatchEntity 図形 #00FF00") && s.EndsWith("loops=2 patterns=2")); // 穴のあるハッチング
         Assert.Equal(3, onlyP21.Count(s => s.StartsWith("TextEntity 寸法")));
         Assert.Contains(fromP21.Entities.OfType<TextEntity>(), t => t.Text == "60" && t.Layer.Name == "寸法");
     }
