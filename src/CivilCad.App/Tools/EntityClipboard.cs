@@ -33,17 +33,31 @@ public static class EntityClipboard
     /// 貼り付ける図形 (target 用の新しい図形。まだ図面には入れない)。
     /// レイヤは target の同じ名前のレイヤにし、無ければ作る。
     /// </summary>
-    public static List<Entity> CreateFor(CadDocument target)
+    public static List<Entity> CreateFor(CadDocument target) => Convert(_items, _surveyRotation, _surveyPivot, target);
+
+    /// <summary>
+    /// 別のシートへ複写する図形 (target 用の新しい図形。まだ図面には入れない)。貼り付けと同じ変換 (レイヤ・測量座標の向き・記号の大きさ・新しいグループ)。
+    /// </summary>
+    public static List<Entity> Transfer(CadDocument source, IEnumerable<Entity> items, CadDocument target)
+        => Convert(items, source.SurveyRotation, source.SurveyPivot, target);
+
+    /// <summary>source の図面座標の点を、測量座標が同じになる target の図面座標へ (向きが同じならそのまま)。</summary>
+    public static Vec2 MapPoint(CadDocument source, Vec2 p, CadDocument target)
+        => source.SurveyRotation == target.SurveyRotation && source.SurveyPivot == target.SurveyPivot
+            ? p
+            : target.FromSurveyCad(source.ToSurveyCad(p));
+
+    private static List<Entity> Convert(IEnumerable<Entity> items, double surveyRotation, Vec2 surveyPivot, CadDocument target)
     {
         var result = new List<Entity>();
-        foreach (var src in _items)
+        foreach (var src in items)
         {
             var e = src.Clone();
             e.Layer = target.FindLayer(src.Layer.Name) ?? target.GetOrCreateLayer(src.Layer.Name, src.Layer.Color);
             // コピー元の測量座標 → 貼り付け先の図面座標 (向きが同じなら何もしない)
-            if (_surveyRotation != target.SurveyRotation || _surveyPivot != target.SurveyPivot)
+            if (surveyRotation != target.SurveyRotation || surveyPivot != target.SurveyPivot)
             {
-                if (_surveyRotation != 0) e.Rotate(_surveyPivot, _surveyRotation);
+                if (surveyRotation != 0) e.Rotate(surveyPivot, surveyRotation);
                 if (target.SurveyRotation != 0) e.Rotate(target.SurveyPivot, -target.SurveyRotation);
             }
             if (e is SymbolEntity s) s.Size = target.PaperMmToMeters(s.SizeMm);

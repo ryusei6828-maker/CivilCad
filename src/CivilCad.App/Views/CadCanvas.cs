@@ -63,6 +63,7 @@ public sealed class CadCanvas : FrameworkElement
             _snapIndex = null;
             Selection.Clear();
             DocumentReplaced?.Invoke(this, EventArgs.Empty);
+            _tool.OnDocumentChanged();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
             if (wasGroupEditing || value.EditingGroupId != null) GroupEditChanged?.Invoke(this, EventArgs.Empty);
             RedrawAll();

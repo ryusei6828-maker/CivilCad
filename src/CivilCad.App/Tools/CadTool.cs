@@ -48,6 +48,9 @@ public abstract class CadTool
 
     protected virtual void OnActivated() { }
 
+    /// <summary>キャンバスの図面 (シート) が切り替わった。シートをまたいで続くツールだけが使う。</summary>
+    internal virtual void OnDocumentChanged() { }
+
     /// <summary>プロンプトを出し直す (選択・削除モードで、範囲選択の方法を切り替えたとき)。</summary>
     internal void RefreshPrompt() => OnActivated();
     public virtual void OnPoint(Vec2 p) { }

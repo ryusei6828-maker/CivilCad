@@ -141,9 +141,17 @@ public sealed class MoveCopyTool(bool copy) : CadTool
     private List<Entity> _targets = [];
     private Vec2? _base;
     private Vec2 _cursor;
+    private CadDocument? _source;                 // 複写を始めたシート
+    private CadDocument? _ghostDoc;               // 別のシート用のプレビューを作った先
+    private List<Entity> _ghosts = [];
 
     public override string Name => copy ? "複写" : "移動";
-    public override Vec2? BasePoint => _base;
+
+    /// <summary>基点の後でシートを切り替えても続く (別のシートへ複写)。</summary>
+    public bool KeepsAcrossSheets => copy && _base != null;
+
+    private bool OnOtherSheet => copy && _source != null && !ReferenceEquals(Doc, _source);
+    public override Vec2? BasePoint => _base is Vec2 b && OnOtherSheet ? EntityClipboard.MapPoint(_source!, b, Doc) : _base;
     public override bool RequiresSelection => true;
     public override bool CanStepBack => _base != null;
     public override string? ConfirmLabel => copy && _base != null ? "複写を終える (Enter)" : null;
@@ -157,7 +165,27 @@ public sealed class MoveCopyTool(bool copy) : CadTool
     protected override void OnActivated()
     {
         _targets = [.. Canvas.Selection];
+        _source = Doc;
+        _ghostDoc = null;
         SetPrompt("基点を指定");
+    }
+
+    internal override void OnDocumentChanged()
+    {
+        _ghostDoc = null;
+        if (_base == null) return;
+        SetPrompt(OnOtherSheet ? "複写先を指定 (別のシートへ。Enter で終了)" : "複写先を指定 (Enter で終了)");
+    }
+
+    /// <summary>別のシートへ置く図形 (そのシートの向き・レイヤに直したもの。シートごとに使い回す)。</summary>
+    private List<Entity> GhostsFor(CadDocument target)
+    {
+        if (!ReferenceEquals(_ghostDoc, target))
+        {
+            _ghosts = EntityClipboard.Transfer(_source!, _targets, target);
+            _ghostDoc = target;
+        }
+        return _ghosts;
     }
 
     public override void OnPoint(Vec2 p)
@@ -166,6 +194,16 @@ public sealed class MoveCopyTool(bool copy) : CadTool
         {
             _base = p;
             SetPrompt(copy ? "複写先を指定 (Enter で終了)" : "移動先を指定");
+            return;
+        }
+
+        if (OnOtherSheet)
+        {
+            // 別のシート: 基点も同じ測量座標の位置に直して、その差だけ動かして置く
+            var mapped = EntityClipboard.MapPoint(_source!, b, Doc);
+            var placed = EntityClipboard.Transfer(_source!, _targets, Doc);
+            placed.ForEach(e => e.Translate(p - mapped));
+            Execute(new AddEntitiesCommand(placed, "複写"));
             return;
         }
 
@@ -190,16 +228,18 @@ public sealed class MoveCopyTool(bool copy) : CadTool
     public override void DrawPreview(DrawingContext dc)
     {
         if (_base is not Vec2 b) return;
-        Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, b, _cursor);
-        var delta = _cursor - b;
-        if (_targets.Count > MaxPreviewEntities)
+        var other = OnOtherSheet;
+        if (!other) Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, b, _cursor);
+        var shown = other ? GhostsFor(Doc) : _targets;
+        var delta = other ? _cursor - EntityClipboard.MapPoint(_source!, b, Doc) : _cursor - b;
+        if (shown.Count > MaxPreviewEntities)
         {
-            var box = _targets.Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
+            var box = shown.Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));
             Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen,
                 [box.Min + delta, new Vec2(box.Max.X, box.Min.Y) + delta, box.Max + delta, new Vec2(box.Min.X, box.Max.Y) + delta], true);
             return;
         }
-        foreach (var e in _targets)
+        foreach (var e in shown)
         {
             var ghost = e.Clone();
             ghost.Translate(delta);

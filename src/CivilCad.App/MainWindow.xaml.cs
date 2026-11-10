@@ -1072,7 +1072,9 @@ public partial class MainWindow : UserControl
         sheet.Doc.Changed += ActiveDoc_Changed;
 
         Canvas.Document = sheet.Doc;
-        Canvas.SetTool(new SelectTool());
+        // 複写は基点の後ならシートをまたいで続ける (別のシートへ複写)
+        if (Canvas.Tool is not MoveCopyTool { KeepsAcrossSheets: true }) Canvas.SetTool(new SelectTool());
+        else Canvas.RedrawOverlay();
         LayerGrid.ItemsSource = sheet.Doc.Layers;
         OnlyCurrentCheck.IsChecked = sheet.Doc.OnlyCurrentLayerEditable;
         if (sheet.ViewCenter is Vec2 c && sheet.ViewScale is double s) Canvas.SetView(c, s);
