@@ -74,7 +74,6 @@ public partial class MainWindow
 
     private void BackstageOpen_Click(object sender, RoutedEventArgs e) { CloseBackstage(); ApplicationCommands.Open.Execute(null, this); }
 
-    private void BackstageSave_Click(object sender, RoutedEventArgs e) { CloseBackstage(); ApplicationCommands.Save.Execute(null, this); }
 
     /// <summary>コマンド (PJO・PJS・PJA・PDF・PI・IMG) を実行する。コマンドは CommandParameter に入れておく。</summary>
     private void BackstageTool_Click(object sender, RoutedEventArgs e)
@@ -89,7 +88,7 @@ public partial class MainWindow
     private void RefreshBackstage()
     {
         BackstageName.Text = _active.FileName + (_active.IsModified ? " *" : "");
-        BackstagePath.Text = _filePath ?? "まだ保存していません (「名前を付けて保存」で図面のファイルにします)";
+        BackstagePath.Text = _filePath ?? "まだファイルにしていません (「プロジェクトを保存」か「エクスポート」)";
         var rows = new List<(string Label, string Value)>
         {
             ("シート", $"{_sheets.IndexOf(_active) + 1} / {_sheets.Count} 枚"),

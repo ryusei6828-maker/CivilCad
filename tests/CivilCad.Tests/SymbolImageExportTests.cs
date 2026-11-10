@@ -53,7 +53,7 @@ public class SymbolImageExportTests
             // 方位記号は線・円・塗り・文字 (N) になって残る
             Assert.Contains(back.Entities.OfType<TextEntity>(), t => t.Text == "N");
             Assert.True(back.Entities.Count > 3, $"{back.Entities.Count} 個");
-            Assert.Contains("画像 1 枚は保存していません", DrawingFiles.ImageNote(doc, path));
+            Assert.Contains("画像 1 枚は書き出していません", DrawingFiles.ImageNote(doc, path));
         }
         finally
         {

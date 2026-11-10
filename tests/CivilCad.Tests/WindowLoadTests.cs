@@ -70,7 +70,7 @@ public class WindowLoadTests
                         }
                     }
                     var homeItems = All<System.Windows.Controls.Button>(backstage).ToList();
-                    Assert.Equal(["PJO", "PJS", "PJA", "PDF", "PI", "IMG"], homeItems.Select(b => b.CommandParameter).OfType<string>());
+                    Assert.Equal(["PJO", "PJS", "PJA", "EXP", "PDF", "PI", "IMG"], homeItems.Select(b => b.CommandParameter).OfType<string>());
                     Assert.Contains(homeItems, b => (string)b.Content == "新規");
                     Assert.Contains(homeItems, b => (string)b.Content == "終了");
                     // 「戻る」で閉じる (Esc も同じ処理)

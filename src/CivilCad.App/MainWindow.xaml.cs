@@ -303,6 +303,7 @@ public partial class MainWindow : UserControl
             case "PJO": OpenProjectDialog(); break;
             case "PJS": SaveProject(saveAs: false); break;
             case "PJA": SaveProject(saveAs: true); break;
+            case "EXP": ExportDrawing(); break;
             case "CEX": SetPanelOpen(_coordDock, true); CoordPanel.ExportCsv(); break;
             case "SEX": SetPanelOpen(_coordDock, true); CoordPanel.ExportSima(); break;
             case "U": Undo_Executed(this, null!); break;
@@ -616,14 +617,14 @@ public partial class MainWindow : UserControl
             }
         }
 
-        // Ctrl+Shift+S: プロジェクトを保存。Ctrl+S: プロジェクトを開いていればプロジェクトに上書き保存 (開いていなければ従来の「名前を付けて保存」)
+        // Ctrl+S・Ctrl+Shift+S: プロジェクトを保存 (まだ無ければ保存先を選ぶ)。DXF・SFC などは「エクスポート」(EXP)
         if (e.Key == Key.S && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             SaveProject(saveAs: false);
             e.Handled = true;
             return;
         }
-        if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control && _projectPath != null)
+        if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
         {
             SaveProject(saveAs: false);
             e.Handled = true;
@@ -829,11 +830,16 @@ public partial class MainWindow : UserControl
         }
     }
 
-    private void Save_Executed(object sender, ExecutedRoutedEventArgs e)
+    /// <summary>保存 (ツールバー・Ctrl+S) はプロジェクトの保存。</summary>
+    private void Save_Executed(object sender, ExecutedRoutedEventArgs e) => SaveProject(saveAs: false);
+
+    /// <summary>エクスポート: 今のシートの図面を DXF・DWG・JWW・SFC・P21 に書き出す。</summary>
+    private void ExportDrawing()
     {
         // 開いたファイルと同じ形式を初期値にする
         var dlg = new SaveFileDialog
         {
+            Title = "エクスポート",
             Filter = DrawingFiles.SaveFilter,
             FilterIndex = DrawingFiles.SaveFilterIndex(_filePath),
             FileName = _filePath != null ? Path.GetFileName(_filePath) : _active.FileName + ".dxf",
@@ -849,7 +855,7 @@ public partial class MainWindow : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "保存エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, ex.Message, "エクスポートエラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

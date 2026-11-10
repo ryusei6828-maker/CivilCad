@@ -175,7 +175,7 @@ public static class DrawingFiles
             var message = SaveAs(doc, path);
             var hiddenCount = doc.Entities.Count(e => !doc.IsVisible(e));
             if (hiddenCount > 0)
-                message += $"  ※非表示のレイヤの図形が {hiddenCount} 個あります (非表示のまま保存しました。開いたときも非表示です)。";
+                message += $"  ※非表示のレイヤの図形が {hiddenCount} 個あります (非表示のまま書き出しました。開いたときも非表示です)。";
             return message;
         }
         finally
@@ -192,26 +192,26 @@ public static class DrawingFiles
             {
                 SfcWriter.Save(doc, path);
                 var (paper, pw, ph, _) = SfcWriter.Layout(doc);
-                return $"SFC で保存しました: {path}  (用紙 {PaperText(paper, pw, ph)} 横, 縮尺 {doc.ScaleText})";
+                return $"SFC にエクスポートしました: {path}  (用紙 {PaperText(paper, pw, ph)} 横, 縮尺 {doc.ScaleText})";
             }
             case ".p21":
             {
                 P21IO.Save(doc, path);
                 var (paper, pw, ph, _) = SfcWriter.Layout(doc);
-                return $"SXF (P21) で保存しました: {path}  (用紙 {PaperText(paper, pw, ph)} 横, 縮尺 {doc.ScaleText})";
+                return $"SXF (P21) にエクスポートしました: {path}  (用紙 {PaperText(paper, pw, ph)} 横, 縮尺 {doc.ScaleText})";
             }
             case ".jww":
             {
                 JwwIO.Save(doc, path);
                 var (paper, pw, ph, _) = SfcWriter.Layout(doc);
-                return $"Jw_cad (JWW) で保存しました: {path}  (用紙 {PaperText(paper, pw, ph)}, 縮尺 {doc.ScaleText})";
+                return $"Jw_cad (JWW) にエクスポートしました: {path}  (用紙 {PaperText(paper, pw, ph)}, 縮尺 {doc.ScaleText})";
             }
             case ".dwg":
                 DwgIO.Save(doc, path);
-                return $"DWG (AutoCAD 2013 形式) で保存しました: {path}";
+                return $"DWG (AutoCAD 2013 形式) にエクスポートしました: {path}";
             default:
                 DxfIO.Save(doc, path);
-                return $"保存しました: {path}";
+                return $"DXF にエクスポートしました: {path}";
         }
     }
 
@@ -224,7 +224,7 @@ public static class DrawingFiles
         if (ext is ".dxf" or "")
             return "※ 画像は DXF に埋め込まず、画像ファイルの場所を記録しています。DXF を別の場所へ移すときは画像ファイルも同じフォルダに入れてください。";
         var name = ext switch { ".sfc" => "SFC", ".p21" => "SXF (P21)", ".jww" => "Jw_cad (JWW)", ".dwg" => "DWG", _ => ext.TrimStart('.').ToUpperInvariant() };
-        return $"※ {name} には画像を保存できないため、画像 {n} 枚は保存していません (画像も残すには DXF で保存してください)。";
+        return $"※ {name} には画像を書き出せないため、画像 {n} 枚は書き出していません (画像も残すには DXF にエクスポートしてください)。";
     }
 
     private static string PaperText(PaperSize? paper, double w, double h) => paper?.Name ?? $"自由 {w:0}×{h:0}mm";

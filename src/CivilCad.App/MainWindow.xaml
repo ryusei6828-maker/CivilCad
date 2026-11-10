@@ -189,7 +189,7 @@
                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="3,4"/>
                 <Button Style="{StaticResource ToolButton}" Command="New" ToolTip="新規 (Ctrl+N)"><StackPanel><Image Source="{StaticResource IconNew}" Width="24" Height="24"/><TextBlock Text="新規" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                 <Button Style="{StaticResource ToolButton}" Command="Open" ToolTip="DXF / SFC を開く (Ctrl+O)"><StackPanel><Image Source="{StaticResource IconOpen}" Width="24" Height="24"/><TextBlock Text="開く" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
-                <Button Style="{StaticResource ToolButton}" Command="Save" ToolTip="DXF / SFC で保存 (Ctrl+S)"><StackPanel><Image Source="{StaticResource IconSave}" Width="24" Height="24"/><TextBlock Text="保存" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                <Button Style="{StaticResource ToolButton}" Command="Save" ToolTip="プロジェクトを保存 (Ctrl+S)。DXF・SFC などはホームの「エクスポート」"><StackPanel><Image Source="{StaticResource IconSave}" Width="24" Height="24"/><TextBlock Text="保存" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="3,4"/>
                 <Button Style="{StaticResource ToolButton}" Command="Undo" ToolTip="元に戻す (Ctrl+Z)"><StackPanel><Image Source="{StaticResource IconUndo}" Width="24" Height="24"/><TextBlock Text="戻す" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                 <Button Style="{StaticResource ToolButton}" Command="Redo" ToolTip="やり直し (Ctrl+Y)"><StackPanel><Image Source="{StaticResource IconRedo}" Width="24" Height="24"/><TextBlock Text="やり直し" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
@@ -567,15 +567,16 @@
                 <StackPanel>
                     <Button Style="{StaticResource BackstageItem}" Tag="&#xE8A5;" Content="新規" ToolTip="新しいシート  Ctrl+N" Click="BackstageNew_Click"/>
                     <Button Style="{StaticResource BackstageItem}" Tag="&#xE838;" Content="開く" ToolTip="図面を開く (DXF・DWG・JWW・SFC・P21)  Ctrl+O" Click="BackstageOpen_Click"/>
-                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE792;" Content="名前を付けて保存" ToolTip="図面を保存 (DXF・DWG・JWW・SFC・P21)  Ctrl+S" Click="BackstageSave_Click"/>
                     <Rectangle Height="1" Fill="#33FFFFFF" Margin="18,6"/>
                     <Button Style="{StaticResource BackstageItem}" Tag="&#xE8B7;" Content="プロジェクト・シートを開く" ToolTip="CivilCad プロジェクト (.ccp)・シート (.ccs) を開く (PJO)"
                             CommandParameter="PJO" Click="BackstageTool_Click"/>
-                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE74E;" Content="プロジェクトを保存" ToolTip="プロジェクトを上書き保存 (PJS)  Ctrl+Shift+S"
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xE74E;" Content="プロジェクトを保存" ToolTip="プロジェクトを上書き保存 (PJS)  Ctrl+S"
                             CommandParameter="PJS" Click="BackstageTool_Click"/>
                     <Button Style="{StaticResource BackstageItem}" Tag="&#xE792;" Content="名前を付けてプロジェクトを保存" ToolTip="プロジェクトを名前を付けて保存 (PJA)"
                             CommandParameter="PJA" Click="BackstageTool_Click"/>
                     <Rectangle Height="1" Fill="#33FFFFFF" Margin="18,6"/>
+                    <Button Style="{StaticResource BackstageItem}" Tag="&#xEDE1;" Content="エクスポート" ToolTip="図面を DXF・DWG・JWW・SFC・P21 に書き出す (EXP)"
+                            CommandParameter="EXP" Click="BackstageTool_Click"/>
                     <Button Style="{StaticResource BackstageItem}" Tag="&#xE749;" Content="PDF に印刷" ToolTip="PDF に印刷 (PDF)"
                             CommandParameter="PDF" Click="BackstageTool_Click"/>
                     <Button Style="{StaticResource BackstageItem}" Tag="&#xE707;" Content="座標読込 (SIMA / CSV)" ToolTip="座標を読み込む (PI)"
