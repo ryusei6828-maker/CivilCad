@@ -171,6 +171,55 @@ public class SectionDrawingTests
     }
 
     [Fact]
+    public void Sections_OrderInColumn_FollowsKind()
+    {
+        var r = Read();
+        // 見出し (測点名) の位置を測点の順 (No.0 → No.1 → No.2) に取る。列は x、段は y で分かる
+        static List<Vec2> Titles(CadDocument doc) =>
+            [.. doc.Entities.OfType<TextEntity>().Where(t => t.Text.StartsWith("No.")).OrderBy(t => t.Text, StringComparer.Ordinal).Select(t => t.Position)];
+
+        // 道路 (既定): 左の列の下から上へ → 次の列へ
+        var road = new CadDocument();
+        SectionDrawing.DrawSections(road, r, new SectionScales(Section: 100, Columns: 2, Rows: 2));
+        var a = Titles(road);
+        Assert.Equal(3, a.Count);
+        Assert.Equal(a[0].X, a[1].X, 6);
+        Assert.True(a[1].Y > a[0].Y + 5, "道路は若い測点が下");
+        Assert.True(a[2].X > a[0].X + 20);
+        // 2 列目の 1 つ目も列のいちばん下 (1 列目のいちばん下と同じ段)
+        Assert.True(Math.Abs(a[2].Y - a[0].Y) < Math.Abs(a[2].Y - a[1].Y));
+
+        // 河川: 左の列の上から下へ → 次の列へ
+        var river = new CadDocument();
+        SectionDrawing.DrawSections(river, r, new SectionScales(Section: 100, Columns: 2, Rows: 2, Kind: SectionKind.River));
+        var b = Titles(river);
+        Assert.Equal(b[0].X, b[1].X, 6);
+        Assert.True(b[1].Y < b[0].Y - 5, "河川は若い測点が上");
+        Assert.True(b[2].X > b[0].X + 20);
+        Assert.True(Math.Abs(b[2].Y - b[0].Y) < Math.Abs(b[2].Y - b[1].Y));
+
+        // 縦に並べる数が 0 (1 枚に全部) でも同じ向き: 横 1 列なら道路は No.0 がいちばん下
+        var one = new CadDocument();
+        SectionDrawing.DrawSections(one, r, new SectionScales(Section: 100, Columns: 1));
+        var c = Titles(one);
+        Assert.True(c[0].Y < c[1].Y && c[1].Y < c[2].Y);
+    }
+
+    [Fact]
+    public void SectionKindArgument_Parses()
+    {
+        Assert.True(SectionScales.TryParseKind("road", out var road));
+        Assert.Equal(SectionKind.Road, road);
+        Assert.True(SectionScales.TryParseKind("River", out var river));
+        Assert.Equal(SectionKind.River, river);
+        Assert.False(SectionScales.TryParseKind("harbor", out var other));
+        Assert.Equal(SectionKind.Road, other); // 読めなければ道路
+        // --section-layout だけなら道路
+        Assert.True(SectionScales.TryParseArgument("500,50,200,2.5,3,4", out var s));
+        Assert.Equal(SectionKind.Road, s.Kind);
+    }
+
+    [Fact]
     public void SectionLayoutArgument_Parses()
     {
         Assert.True(SectionScales.TryParseArgument("500,50,200,2.5,3,4", out var s));

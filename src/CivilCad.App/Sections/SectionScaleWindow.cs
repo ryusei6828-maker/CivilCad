@@ -14,6 +14,19 @@ public sealed class SectionScaleWindow : Window
     public static void Remember(SectionScales scales) => Last = scales;
 
     private readonly TextBox _h = Box(), _v = Box(), _s = Box(), _cols = Box(), _rows = Box(), _dl = Box();
+    private readonly ComboBox _kind = new()
+    {
+        Width = 70,
+        ItemsSource = new[] { "道路", "河川" },
+        ToolTip = "道路 (港湾も): 左の列の下から上へ並べる。河川: 左の列の上から下へ並べる",
+    };
+
+    /// <summary>工種の欄で選んでいるもの。</summary>
+    public SectionKind Kind
+    {
+        get => _kind.SelectedIndex == 1 ? SectionKind.River : SectionKind.Road;
+        set => _kind.SelectedIndex = value == SectionKind.River ? 1 : 0;
+    }
 
     public SectionScales? Result { get; private set; }
 
@@ -36,6 +49,7 @@ public sealed class SectionScaleWindow : Window
         if (hasSections)
         {
             panel.Children.Add(Header("横断図"));
+            panel.Children.Add(Labeled("工種", _kind));
             panel.Children.Add(Row("縦横  1 :", _s, Last.Section));
             panel.Children.Add(Row("横に並べる数", _cols, Last.Columns));
             panel.Children.Add(Row("縦に並べる数", _rows, Last.Rows));
@@ -46,6 +60,7 @@ public sealed class SectionScaleWindow : Window
             });
             panel.Children.Add(Row("DL の刻み (m)", _dl, Last.DatumStep));
         }
+        Kind = Last.Kind;
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
         var ok = new Button { Content = "作る", Width = 80, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
         var cancel = new Button { Content = "キャンセル", Width = 80, IsCancel = true };
@@ -58,7 +73,7 @@ public sealed class SectionScaleWindow : Window
                 MessageBox.Show(this, "0 より大きい数を入れてください (縦に並べる数は 0 でも可)。", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            Result = Last = new SectionScales(h, v, s, Math.Max(1, (int)Math.Round(c)), dl, (int)Math.Round(rows));
+            Result = Last = new SectionScales(h, v, s, Math.Max(1, (int)Math.Round(c)), dl, (int)Math.Round(rows), hasSections ? Kind : Last.Kind);
             DialogResult = true;
         };
         buttons.Children.Add(ok);
@@ -74,9 +89,14 @@ public sealed class SectionScaleWindow : Window
     private static FrameworkElement Row(string label, TextBox box, double value)
     {
         box.Text = value.ToString("0.###", CultureInfo.InvariantCulture);
+        return Labeled(label, box);
+    }
+
+    private static StackPanel Labeled(string label, FrameworkElement field)
+    {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
         row.Children.Add(new TextBlock { Text = label, Width = 110, VerticalAlignment = VerticalAlignment.Center });
-        row.Children.Add(box);
+        row.Children.Add(field);
         return row;
     }
 

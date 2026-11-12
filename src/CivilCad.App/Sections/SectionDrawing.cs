@@ -5,6 +5,15 @@ using CivilCad.Core.Model;
 
 namespace CivilCad.App.Sections;
 
+/// <summary>横断図の並べ方を決める工種 (設計図面記載要領の並べ方)。</summary>
+public enum SectionKind
+{
+    /// <summary>道路 (港湾も): 左の列の下から上へ → 次の列へ (測点が若いほど下)。</summary>
+    Road,
+    /// <summary>河川: 左の列の上から下へ → 次の列へ。</summary>
+    River,
+}
+
 /// <summary>縦断図・横断図の縮尺。</summary>
 /// <param name="ProfileHorizontal">縦断図の横 (距離) の縮尺の分母。</param>
 /// <param name="ProfileVertical">縦断図の縦 (高さ) の縮尺の分母。</param>
@@ -12,11 +21,27 @@ namespace CivilCad.App.Sections;
 /// <param name="Columns">横断図を横に並べる数。</param>
 /// <param name="DatumStep">横断図の基準高 (DL) の刻み (m)。DL はこの倍数に切り下げる。</param>
 /// <param name="Rows">横断図を縦に並べる数。1 枚のシートに 横 × 縦 の数まで並べ、残りは次のシートへ。0 なら 1 枚に全部。</param>
+/// <param name="Kind">工種。横断図を列の下から並べる (道路) か上から並べる (河川) かを決める。</param>
 public sealed record SectionScales(double ProfileHorizontal = 1000, double ProfileVertical = 100, double Section = 100, int Columns = 3,
-    double DatumStep = 5, int Rows = 0)
+    double DatumStep = 5, int Rows = 0, SectionKind Kind = SectionKind.Road)
 {
     /// <summary>コマンドライン引数の名前 (「--section-layout=横,縦,横断,DL の刻み,横に並べる数,縦に並べる数」)。CivilCadPoint から渡す。</summary>
     public const string ArgumentPrefix = "--section-layout=";
+
+    /// <summary>工種のコマンドライン引数の名前 (「--section-kind=road」か「--section-kind=river」。無ければ road)。CivilCadPoint から渡す。</summary>
+    public const string KindArgumentPrefix = "--section-kind=";
+
+    /// <summary>「road」「river」を読む (大文字小文字は問わない)。ほかは false。</summary>
+    public static bool TryParseKind(string value, out SectionKind kind)
+    {
+        kind = SectionKind.Road;
+        switch (value.Trim().ToLowerInvariant())
+        {
+            case "road": return true;
+            case "river": kind = SectionKind.River; return true;
+            default: return false;
+        }
+    }
 
     /// <summary>1 枚のシートに並べる横断の数 (0 は全部)。</summary>
     public int PerSheet => Rows > 0 ? Math.Max(1, Columns) * Rows : 0;
@@ -176,7 +201,8 @@ public static class SectionDrawing
     }
 
     /// <summary>
-    /// 空のシート doc に横断図を並べて描く (上から下、左から右)。描いた横断の数。
+    /// 空のシート doc に横断図を並べて描く。描いた横断の数。
+    /// 並べ方は工種で変わる: 道路は左の列の下から上へ、河川は左の列の上から下へ。どちらも左の列から右の列へ。
     /// 縦に並べる数があれば、sheet 枚目 (0 から) の分 (横 × 縦 の数) だけを描く。枠の大きさはどのシートも同じ (全部の横断から決める)。
     /// 横断ごとに 基準線 (DL は刻みの倍数)・中心線・地盤線・計画線・計画高 (FH)・見出し (測点と中心の地盤高 GH) を描く。
     /// </summary>
@@ -212,7 +238,9 @@ public static class SectionDrawing
         {
             var sec = sections[k];
             var ox = k / perColumn * cellW + left + doc.PaperMmToMeters(20);
-            var oy = -(k % perColumn) * cellH;
+            // 道路は列の下から上へ (測点が若いほど下)、河川は上から下へ
+            var row = scales.Kind == SectionKind.River ? k % perColumn : perColumn - 1 - k % perColumn;
+            var oy = -row * cellH;
             var (minZ, maxZ) = Range(sec, r);
             var dl = scales.SectionDatum(minZ);
             Vec2 P(double off, double z) => new(ox + off, oy + (z - dl));

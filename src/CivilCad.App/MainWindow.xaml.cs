@@ -890,15 +890,22 @@ public partial class MainWindow : UserControl
     /// 起動時の引数や、ほかの CivilCad・CivilCadPoint から渡されたファイルを開く。
     /// 「--sections ファイル」は LandXML の縦断・横断から縦横断図を作る。そのほかは図面ファイルとして開く。
     /// 「--section-layout=…」があれば、その縮尺・並べ方で縦横断図を作る (無ければ前に使った値)。
+    /// 「--section-kind=road / river」は横断図を並べる向きを決める工種 (無ければ road)。
     /// </summary>
     public void OpenFromArgs(string[] args)
     {
         SectionScales? layout = null;
+        var kind = SectionKind.Road;
         foreach (var a in args)
             if (a.StartsWith(SectionScales.ArgumentPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 if (SectionScales.TryParseArgument(a[SectionScales.ArgumentPrefix.Length..], out var s)) layout = s;
                 else Log($"縦横断図の縮尺・並べ方を読めませんでした: {a}");
+            }
+            else if (a.StartsWith(SectionScales.KindArgumentPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                if (SectionScales.TryParseKind(a[SectionScales.KindArgumentPrefix.Length..], out var k)) kind = k;
+                else Log($"縦横断図の工種を読めませんでした (道路として並べます): {a}");
             }
 
         // 窓を前に出す (最小化していれば戻す)
@@ -912,7 +919,7 @@ public partial class MainWindow : UserControl
             var a = args[i];
             if (a.Equals("--sections", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
-                ImportRouteSections(args[++i], askScales: false, layout);
+                ImportRouteSections(args[++i], askScales: false, (layout ?? SectionScaleWindow.Last) with { Kind = kind });
                 continue;
             }
             if (a.StartsWith("--", StringComparison.Ordinal)) continue;
@@ -998,7 +1005,7 @@ public partial class MainWindow : UserControl
                     FinishDrawnSheet(sheet);
                     first ??= sheet;
                 }
-                Log($"横断図: {n} 測点を 1:{scales.Section:0} で並べました" +
+                Log($"横断図: {n} 測点を 1:{scales.Section:0} で並べました ({(scales.Kind == SectionKind.River ? "河川: 列の上から下へ" : "道路: 列の下から上へ")})" +
                     (sheets > 1 ? $" (1 枚に 横 {scales.Columns} × 縦 {scales.Rows}、{sheets} 枚のシート)。" : "。"));
             }
         }
