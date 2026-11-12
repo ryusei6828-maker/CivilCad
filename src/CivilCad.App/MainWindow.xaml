@@ -165,6 +165,7 @@
                 <MenuItem Header="距離・方向角 (DI)" Tag="DI" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconDistance}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="座標計測 (ID)" Tag="ID" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconCoord}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="面積 (AA)" Tag="AA" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconArea}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="ヘロン面積 (HE)" Tag="HE" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconHeron}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
             <MenuItem Header="路線(_R)">
                 <MenuItem Header="路線作成 (路線パネル) (RL)" Tag="RL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
@@ -264,6 +265,7 @@
                     <StackPanel Orientation="Horizontal">
                         <Button Style="{StaticResource ToolButton}" Tag="DI" Click="Tool_Click" ToolTip="距離・方向角 (DI)"><StackPanel><Image Source="{StaticResource IconDistance}" Width="24" Height="24"/><TextBlock Text="距離" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="AA" Click="Tool_Click" ToolTip="面積 (AA)"><StackPanel><Image Source="{StaticResource IconArea}" Width="24" Height="24"/><TextBlock Text="面積" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
+                        <Button Style="{StaticResource ToolButton}" Tag="HE" Click="Tool_Click" ToolTip="ヘロン面積 (HE): 三角形の頂点を順にクリックし、辺長・面積・ヘロン面積計算書を記入 (標高のある点は斜距離)"><StackPanel><Image Source="{StaticResource IconHeron}" Width="24" Height="24"/><TextBlock Text="ヘロン" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource ToolButton}" Tag="ID" Click="Tool_Click" ToolTip="座標計測 (ID): クリックした点の測量座標 X・Y を表示し、座標管理に登録 (右クリックで登録しない設定に)"><StackPanel><Image Source="{StaticResource IconCoord}" Width="24" Height="24"/><TextBlock Text="座標" FontSize="11" HorizontalAlignment="Center"/></StackPanel></Button>
                     </StackPanel>
                 </TabItem>

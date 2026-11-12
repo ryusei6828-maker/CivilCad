@@ -387,6 +387,12 @@
         <GeometryDrawing Brush="#8C2F74D0" Pen="{StaticResource IcoBluePen}" Geometry="M3,19 L6,5 L16,3 L21,12 L14,21 Z"/>
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
+    <DrawingImage x:Key="IconHeron" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Brush="#8C2F74D0" Pen="{StaticResource IcoBluePen}" Geometry="M2,20 L9,4 L22,20 Z M9,4 L14,20"/>
+        <GeometryDrawing Brush="White" Pen="{StaticResource IcoBluePen}" Geometry="M12.5,13 A2.5,2.5 0 1 1 12.5,13.01 Z"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <!-- 路線 -->
     <DrawingImage x:Key="IconRoute" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>

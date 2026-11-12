@@ -288,6 +288,7 @@ public partial class MainWindow : UserControl
             case "DI": StartTool(new DistanceTool(), c); break;
             case "ID": StartTool(new CoordinateMeasureTool(), c); break;
             case "AA": StartTool(new AreaTool(), c); break;
+            case "HE": StartTool(new HeronTool(), c); break;
             case "E" or "DEL":
                 // 選択していた図形は消さずに選択を外してから削除モードへ (消す図形は削除モードで選び、ダブルクリックで確定)
                 Canvas.ClearSelection();

@@ -180,6 +180,20 @@ public sealed class DrawInputBar : Border
                         v => { if (v is double a) { PresetSettings.AngleDeg = a; _canvas?.Tool.RefreshPrompt(); } },
                         "記号の上の向き。0 = 図面の上、反時計回りが正", allowEmpty: false, allowNegative: true);
                 break;
+            case HeronTool:
+                AddCheck("斜距離 (標高を使う)", HeronSettings.Slope, v => HeronSettings.Slope = v,
+                    "オンなら、標高のある点どうしの辺長を斜距離 (3D) で出す。標高の無い点は水平距離");
+                AddCheck("連続三角形 (直前の 2 点と次の点)", HeronSettings.Strip, v => HeronSettings.Strip = v,
+                    "オンなら、最初の 3 点で 1 個目、以降は 1 点クリックするごとに直前の 2 点と組んで次の三角形ができる");
+                AddNumber("辺長の桁", () => HeronSettings.SideDecimals, v => { if (v is double d) HeronSettings.SideDecimals = (int)Math.Round(d); },
+                    "辺長の小数点以下の桁数 (0〜4。丸めた辺長で計算する)", allowEmpty: false);
+                AddNumber("面積の桁", () => HeronSettings.AreaDecimals, v => { if (v is double d) HeronSettings.AreaDecimals = (int)Math.Round(d); },
+                    "面積の小数点以下の桁数 (0〜6。丸めた面積を合計する)", allowEmpty: false);
+                AddNumber($"文字高 (mm, {doc.ScaleText})", () => HeronSettings.TextHeightMm, v => { if (v is double h) HeronSettings.TextHeightMm = h; },
+                    "記入する文字の高さ (用紙上の mm)", allowEmpty: false);
+                AddCheck("計算書を置く", HeronSettings.PlaceTable, v => HeronSettings.PlaceTable = v,
+                    "オンなら、Enter のあと計算書 (表) を置く位置を指定する");
+                break;
             case MeasureToolBase:
                 AddMeasureUnit();
                 AddCheck("結果を文字で記入", MeasureSettings.PlaceText, v => MeasureSettings.PlaceText = v,
