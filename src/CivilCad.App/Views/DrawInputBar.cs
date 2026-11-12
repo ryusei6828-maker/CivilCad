@@ -201,7 +201,7 @@ public sealed class DrawInputBar : Border
                         MeasureSettings.AreaByRegion = i == 1;
                         _canvas?.Tool.RefreshPrompt();
                         _canvas?.RedrawOverlay();
-                    }, "点を指定: 頂点を順にクリック\n囲まれた部分: 境界にする図形 (線・ポリライン・円弧・円) を指定し、囲まれた部分の内側をクリック。選択中の図形があればそれが境界");
+                    }, "点を指定: 頂点を順にクリック\n囲まれた部分: 境界にする図形 (線・ポリライン・円弧・円) を指定し、囲まれた部分の内側をクリック。選択中の図形は最初から境界に入っている");
                 AddMeasureUnit();
                 AddCheck("結果を文字で記入", MeasureSettings.PlaceText, v => MeasureSettings.PlaceText = v,
                     "オンなら、計測のあと結果の文字がカーソルに付いて動き、クリックした位置に置ける (Enter で置かずに次へ)");

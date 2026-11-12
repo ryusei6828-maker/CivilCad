@@ -112,10 +112,36 @@ public class AreaRegionToolTests
         var lines = Lines(doc);
         canvas.SetSelection(lines);
         var tool = new AreaTool();
-        canvas.SetTool(tool);                  // 選択中なので、境界の指定を飛ばして内側のクリックから
+        canvas.SetTool(tool);                  // 選択中の図形は境界に入っているが、境界の指定は続く
+        tool.OnEnter();                        // 境界を確定
         tool.OnPoint(new Vec2(5, 2));
         tool.OnPoint(new Vec2(5, 2));
         Assert.Equal("A=50.000m²", Assert.Single(doc.Entities.OfType<TextEntity>()).Text);
+    });
+
+    [Fact]
+    public void OneSelectedLine_StillPicking_CanAddMoreBoundary() => RunSta((doc, canvas) =>
+    {
+        var lines = Lines(doc);
+        canvas.SetSelection([lines[0]]);
+        string? message = null;
+        canvas.Message += (_, m) => message = m;
+        var tool = new AreaTool();
+        canvas.SetTool(tool);                  // 1 本だけ選択中でも、境界の指定中のまま
+        tool.OnPoint(new Vec2(5, 5));          // 上の線を足す
+        tool.OnPoint(new Vec2(0, 2));          // 左
+        tool.OnPoint(new Vec2(10, 2));         // 右
+        tool.OnEnter();
+        tool.OnPoint(new Vec2(5, 2));
+        tool.OnPoint(new Vec2(5, 2));
+        Assert.Equal("A=50.000m²", Assert.Single(doc.Entities.OfType<TextEntity>()).Text);
+
+        // 閉じていない境界のメッセージには境界の数が出る
+        tool.StepBack();                       // 境界の指定へ
+        tool.StepBack();                       // 右の線を外す
+        tool.OnEnter();
+        tool.OnPoint(new Vec2(5, 2));
+        Assert.Contains("境界 3 個", message);
     });
 
     [Fact]

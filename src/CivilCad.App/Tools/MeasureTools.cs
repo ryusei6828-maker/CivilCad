@@ -285,9 +285,8 @@ public sealed class AreaTool : MeasureToolBase
         _picking = true;
         if (ByRegion)
         {
-            // 選択中の図形があれば、それを境界にして内側のクリックへ
+            // 選択中の図形は境界に入れておく (橙色)。ただし境界の指定は続ける (1 本だけでは囲めないので、足してから Enter)
             _boundary.AddRange(Canvas.Selection.Where(e => ToCurves(e).Any()));
-            _picking = _boundary.Count == 0;
             PromptRegion();
         }
         else SetPrompt("頂点を順に指定 (Enter で計算)");
@@ -296,7 +295,9 @@ public sealed class AreaTool : MeasureToolBase
     private void PromptRegion()
     {
         SetPrompt(_picking
-            ? "境界にする図形をクリック (もう一度クリックで外す。Enter で確定、何も選ばずに Enter なら表示中のすべての図形)"
+            ? _boundary.Count > 0
+                ? $"境界にする図形をクリック (境界 {_boundary.Count} 個。もう一度クリックで外す。Enter で確定)"
+                : "境界にする図形をクリック (もう一度クリックで外す。Enter で確定、何も選ばずに Enter なら表示中のすべての図形)"
             : "囲まれた部分の内側をクリック (右クリック > 一つ戻すで境界の指定に戻る)");
     }
 
@@ -372,7 +373,9 @@ public sealed class AreaTool : MeasureToolBase
         if (region == null)
         {
             _region = null;
-            Canvas.ShowMessage("囲まれた部分が見つかりません (境界が閉じていない)");
+            Canvas.ShowMessage(_useAll
+                ? "囲まれた部分が見つかりません (表示中の図形では閉じていない)"
+                : $"囲まれた部分が見つかりません。境界 {_boundary.Count} 個では閉じていません (右クリック > 一つ戻すで境界の図形を足す)");
             return;
         }
         double perimeter = region.Perimeter;
