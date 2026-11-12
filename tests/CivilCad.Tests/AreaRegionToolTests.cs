@@ -25,6 +25,7 @@ public class AreaRegionToolTests
             {
                 MeasureSettings.AreaByRegion = false;
                 MeasureSettings.PlaceText = true;
+                MeasureSettings.KeepAreaFill = false;
                 MeasureSettings.Detail = false;
                 MeasureSettings.Decimals = 3;
                 MeasureSettings.Unit = LengthUnit.M;
@@ -142,6 +143,58 @@ public class AreaRegionToolTests
         tool.OnEnter();
         tool.OnPoint(new Vec2(5, 2));
         Assert.Contains("境界 3 個", message);
+    });
+
+    private const string FillLayer = "面積-塗り";
+
+    [Fact]
+    public void KeepAreaFill_AddsHatchWithHoles() => RunSta((doc, canvas) =>
+    {
+        MeasureSettings.KeepAreaFill = true;
+        MeasureSettings.PlaceText = false;
+        Lines(doc);
+        // 内側に 2 x 2 の四角 (穴)
+        doc.Entities.Add(new PolylineEntity(doc.CurrentLayer, [new Vec2(4, 1), new Vec2(6, 1), new Vec2(6, 3), new Vec2(4, 3)], true));
+        var tool = new AreaTool();
+        canvas.SetTool(tool);
+        tool.OnEnter();                        // すべての図形を境界に
+        tool.OnPoint(new Vec2(1, 1));          // 穴の外側の部分
+        var hatch = Assert.Single(doc.Entities.OfType<HatchEntity>());
+        Assert.Equal(FillLayer, hatch.Layer.Name);
+        Assert.True(hatch.Solid);
+        Assert.Equal(50, hatch.TransparencyPercent);
+        Assert.Equal(2, hatch.Loops.Count);
+        Assert.Equal(46, Math.Abs(HatchEntity.SignedArea(hatch.Loops[0])) - Math.Abs(HatchEntity.SignedArea(hatch.Loops[1])), 1e-9);
+        doc.History.Undo();
+        Assert.Empty(doc.Entities.OfType<HatchEntity>());
+    });
+
+    [Fact]
+    public void KeepAreaFill_Off_AddsNoHatch() => RunSta((doc, canvas) =>
+    {
+        MeasureSettings.PlaceText = false;
+        Lines(doc);
+        var tool = new AreaTool();
+        canvas.SetTool(tool);
+        tool.OnEnter();
+        tool.OnPoint(new Vec2(5, 2));
+        Assert.Empty(doc.Entities.OfType<HatchEntity>());
+    });
+
+    [Fact]
+    public void KeepAreaFill_PointMode_AddsHatch() => RunSta((doc, canvas) =>
+    {
+        MeasureSettings.AreaByRegion = false;
+        MeasureSettings.KeepAreaFill = true;
+        var tool = new AreaTool();
+        canvas.SetTool(tool);
+        tool.OnPoint(new Vec2(0, 0));
+        tool.OnPoint(new Vec2(4, 0));
+        tool.OnPoint(new Vec2(4, 3));
+        tool.OnEnter();
+        var hatch = Assert.Single(doc.Entities.OfType<HatchEntity>());
+        Assert.Equal(FillLayer, hatch.Layer.Name);
+        Assert.Equal(6, Math.Abs(HatchEntity.SignedArea(Assert.Single(hatch.Loops))), 1e-9);
     });
 
     [Fact]

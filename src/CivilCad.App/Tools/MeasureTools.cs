@@ -29,6 +29,9 @@ public static class MeasureSettings
     /// <summary>面積の測り方: false = 点を順に指定、true = 境界の図形で囲まれた部分をクリック。</summary>
     public static bool AreaByRegion { get; set; }
 
+    /// <summary>面積: 測った部分を、塗りつぶし (ハッチング) として図面に残す (レイヤ「面積-塗り」、透明度 50%)。</summary>
+    public static bool KeepAreaFill { get; set; }
+
     /// <summary>距離なら方向角、面積なら周長も書く。</summary>
     public static bool Detail { get; set; }
 
@@ -252,6 +255,28 @@ public sealed class DistanceTool : MeasureToolBase
 public sealed class AreaTool : MeasureToolBase
 {
     private static readonly RgbColor BoundaryColor = new(0xFF, 0xAA, 0x33);
+    private static readonly Brush MeasuredFillBrush = FrozenBrush(Color.FromArgb(0x59, 0x66, 0xCC, 0xFF)); // 薄い水色 (不透明度 35%)
+
+    private static Brush FrozenBrush(Color c)
+    {
+        var b = new SolidColorBrush(c);
+        b.Freeze();
+        return b;
+    }
+
+    /// <summary>図面に残す塗りつぶしのレイヤ名と色。</summary>
+    public const string FillLayerName = "面積-塗り";
+    private static readonly RgbColor FillLayerColor = new(0x99, 0xCC, 0xFF);
+
+    /// <summary>「測った部分を塗りつぶして残す」がオンなら、測った部分 (最初が外形、残りは中抜き) を塗りつぶしとして追加する。</summary>
+    private void KeepFill(IEnumerable<IReadOnlyList<Vec2>> loops)
+    {
+        if (!MeasureSettings.KeepAreaFill) return;
+        var layer = Doc.GetOrCreateLayer(FillLayerName, FillLayerColor);
+        var hatch = new HatchEntity(layer, loops, [], true) { TransparencyPercent = 50 };
+        if (hatch.Loops.Count == 0) return;
+        Execute(new AddEntitiesCommand([hatch], "面積の塗りつぶし"));
+    }
 
     private readonly List<Vec2> _points = [];
     private bool _closed;
@@ -322,8 +347,7 @@ public sealed class AreaTool : MeasureToolBase
     {
         if (ByRegion)
         {
-            // 同じ境界のまま、別の部分を続けて測る
-            _region = null;
+            // 同じ境界のまま、別の部分を続けて測る (測った部分の塗りは、次のクリック・境界の指定に戻るまで見せておく)
             PromptRegion();
             return;
         }
@@ -388,6 +412,7 @@ public sealed class AreaTool : MeasureToolBase
         var u = MeasureSettings.UnitLabel;
         Canvas.ShowMessage($"面積 = {MeasureSettings.Num(MeasureSettings.Area(area))} {u}²   周長 = {MeasureSettings.Num(MeasureSettings.Length(perimeter))} {u}   (囲まれた部分)");
         _region = region;
+        KeepFill(region.Loops);
         Measured(MeasureSettings.AreaText(area, perimeter), 0, TextHAlign.Center, TextVAlign.Middle);
     }
 
@@ -434,6 +459,7 @@ public sealed class AreaTool : MeasureToolBase
         Canvas.ShowMessage($"面積 = {MeasureSettings.Num(MeasureSettings.Area(area))} {u}²   周長 = {MeasureSettings.Num(MeasureSettings.Length(perimeter))} {u}" +
                            $"   ({_points.Count} 点)");
         _closed = true;
+        KeepFill([_points.ToList()]);
         Measured(MeasureSettings.AreaText(area, perimeter), 0, TextHAlign.Center, TextVAlign.Middle);
     }
 
@@ -443,10 +469,14 @@ public sealed class AreaTool : MeasureToolBase
         {
             foreach (var e in _boundary) Canvas.DrawEntity(dc, e, BoundaryColor);
             if (_region != null)
+            {
+                Canvas.DrawWorldRegionFill(dc, MeasuredFillBrush, _region.Loops);
                 foreach (var loop in _region.Loops) Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen, [.. loop], true);
+            }
             return;
         }
         if (_points.Count == 0) return;
+        if (_closed) Canvas.DrawWorldRegionFill(dc, MeasuredFillBrush, [_points]);
         Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen, _closed ? _points : [.. _points, Cursor], true);
     }
 

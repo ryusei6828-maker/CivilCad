@@ -209,6 +209,9 @@ public sealed class DrawInputBar : Border
                     "記入する文字の高さ (用紙上の mm)", allowEmpty: false);
                 AddNumber("小数桁", () => MeasureSettings.Decimals, v => { if (v is double d) MeasureSettings.Decimals = (int)Math.Round(d); },
                     "小数点以下の桁数 (0〜6)", allowEmpty: false, allowNegative: true);
+                if (tool is AreaTool)
+                    AddCheck("測った部分を塗りつぶして残す", MeasureSettings.KeepAreaFill, v => MeasureSettings.KeepAreaFill = v,
+                        "オンなら、測った部分を薄い水色の塗りつぶし (レイヤ「面積-塗り」、透明度 50%) として図面に残す。文字の記入とは別に、元に戻せる");
                 AddCheck(tool is DistanceTool ? "方向角も記入" : "周長も記入", MeasureSettings.Detail, v => MeasureSettings.Detail = v,
                     tool is DistanceTool ? "例: L=12.345m  θ=45°00'00\"" : "例: A=123.456m²  (周長 45.678m)");
                 break;

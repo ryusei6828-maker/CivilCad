@@ -928,6 +928,23 @@ public sealed class CadCanvas : FrameworkElement
 
     public void DrawWorldLine(DrawingContext dc, Pen pen, Vec2 a, Vec2 b) => dc.DrawLine(pen, WorldToScreen(a), WorldToScreen(b));
 
+    /// <summary>複数のループ (外形と中抜き) を、偶奇規則で中抜きして塗る (計測した範囲の表示など)。</summary>
+    public void DrawWorldRegionFill(DrawingContext dc, Brush brush, IEnumerable<IReadOnlyList<Vec2>> loops)
+    {
+        var g = new StreamGeometry { FillRule = FillRule.EvenOdd };
+        using (var ctx = g.Open())
+        {
+            foreach (var loop in loops)
+            {
+                if (loop.Count < 3) continue;
+                ctx.BeginFigure(WorldToScreen(loop[0]), true, true);
+                for (var i = 1; i < loop.Count; i++) ctx.LineTo(WorldToScreen(loop[i]), true, false);
+            }
+        }
+        g.Freeze();
+        dc.DrawGeometry(brush, null, g);
+    }
+
     public void DrawWorldPolyline(DrawingContext dc, Pen pen, IReadOnlyList<Vec2> pts, bool closed)
     {
         if (pts.Count > 1) dc.DrawGeometry(null, pen, PolylineGeometry(pts, closed));
