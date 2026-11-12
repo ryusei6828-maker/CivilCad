@@ -64,6 +64,7 @@ public static class CommandRegistry
         new("TR", "トリム", "IconTrim", "境界を選んで Enter → 切り取る部分をクリック。Shift+クリックで延長"),
         new("EX", "延長", "IconExtend", "境界を選んで Enter → 伸ばす端をクリック。Shift+クリックでトリム"),
         new("F", "フィレット", "IconFillet", "半径を入力 → 2 本の線をクリック (残す側) で角を円弧でつなぐ。半径 0 で角を突き合わせる (コーナー)"),
+        new("CHA", "面取り", "IconChamfer", "距離を入力 (2,3 で 1 本目・2 本目を別々に) → 2 本の線をクリック (残す側) で角を斜めに落とす"),
         new("ED", "文字変更", "IconText", "文字をクリックして中身を変える (選択中は文字のダブルクリックでも)"),
         new("E", "削除モード", "IconErase", "クリック (ドラッグで範囲) で消す図形を選び、ダブルクリックか Enter で削除。Esc で終了"),
         new("DI", "距離・方向角", "IconDistance"),

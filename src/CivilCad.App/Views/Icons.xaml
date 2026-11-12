@@ -329,6 +329,13 @@
         <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M4,11 A7,7 0 0 1 11,4"/>
     </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 
+    <DrawingImage x:Key="IconChamfer" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
+        <GeometryDrawing Pen="{StaticResource IcoInkPen}" Geometry="M4,12 L4,4 L12,4"/>
+        <GeometryDrawing Pen="{StaticResource IcoInkThick}" Geometry="M4,22 L4,12 M12,4 L22,4"/>
+        <GeometryDrawing Pen="{StaticResource IcoBluePen}" Geometry="M4,12 L12,4"/>
+    </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+
     <DrawingImage x:Key="IconOffset" po:Freeze="True"><DrawingImage.Drawing><DrawingGroup>
         <GeometryDrawing Brush="Transparent" Geometry="{StaticResource IcoFrame}"/>
         <GeometryDrawing Pen="{StaticResource IcoInkThick}" Geometry="M3,18 L10,18 L18,6"/>

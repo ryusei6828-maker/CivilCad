@@ -283,6 +283,7 @@ public partial class MainWindow : UserControl
             case "TR": StartTool(new TrimTool(), c); break;
             case "EX": StartTool(new ExtendTool(), c); break;
             case "F": StartTool(new FilletTool(), c); break;
+            case "CHA": StartTool(new ChamferTool(), c); break;
             case "ED": StartTool(new TextEditTool(), c); break;
             case "DI": StartTool(new DistanceTool(), c); break;
             case "ID": StartTool(new CoordinateMeasureTool(), c); break;
