@@ -26,6 +26,9 @@ public static class MeasureSettings
 
     private static int _decimals = 3;
 
+    /// <summary>面積の測り方: false = 点を順に指定、true = 境界の図形で囲まれた部分をクリック。</summary>
+    public static bool AreaByRegion { get; set; }
+
     /// <summary>距離なら方向角、面積なら周長も書く。</summary>
     public static bool Detail { get; set; }
 
@@ -88,6 +91,9 @@ public abstract class MeasureToolBase : CadTool, IStyledDrawTool
     protected TextEntity? Pending { get; private set; }
 
     protected Vec2 Cursor { get; private set; }
+
+    /// <summary>置こうとしている文字を取り下げる (測り方を切り替えたとき)。</summary>
+    protected void CancelPending() => Pending = null;
 
     /// <summary>計測が終わった: 記入する設定なら文字を置く手順へ、そうでなければすぐ次の計測へ。</summary>
     protected void Measured(string text, double rotation, TextHAlign halign, TextVAlign valign)
@@ -238,40 +244,170 @@ public sealed class DistanceTool : MeasureToolBase
     }
 }
 
-/// <summary>点を順に指定して面積 (座標法) と周長を求める。結果は文字で記入できる。</summary>
+/// <summary>
+/// 面積 (AA)。測り方は 2 通り (入力バーで切替):
+/// 点を指定 = 頂点を順にクリックして座標法で求める。
+/// 囲まれた部分 = 境界にする図形 (線・ポリライン・円弧・円。1 つの閉じた図形でなくてもよい) を指定し、囲まれた部分の内側をクリックする。
+/// </summary>
 public sealed class AreaTool : MeasureToolBase
 {
+    private static readonly RgbColor BoundaryColor = new(0xFF, 0xAA, 0x33);
+
     private readonly List<Vec2> _points = [];
     private bool _closed;
 
+    // 囲まれた部分モード
+    private readonly List<Entity> _boundary = [];
+    private bool _picking = true;      // true = 境界の指定中、false = 内側のクリック待ち
+    private bool _useAll;              // 何も選ばずに Enter: 表示中のすべての図形を境界にする
+    private Region? _region;
+
+    private static bool ByRegion => MeasureSettings.AreaByRegion;
+
     public override string Name => "面積";
-    public override Vec2? BasePoint => _points.Count > 0 && Pending == null ? _points[^1] : null;
-    protected override bool CanStepBackMeasure => _points.Count > 0;
-    protected override string? MeasureConfirmLabel => _points.Count >= 3 ? "面積を計算 (Enter)" : null;
-    protected override void OnActivated() => SetPrompt("頂点を順に指定 (Enter で計算)");
+    public override Vec2? BasePoint => !ByRegion && _points.Count > 0 && Pending == null ? _points[^1] : null;
+    /// <summary>図形を選ぶ間と内側をクリックする間は、スナップしない (図形そのものをクリックする)。</summary>
+    public override bool WantsSnap => !ByRegion || Pending != null;
+    protected override bool CanStepBackMeasure => ByRegion ? !_picking || _boundary.Count > 0 : _points.Count > 0;
+    protected override string? MeasureConfirmLabel => ByRegion
+        ? (_picking ? (_boundary.Count > 0 ? "境界を確定 (Enter)" : "すべての図形を境界に (Enter)") : "境界の指定に戻る (Enter)")
+        : _points.Count >= 3 ? "面積を計算 (Enter)" : null;
+
+    /// <summary>起動時と、測り方を切り替えたとき: 状態を最初に戻す。</summary>
+    protected override void OnActivated()
+    {
+        CancelPending();
+        _points.Clear();
+        _closed = false;
+        _boundary.Clear();
+        _useAll = false;
+        _region = null;
+        _picking = true;
+        if (ByRegion)
+        {
+            // 選択中の図形があれば、それを境界にして内側のクリックへ
+            _boundary.AddRange(Canvas.Selection.Where(e => ToCurves(e).Any()));
+            _picking = _boundary.Count == 0;
+            PromptRegion();
+        }
+        else SetPrompt("頂点を順に指定 (Enter で計算)");
+    }
+
+    private void PromptRegion()
+    {
+        SetPrompt(_picking
+            ? "境界にする図形をクリック (もう一度クリックで外す。Enter で確定、何も選ばずに Enter なら表示中のすべての図形)"
+            : "囲まれた部分の内側をクリック (右クリック > 一つ戻すで境界の指定に戻る)");
+    }
 
     protected override void StepBackMeasure()
     {
-        if (_points.Count > 0) _points.RemoveAt(_points.Count - 1);
+        if (!ByRegion)
+        {
+            if (_points.Count > 0) _points.RemoveAt(_points.Count - 1);
+            return;
+        }
+        _region = null;
+        if (!_picking)
+        {
+            _picking = true;
+            _useAll = false;
+        }
+        else if (_boundary.Count > 0) _boundary.RemoveAt(_boundary.Count - 1);
+        PromptRegion();
     }
 
     protected override void Restart()
     {
+        if (ByRegion)
+        {
+            // 同じ境界のまま、別の部分を続けて測る
+            _region = null;
+            PromptRegion();
+            return;
+        }
         _points.Clear();
         _closed = false;
-        OnActivated();
+        SetPrompt("頂点を順に指定 (Enter で計算)");
     }
 
     protected override void BackToMeasuring()
     {
+        if (ByRegion)
+        {
+            _region = null;
+            PromptRegion();
+            return;
+        }
         _closed = false;
-        OnActivated();
+        SetPrompt("頂点を順に指定 (Enter で計算)");
     }
 
-    protected override void OnMeasurePoint(Vec2 p) => _points.Add(p);
+    protected override void OnMeasurePoint(Vec2 p)
+    {
+        if (!ByRegion)
+        {
+            _points.Add(p);
+            return;
+        }
+        if (_picking)
+        {
+            if (Canvas.HitTest(p) is not { } hit) return;
+            if (_boundary.Remove(hit)) return;
+            if (!ToCurves(hit).Any())
+            {
+                Canvas.ShowMessage("面積: 線・ポリライン・円弧・円が境界にできます。");
+                return;
+            }
+            _boundary.Add(hit);
+            return;
+        }
+        MeasureRegion(p);
+    }
+
+    private void MeasureRegion(Vec2 p)
+    {
+        var source = _useAll ? Doc.Entities.Where(Doc.IsVisible) : _boundary.Where(e => Doc.Entities.Contains(e));
+        var region = RegionFinder.Find(source.SelectMany(ToCurves), p);
+        if (region == null)
+        {
+            _region = null;
+            Canvas.ShowMessage("囲まれた部分が見つかりません (境界が閉じていない)");
+            return;
+        }
+        double perimeter = region.Perimeter;
+        if (Doc.HasVerticalScale)
+        {
+            // 縦横で縮尺が違えば、縦を直した長さで周長を出す (円弧は細かい弦で近似)
+            perimeter = region.Loops.Sum(l => Enumerable.Range(0, l.Count).Sum(i => Doc.ToRealDelta(l[(i + 1) % l.Count] - l[i]).Length));
+        }
+        var area = region.Area * Doc.VerticalFactor;
+        var u = MeasureSettings.UnitLabel;
+        Canvas.ShowMessage($"面積 = {MeasureSettings.Num(MeasureSettings.Area(area))} {u}²   周長 = {MeasureSettings.Num(MeasureSettings.Length(perimeter))} {u}   (囲まれた部分)");
+        _region = region;
+        Measured(MeasureSettings.AreaText(area, perimeter), 0, TextHAlign.Center, TextVAlign.Middle);
+    }
 
     protected override void OnMeasureEnter()
     {
+        if (ByRegion)
+        {
+            if (_picking)
+            {
+                _useAll = _boundary.Count == 0;
+                _picking = false;
+            }
+            else
+            {
+                // 境界の指定に戻る (空から選び直す)
+                _boundary.Clear();
+                _useAll = false;
+                _picking = true;
+            }
+            _region = null;
+            PromptRegion();
+            return;
+        }
         if (_points.Count == 0)
         {
             Finish();
@@ -300,8 +436,37 @@ public sealed class AreaTool : MeasureToolBase
 
     protected override void DrawMeasurePreview(DrawingContext dc)
     {
+        if (ByRegion)
+        {
+            foreach (var e in _boundary) Canvas.DrawEntity(dc, e, BoundaryColor);
+            if (_region != null)
+                foreach (var loop in _region.Loops) Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen, [.. loop], true);
+            return;
+        }
         if (_points.Count == 0) return;
         Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen, _closed ? _points : [.. _points, Cursor], true);
+    }
+
+    /// <summary>図形を、囲まれた部分を作る境界の曲線にする (対象外の図形は空)。閉じ方はハッチング (HatchTool.ClosedLoop) と同じ。</summary>
+    public static IEnumerable<BoundaryCurve> ToCurves(Entity e)
+    {
+        switch (e)
+        {
+            case LineEntity l:
+                yield return BoundaryCurve.Segment(l.Start, l.End);
+                break;
+            case PolylineEntity pl:
+                var pts = pl.Points;
+                for (var i = 0; i + 1 < pts.Count; i++) yield return BoundaryCurve.Segment(pts[i], pts[i + 1]);
+                if ((pl.IsClosed || pl.Filled) && pts.Count > 2) yield return BoundaryCurve.Segment(pts[^1], pts[0]);
+                break;
+            case ArcEntity a:
+                yield return BoundaryCurve.Arc(a.Center, a.Radius, a.StartAngle, a.Sweep);
+                break;
+            case CircleEntity c:
+                yield return BoundaryCurve.Circle(c.Center, c.Radius);
+                break;
+        }
     }
 }
 

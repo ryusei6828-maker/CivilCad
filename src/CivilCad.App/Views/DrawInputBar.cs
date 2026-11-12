@@ -195,6 +195,13 @@ public sealed class DrawInputBar : Border
                     "オンなら、Enter のあと計算書 (表) を置く位置を指定する");
                 break;
             case MeasureToolBase:
+                if (tool is AreaTool)
+                    AddChoice("測り方", ["点を指定", "囲まれた部分"], MeasureSettings.AreaByRegion ? 1 : 0, i =>
+                    {
+                        MeasureSettings.AreaByRegion = i == 1;
+                        _canvas?.Tool.RefreshPrompt();
+                        _canvas?.RedrawOverlay();
+                    }, "点を指定: 頂点を順にクリック\n囲まれた部分: 境界にする図形 (線・ポリライン・円弧・円) を指定し、囲まれた部分の内側をクリック。選択中の図形があればそれが境界");
                 AddMeasureUnit();
                 AddCheck("結果を文字で記入", MeasureSettings.PlaceText, v => MeasureSettings.PlaceText = v,
                     "オンなら、計測のあと結果の文字がカーソルに付いて動き、クリックした位置に置ける (Enter で置かずに次へ)");
