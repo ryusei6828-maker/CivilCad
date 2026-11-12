@@ -141,4 +141,51 @@ public class RoutePanelTests
         Assert.True(panel.Draw());                // 同じ路線名で作図し直すと置き換え
         Assert.Equal(count, doc.Entities.Count);
     });
+
+    [Fact]
+    public void Panel_ElementMethod_LoadComputeDraw_AndIpToElementSwitch() => RunSta(() =>
+    {
+        var doc = new CadDocument { ScaleDenominator = 500 };
+        var canvas = new CadCanvas { Document = doc };
+        var panel = new RoutePanel();
+        panel.Attach(canvas);
+        (AlignmentInput Input, CivilCad.Alignment.HorizontalAlignment Al)? drawn = null;
+        panel.Drawn += (i, a) => drawn = (i, a);
+
+        // 要素法の入力を読み込む → 計算 → 作図 (IP の図形は無い)
+        var input = new AlignmentInput
+        {
+            Name = "ランプ", IsElementMethod = true, StartName = "S", StartX = 0, StartY = 0, StartAzimuthDeg = 90,
+            ElementRows =
+            [
+                new() { Kind = ElementRow.KindLine, Length = 100 },
+                new() { Kind = ElementRow.KindArc, Length = 78.5398, R1 = 50, Turn = ElementRow.TurnLeft, EndName = "E1" },
+                new() { Kind = ElementRow.KindLine, Length = 100 },
+            ],
+        };
+        panel.Load(input);
+        Assert.True(panel.HasInput);
+        Assert.True(panel.Compute());
+        Assert.True(panel.Result!.IsElementMethod);
+        Assert.Equal(278.5398, panel.Result.Length, 4);
+        Assert.Contains(panel.Passing, p => p.種類 == AlignmentInput.KindMain && p.点名 == "E1");
+        Assert.True(panel.Draw());
+        Assert.True(drawn!.Value.Input.IsElementMethod);
+        Assert.DoesNotContain(doc.Entities, e => e.Layer.Name == AlignmentDrawer.LayerIp);
+
+        // IP 法の入力を読み込み、要素法に切り替えられる (同じ形のまま)
+        panel.Load(AlignmentInput.Sample());
+        Assert.True(panel.Compute());
+        var ipLength = panel.Result!.Length;
+        var combo = panel.MethodCombo;
+        combo.SelectedIndex = 1;
+        Assert.True(panel.HasInput);
+        Assert.True(panel.Compute());
+        Assert.True(panel.Result!.IsElementMethod);
+        Assert.Equal(ipLength, panel.Result.Length, 5);
+
+        // 要素法から IP 法には戻せない
+        combo.SelectedIndex = 0;
+        Assert.Equal(1, combo.SelectedIndex);
+    });
 }

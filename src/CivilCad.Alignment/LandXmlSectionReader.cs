@@ -62,7 +62,7 @@ public static class LandXmlSectionReader
                 try
                 {
                     var read = LandXmlReader.Parse(new XDocument(new XElement(xml.Root!.Name, new XElement(al))));
-                    length = HorizontalAlignment.FromIps(read[0].Ips, start).Length;
+                    length = read[0].ToHorizontal().Length;
                 }
                 catch (AlignmentException) { length = 0; }
             }

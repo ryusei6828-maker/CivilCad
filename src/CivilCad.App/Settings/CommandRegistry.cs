@@ -74,7 +74,7 @@ public static class CommandRegistry
         new("RL", "路線作成 (路線パネル)", "IconRoute", "始点 → IP → 終点 を表で入れる (図面から・手入力・Excel から貼り付け)。計算して通過点 (No.杭の間隔・中間杭) を選んで作図"),
         new("RLF", "路線パネル フロート/ドッキング", "IconRoute", "別ウィンドウに切り離す / 左側に戻す"),
         new("RC", "路線計算 (IP法)", "IconRoute"),
-        new("RX", "路線 XML (LandXML) 読込", "IconRoute", "J-LandXML の平面線形を IP 表にして路線計算を開く"),
+        new("RX", "路線 XML (LandXML) 読込", "IconRoute", "J-LandXML の平面線形を IP 表 (要素法の路線・卵形クロソイドは要素表) にして路線計算を開く"),
         new("RXO", "路線 XML (LandXML) 出力", "IconRoute", "路線パネルの路線 (無ければ最後に作図した路線) を、平面線形・IP・測点間隔の LandXML (J-LandXML の並び) に書き出す"),
         new("VX", "縦横断図 (LandXML)", "IconRoute", "LandXML の縦断・横断 (CivilCadPoint・CivilCad3D の書き出し) から縦断図・横断図のシートを作る"),
         new("ST", "測点照会", "IconStation"),

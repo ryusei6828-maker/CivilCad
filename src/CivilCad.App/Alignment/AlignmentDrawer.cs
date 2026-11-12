@@ -34,9 +34,9 @@ public static class AlignmentDrawer
         var h = doc.PaperMmToMeters(input.TextHeightMm);
         var list = new List<Entity>();
 
-        // IP 線と IP 名
-        var ips = input.Rows.Where(r => !string.IsNullOrWhiteSpace(r.Name) || r.X != 0 || r.Y != 0).ToList();
-        list.Add(new PolylineEntity(ipLayer, ips.Select(r => Vec2.FromSurvey(r.X, r.Y))));
+        // IP 線と IP 名 (要素法には IP が無い)
+        var ips = al.IsElementMethod ? [] : input.Rows.Where(r => !string.IsNullOrWhiteSpace(r.Name) || r.X != 0 || r.Y != 0).ToList();
+        if (ips.Count > 0) list.Add(new PolylineEntity(ipLayer, ips.Select(r => Vec2.FromSurvey(r.X, r.Y))));
         foreach (var r in ips)
         {
             var p = Vec2.FromSurvey(r.X, r.Y);
@@ -59,7 +59,8 @@ public static class AlignmentDrawer
                         ? new ArcEntity(centerLayer, a.Center, a.Radius, sa, ea)
                         : new ArcEntity(centerLayer, a.Center, a.Radius, ea, sa));
                     break;
-                case ClothoidElement c:
+                case ClothoidElement or SpiralElement:
+                    var c = e;
                     var n = Math.Max(8, (int)Math.Ceiling(c.Length));
                     list.Add(new PolylineEntity(centerLayer, Enumerable.Range(0, n + 1).Select(k => c.Evaluate(c.Length * k / n).Point)));
                     break;

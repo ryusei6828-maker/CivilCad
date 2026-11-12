@@ -1947,7 +1947,7 @@ public partial class MainWindow : UserControl
         if (!_routeDock.IsOpen) SetPanelOpen(_routeDock, true);
         foreach (var t in RibbonTabs.Items.OfType<TabItem>())
             if ((string)t.Header == "路線") RibbonTabs.SelectedItem = t;
-        if (RoutePanel.Rows.All(r => r.IsEmpty) && _alignment != null) RoutePanel.Load(_alignmentInput);
+        if (!RoutePanel.HasInput && _alignment != null) RoutePanel.Load(_alignmentInput);
         Log("路線: 左の路線パネルで 始点 → IP → 終点 を入れ (「図面から追加」でクリック、手入力、Excel から Ctrl+V)、「計算」→ 通過点を選んで「作図」。");
     }
 
@@ -1957,7 +1957,7 @@ public partial class MainWindow : UserControl
     /// </summary>
     private void ExportRouteXml()
     {
-        if (RoutePanel.Rows.Any(r => !r.IsEmpty))
+        if (RoutePanel.HasInput)
         {
             if (!_routeDock.IsOpen) SetPanelOpen(_routeDock, true);
             if (!RoutePanel.ExportXml() && RoutePanel.Result == null) Log("路線 XML 出力: 路線パネルの表を直してください (エラーは路線パネルに出ています)。");

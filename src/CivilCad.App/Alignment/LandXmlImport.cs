@@ -37,7 +37,9 @@ public static class LandXmlImport
 
         if (list.Count == 1) return AlignmentInput.FromLandXml(list[0], textHeightMm);
         var index = Pick(owner, "このファイルには路線が複数あります。読み込む路線を選んでください。",
-            list.Select(a => $"{a.Name}    (IP {a.Ips.Count - 2} 点、延長 {a.FileLength:F3} m)").ToList());
+            list.Select(a => (a.IsElementMethod || !a.HasIps) && a.HasElements
+                ? $"{a.Name}    (要素法 {a.Elements!.Count} 要素、延長 {a.FileLength:F3} m)"
+                : $"{a.Name}    (IP {a.Ips.Count - 2} 点、延長 {a.FileLength:F3} m)").ToList());
         return index < 0 ? null : AlignmentInput.FromLandXml(list[index], textHeightMm);
     }
 

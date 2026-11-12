@@ -69,6 +69,9 @@ public static class LandXmlWriter
         if (ips is { Count: > 0 })
             al.Add(new XElement(Ns + "AlignPIs",
                 ips.Select(ip => new XElement(Ns + "AlignPI", new XElement(Ns + "PI", new XAttribute("name", ip.Name), P(ip.Point))))));
+        if (h.IsElementMethod)
+            al.Add(new XElement(Ns + "Feature", new XAttribute("name", "Horizontal"),
+                new XElement(Ns + "Property", new XAttribute("label", "method"), new XAttribute("value", "要素法"))));
         if (pitch > 0)
             al.Add(new XElement(Ns + "Feature", new XAttribute("name", "Interval"),
                 new XElement(Ns + "Property", new XAttribute("label", "main"), new XAttribute("value", F(pitch)))));
@@ -91,12 +94,20 @@ public static class LandXmlWriter
                     start,
                     new XElement(Ns + "Center", P(arc.Center)),
                     end);
+            case SpiralElement sp:
+                return new XElement(Ns + "Spiral", common,
+                    new XAttribute("radiusStart", double.IsInfinity(sp.RadiusStart) ? "INF" : F(sp.RadiusStart)),
+                    new XAttribute("radiusEnd", double.IsInfinity(sp.RadiusEnd) ? "INF" : F(sp.RadiusEnd)),
+                    new XAttribute("rot", sp.Turn > 0 ? "ccw" : "cw"),
+                    new XAttribute("spiType", "clothoid"),
+                    start,
+                    new XElement(Ns + "PI", P(TangentIntersection(e))),
+                    end,
+                    new XElement(Ns + "Feature",
+                        new XElement(Ns + "Property", new XAttribute("label", "A"), new XAttribute("value", F(sp.A)))));
             case ClothoidElement cl:
                 // PI = 始点と終点の接線の交点
-                var u = Vec2.FromAngle(e.StartDirection);
-                var v = Vec2.FromAngle(e.EndDirection);
-                var den = u.Cross(v);
-                var pi = Math.Abs(den) < 1e-12 ? (s + t) / 2 : s + u * ((t - s).Cross(v) / den);
+                var pi = TangentIntersection(e);
                 return new XElement(Ns + "Spiral", common,
                     new XAttribute("radiusStart", cl.Entering ? "INF" : F(cl.Radius)),
                     new XAttribute("radiusEnd", cl.Entering ? F(cl.Radius) : "INF"),
@@ -110,6 +121,17 @@ public static class LandXmlWriter
             default:
                 return new XElement(Ns + "Line", common, start, end);
         }
+    }
+
+    /// <summary>要素の始点と終点の接線の交点 (平行なら中点)。</summary>
+    private static Vec2 TangentIntersection(HorizontalElement e)
+    {
+        var s = e.StartPoint;
+        var t = e.EndPoint;
+        var u = Vec2.FromAngle(e.StartDirection);
+        var v = Vec2.FromAngle(e.EndDirection);
+        var den = u.Cross(v);
+        return Math.Abs(den) < 1e-12 ? (s + t) / 2 : s + u * ((t - s).Cross(v) / den);
     }
 
     /// <summary>その追加距離にある主要点の名前 (無ければ null)。</summary>

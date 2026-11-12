@@ -37,6 +37,17 @@ public sealed class RoutePanel : DockPanel
     private readonly CheckBox _stake = new() { Content = "幅杭", IsChecked = true };
     private readonly TextBox _textHeight = new() { Width = 50, Text = "3.5" };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4) };
+    private readonly ObservableCollection<ElementRow> _elementRows = [];
+    private readonly ComboBox _method = new() { Width = 80, Margin = new Thickness(0, 0, 10, 0), ToolTip = "IP法: IP (交点) と R・A で決める。要素法: 始点・方向角と、直線・円曲線・クロソイドの要素を順に並べて決める (IP法から要素法への変換はできるが、戻せない)" };
+    private readonly TextBox _startName = new() { Width = 50, Text = "BP", Margin = new Thickness(0, 0, 8, 0) };
+    private readonly TextBox _startX = new() { Width = 90, Margin = new Thickness(0, 0, 8, 0) };
+    private readonly TextBox _startY = new() { Width = 90, Margin = new Thickness(0, 0, 8, 0) };
+    private readonly TextBox _startDir = new() { Width = 120, ToolTip = "始点の方向角。北を 0 として時計回り。度の小数 (123.4567) か 度分秒 (123°45'06.7\") で入れる" };
+    private DataGrid _elementGrid = null!;
+    private GroupBox _ipBox = null!;
+    private GroupBox _elementBox = null!;
+    private WrapPanel _ipButtons = null!;
+    private bool _elementMode;
     private CadCanvas? _canvas;
     private HorizontalAlignment? _result;
     private AlignmentInput _resultInput = new();
@@ -57,6 +68,9 @@ public sealed class RoutePanel : DockPanel
     public IReadOnlyList<PassingRow> Passing => _passing;
     public HorizontalAlignment? Result => _result;
     public DataGrid Grid => _grid;
+
+    /// <summary>計算方法 (IP法 / 要素法) の選択 (テスト用)。</summary>
+    public ComboBox MethodCombo => _method;
 
     /// <summary>通過点の一覧の 1 行。</summary>
     public sealed record PassingRow(string 点名, string 種類, string 追加距離, string X, string Y);
@@ -97,6 +111,12 @@ public sealed class RoutePanel : DockPanel
 
         // 路線名・開始追加距離
         var top = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        _method.Items.Add("IP法");
+        _method.Items.Add("要素法");
+        _method.SelectedIndex = 0;
+        _method.SelectionChanged += (_, _) => MethodChanged();
+        top.Children.Add(Label("計算方法"));
+        top.Children.Add(_method);
         top.Children.Add(Label("路線名"));
         top.Children.Add(_name);
         top.Children.Add(Label("開始追加距離 (m)"));
@@ -105,6 +125,7 @@ public sealed class RoutePanel : DockPanel
 
         // 表の操作
         var buttons = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        _ipButtons = buttons;
         Button B(string text, string tip, Action run)
         {
             var b = new Button { Content = text, Padding = new Thickness(8, 1, 8, 1), Margin = new Thickness(0, 0, 4, 4), ToolTip = tip };
@@ -168,7 +189,10 @@ public sealed class RoutePanel : DockPanel
         SetDock(note, Dock.Top);
         tableBox.Children.Add(note);
         tableBox.Children.Add(_grid);
-        Put(new GroupBox { Header = "始点 → IP → 終点", Content = tableBox }, 2);
+        _ipBox = new GroupBox { Header = "始点 → IP → 終点", Content = tableBox };
+        Put(_ipBox, 2);
+        BuildElementBox();
+        Put(_elementBox, 2);
 
         // 計算
         var calc = new StackPanel();
@@ -235,6 +259,139 @@ public sealed class RoutePanel : DockPanel
         Put(bottom, 6);
     }
 
+    /// <summary>要素法の入力 (始点・方向角・要素表) を組み立てる。</summary>
+    private void BuildElementBox()
+    {
+        var dock = new DockPanel();
+        var start = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        start.Children.Add(Label("始点名"));
+        start.Children.Add(_startName);
+        start.Children.Add(Label("X (北)"));
+        start.Children.Add(_startX);
+        start.Children.Add(Label("Y (東)"));
+        start.Children.Add(_startY);
+        start.Children.Add(Label("方向角"));
+        start.Children.Add(_startDir);
+        SetDock(start, Dock.Top);
+        dock.Children.Add(start);
+
+        var btns = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        void B(string text, string tip, Action run)
+        {
+            var b = new Button { Content = text, Padding = new Thickness(8, 1, 8, 1), Margin = new Thickness(0, 0, 4, 4), ToolTip = tip };
+            b.Click += (_, _) => run();
+            btns.Children.Add(b);
+        }
+        B("行を挿入", "選んだ行の前に空の行を入れる", () =>
+        {
+            var i = _elementGrid.SelectedItem is ElementRow r ? _elementRows.IndexOf(r) : _elementRows.Count;
+            _elementRows.Insert(Math.Max(0, i), new ElementRow());
+            Invalidate();
+        });
+        B("行を削除", "選んだ行を消す", () =>
+        {
+            foreach (var r in _elementGrid.SelectedItems.OfType<ElementRow>().ToList()) _elementRows.Remove(r);
+            Invalidate();
+        });
+        B("全部消す", "要素表を空にする", () => { _elementRows.Clear(); Invalidate(); });
+        SetDock(btns, Dock.Top);
+        dock.Children.Add(btns);
+
+        var note = new TextBlock
+        {
+            Text = "始点から順に 直線・円曲線・クロソイド をつなぐ (前の要素の終点から続く)。R が空・0 は ∞ (クロソイドの直線側)。" +
+                   "円曲線は始点 R、クロソイドは始点 R と終点 R (両方に値があれば卵形)。A は表示のみ。座標は測量座標 (X = 北、Y = 東)。",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brushes.Gray,
+            Margin = new Thickness(0, 0, 0, 3),
+        };
+        SetDock(note, Dock.Top);
+        dock.Children.Add(note);
+
+        _elementGrid = new DataGrid
+        {
+            ItemsSource = _elementRows,
+            AutoGenerateColumns = false,
+            CanUserAddRows = true,
+            CanUserDeleteRows = false,
+            CanUserSortColumns = false,
+            SelectionUnit = DataGridSelectionUnit.FullRow,
+            SelectionMode = DataGridSelectionMode.Extended,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.All,
+        };
+        _elementGrid.Columns.Add(new DataGridComboBoxColumn
+        {
+            Header = "要素",
+            ItemsSource = ElementRow.Kinds,
+            SelectedItemBinding = new Binding(nameof(ElementRow.Kind)) { UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
+            Width = 80,
+        });
+        DataGridTextColumn Col(string header, string path, double width, bool readOnly = false)
+        {
+            var binding = new Binding(path) { UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged, Mode = readOnly ? BindingMode.OneWay : BindingMode.TwoWay };
+            if (readOnly) binding.StringFormat = "0.###";
+            return new DataGridTextColumn
+            {
+                Header = header,
+                Binding = binding,
+                IsReadOnly = readOnly,
+                Width = width > 0 ? new DataGridLength(width) : new DataGridLength(1, DataGridLengthUnitType.Star),
+            };
+        }
+        _elementGrid.Columns.Add(Col("延長", nameof(ElementRow.Length), 0));
+        _elementGrid.Columns.Add(Col("始点 R", nameof(ElementRow.R1), 0));
+        _elementGrid.Columns.Add(Col("終点 R", nameof(ElementRow.R2), 0));
+        _elementGrid.Columns.Add(new DataGridComboBoxColumn
+        {
+            Header = "回転",
+            ItemsSource = ElementRow.Turns,
+            SelectedItemBinding = new Binding(nameof(ElementRow.Turn)) { UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged },
+            Width = 55,
+        });
+        _elementGrid.Columns.Add(Col("A", nameof(ElementRow.A), 60, readOnly: true));
+        _elementGrid.Columns.Add(Col("終点名", nameof(ElementRow.EndName), 70));
+        _elementGrid.CellEditEnding += (_, _) => Invalidate();
+        foreach (var t in new[] { _startName, _startX, _startY, _startDir }) t.TextChanged += (_, _) => Invalidate();
+        dock.Children.Add(_elementGrid);
+        _elementBox = new GroupBox { Header = "要素法: 始点・方向角 → 要素", Content = dock, Visibility = Visibility.Collapsed };
+    }
+
+    /// <summary>入力があるか (IP 表または要素表に何か入っている)。</summary>
+    public bool HasInput => _elementMode ? _elementRows.Any(r => !r.IsEmpty) : _rows.Any(r => !r.IsEmpty);
+
+    /// <summary>今の計算方法に合わせて表示 (IP 表 / 要素表) を切り替える。</summary>
+    private void ShowMode()
+    {
+        var loading = _loading;
+        _loading = true;
+        _method.SelectedIndex = _elementMode ? 1 : 0;
+        _loading = loading;
+        _ipBox.Visibility = _elementMode ? Visibility.Collapsed : Visibility.Visible;
+        _ipButtons.Visibility = _elementMode ? Visibility.Collapsed : Visibility.Visible;
+        _elementBox.Visibility = _elementMode ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void MethodChanged()
+    {
+        if (_loading) return;
+        var toElement = _method.SelectedIndex == 1;
+        if (toElement == _elementMode) return;
+        if (!toElement)
+        {
+            _status.Foreground = Brushes.Firebrick;
+            _status.Text = "要素法から IP 法には戻せません (IP 法で作り直すか、IP 法の路線 XML を読み込んでください)。";
+            ShowMode();
+            return;
+        }
+        // IP 法 → 要素法: 今の表を計算した線形の要素を要素表にする
+        if (!Compute()) { ShowMode(); return; }
+        var input = _resultInput.Clone();
+        input.SetElementsFrom(_result!);
+        Load(input);
+        Compute();
+    }
+
     private static TextBlock Label(string text) => new() { Text = text, VerticalAlignment = System.Windows.VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) };
 
     public void Attach(CadCanvas canvas) => _canvas = canvas;
@@ -253,8 +410,22 @@ public sealed class RoutePanel : DockPanel
         _shoulder.IsChecked = input.DrawShoulders;
         _stake.IsChecked = input.DrawStakes;
         _textHeight.Text = input.TextHeightMm.ToString(CultureInfo.InvariantCulture);
+        _elementMode = input.IsElementMethod;
         _rows.Clear();
-        foreach (var r in RouteTable.FromInput(input)) _rows.Add(r);
+        _elementRows.Clear();
+        if (input.IsElementMethod)
+        {
+            foreach (var r in input.ElementRows) _elementRows.Add(r.Clone());
+            _startName.Text = input.StartName;
+            _startX.Text = input.StartX.ToString("0.000", CultureInfo.InvariantCulture);
+            _startY.Text = input.StartY.ToString("0.000", CultureInfo.InvariantCulture);
+            _startDir.Text = Angles.ToDms(input.StartAzimuthDeg * Math.PI / 180, 3);
+        }
+        else
+        {
+            foreach (var r in RouteTable.FromInput(input)) _rows.Add(r);
+        }
+        ShowMode();
         _loading = false;
         Invalidate();
     }
@@ -394,6 +565,8 @@ public sealed class RoutePanel : DockPanel
     {
         _grid.CommitEdit();
         _grid.CommitEdit();
+        _elementGrid.CommitEdit();
+        _elementGrid.CommitEdit();
         var settings = new AlignmentInput
         {
             Name = string.IsNullOrWhiteSpace(_name.Text) ? "路線1" : _name.Text.Trim(),
@@ -414,6 +587,17 @@ public sealed class RoutePanel : DockPanel
         if (!(settings.TextHeightMm > 0)) throw new AlignmentException("文字高は 0 より大きい数値にしてください。");
         AlignmentInput.ParseWidths(settings.LeftWidths, "左の幅");
         AlignmentInput.ParseWidths(settings.RightWidths, "右の幅");
+        if (_elementMode)
+        {
+            settings.IsElementMethod = true;
+            settings.StartName = string.IsNullOrWhiteSpace(_startName.Text) ? "BP" : _startName.Text.Trim();
+            settings.StartX = Num(_startX.Text, "始点の X");
+            settings.StartY = Num(_startY.Text, "始点の Y");
+            if (!Angles.TryParseDegrees(_startDir.Text, out var rad)) throw new AlignmentException("始点の方向角が読めません (例: 123.4567 または 123°45'06.7\")。");
+            settings.StartAzimuthDeg = rad * 180 / Math.PI;
+            settings.ElementRows = [.. _elementRows.Where(r => !r.IsEmpty).Select(r => r.Clone())];
+            return settings;
+        }
         return RouteTable.ToInput(_rows, settings);
     }
 
@@ -422,13 +606,13 @@ public sealed class RoutePanel : DockPanel
     {
         try
         {
-            RouteTable.FixKinds(_rows);
+            if (!_elementMode) RouteTable.FixKinds(_rows);
             _resultInput = BuildInput();
             _result = _resultInput.Compute();
             ShowPassing();
             _status.Foreground = Brushes.DarkGreen;
             _status.Text = $"延長 {_result.Length:F3} m ({Station.Format(_result.StartStation, _resultInput.Pitch)} 〜 {Station.Format(_result.EndStation, _resultInput.Pitch)})、" +
-                           $"曲線 {_result.Curves.Count(c => c.Radius > 0)} 箇所、通過点 {_passing.Count} 点。通過点を選んで「作図」を押してください。";
+                           $"{(_result.IsElementMethod ? $"要素 {_result.Elements.Count} 個" : $"曲線 {_result.Curves.Count(c => c.Radius > 0)} 箇所")}、通過点 {_passing.Count} 点。通過点を選んで「作図」を押してください。";
             return true;
         }
         catch (AlignmentException ex)

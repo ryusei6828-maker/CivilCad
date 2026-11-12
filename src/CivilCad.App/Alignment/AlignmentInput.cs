@@ -15,6 +15,90 @@ public sealed class IpRow
     public double A2 { get; set; }
 }
 
+/// <summary>
+/// 要素表の 1 行 (要素法)。種類は 直線 / 円曲線 / クロソイド。R が 0 または空は ∞ (クロソイドの直線側)。
+/// 回転は 右 / 左 (直線は不要)。A はクロソイドの パラメータ (表示のみ。A² = L / |1/R2 − 1/R1|)。
+/// </summary>
+public sealed class ElementRow : System.ComponentModel.INotifyPropertyChanged
+{
+    public const string KindLine = "直線";
+    public const string KindArc = "円曲線";
+    public const string KindClothoid = "クロソイド";
+    public const string TurnRight = "右";
+    public const string TurnLeft = "左";
+
+    public static IReadOnlyList<string> Kinds { get; } = [KindLine, KindArc, KindClothoid];
+    public static IReadOnlyList<string> Turns { get; } = ["", TurnRight, TurnLeft];
+
+    private string _kind = KindLine, _turn = "", _endName = "";
+    private double _length, _r1, _r2;
+
+    public string Kind { get => _kind; set { _kind = value ?? KindLine; Changed(nameof(Kind)); Changed(nameof(A)); } }
+    public double Length { get => _length; set { _length = value; Changed(nameof(Length)); Changed(nameof(A)); } }
+    /// <summary>始点の半径 (円曲線はこの半径)。0 は ∞。</summary>
+    public double R1 { get => _r1; set { _r1 = value; Changed(nameof(R1)); Changed(nameof(A)); } }
+    /// <summary>終点の半径 (クロソイドのみ)。0 は ∞。</summary>
+    public double R2 { get => _r2; set { _r2 = value; Changed(nameof(R2)); Changed(nameof(A)); } }
+    public string Turn { get => _turn; set { _turn = value ?? ""; Changed(nameof(Turn)); } }
+    public string EndName { get => _endName; set { _endName = value ?? ""; Changed(nameof(EndName)); } }
+
+    /// <summary>クロソイドパラメータ (表示のみ。クロソイド以外・半径が決まらないときは 0)。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double A => ToDefOrNull()?.A ?? 0;
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsEmpty => _length == 0 && _r1 == 0 && _r2 == 0 && _endName.Trim().Length == 0;
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private void Changed(string name) => PropertyChanged?.Invoke(this, new(name));
+
+    public ElementRow Clone() => new() { Kind = Kind, Length = Length, R1 = R1, R2 = R2, Turn = Turn, EndName = EndName };
+
+    private ElementDef? ToDefOrNull()
+    {
+        try { return ToDef(0); }
+        catch (AlignmentException) { return null; }
+    }
+
+    /// <summary>計算用の要素にする。正しくなければ AlignmentException (何番目か付き。index は 0 始まり)。</summary>
+    public ElementDef ToDef(int index)
+    {
+        var no = $"{index + 1} 行目の要素";
+        var name = _endName.Trim().Length > 0 ? _endName.Trim() : null;
+        if (!(_length > 0)) throw new AlignmentException($"{no}: 延長は 0 より大きい数値にしてください。");
+        var turn = _turn == TurnLeft ? 1 : _turn == TurnRight ? -1 : 0;
+        static double Rad(double r) => r > 0 ? r : double.PositiveInfinity;
+        switch (_kind)
+        {
+            case KindArc:
+                if (!(_r1 > 0)) throw new AlignmentException($"{no}: 円曲線の半径 (始点 R) を入れてください。");
+                if (turn == 0) throw new AlignmentException($"{no}: 回転 (右・左) を選んでください。");
+                return ElementDef.Arc(_length, _r1, turn, name);
+            case KindClothoid:
+                if (!(_r1 > 0) && !(_r2 > 0)) throw new AlignmentException($"{no}: クロソイドの始点 R か終点 R のどちらかを入れてください (空は ∞)。");
+                if (turn == 0) throw new AlignmentException($"{no}: 回転 (右・左) を選んでください。");
+                return ElementDef.Spiral(_length, Rad(_r1), Rad(_r2), turn, name);
+            default:
+                return ElementDef.Line(_length, name);
+        }
+    }
+
+    /// <summary>要素の定義から行を作る (読み込んだ路線・IP 法の線形を要素表にするとき)。</summary>
+    public static ElementRow FromDef(ElementDef d)
+    {
+        static double R(double r) => double.IsInfinity(r) || r <= 0 ? 0 : r;
+        return new ElementRow
+        {
+            Kind = d.Kind switch { ElementKind.Arc => KindArc, ElementKind.Clothoid => KindClothoid, _ => KindLine },
+            Length = d.Length,
+            R1 = d.Kind == ElementKind.Line ? 0 : R(d.RadiusStart),
+            R2 = d.Kind == ElementKind.Clothoid ? R(d.RadiusEnd) : 0,
+            Turn = d.Turn > 0 ? TurnLeft : d.Turn < 0 ? TurnRight : "",
+            EndName = d.EndName ?? "",
+        };
+    }
+}
+
 /// <summary>通過点 (中心杭・中間杭・主要点) の 1 つ。Point は測量座標から作った図面の座標 (x = 東, y = 北)。</summary>
 public sealed record PassingPoint(string Name, string Kind, double Station, Vec2 Point);
 
@@ -36,6 +120,18 @@ public sealed class AlignmentInput
     /// <summary>注記の文字高 (用紙上の mm)。図面の縮尺で m に換算する。</summary>
     public double TextHeightMm { get; set; } = 3.5;
     public ObservableCollection<IpRow> Rows { get; set; } = [];
+
+    /// <summary>true なら要素法 (始点・方向角・要素表で線形を決める)。false (昔のファイルも) は IP 法。</summary>
+    public bool IsElementMethod { get; set; }
+
+    /// <summary>要素法の始点の名前・座標 (測量座標 X = 北, Y = 東)・方向角 (測量の方向角, 北 = 0 で時計回り, 度の小数)。</summary>
+    public string StartName { get; set; } = "BP";
+    public double StartX { get; set; }
+    public double StartY { get; set; }
+    public double StartAzimuthDeg { get; set; }
+
+    /// <summary>要素法の要素表。</summary>
+    public ObservableCollection<ElementRow> ElementRows { get; set; } = [];
 
     /// <summary>中心線から左の幅 (m)。カンマ区切りで複数 (例: "3.0, 5.5" = 路肩 3.0m・用地 5.5m)。空なら作図しない。</summary>
     public string LeftWidths { get; set; } = "";
@@ -109,6 +205,13 @@ public sealed class AlignmentInput
 
     public HorizontalAlignment Compute()
     {
+        if (IsElementMethod)
+        {
+            var defs = ElementRows.Where(r => !r.IsEmpty).Select((r, i) => r.ToDef(i)).ToList();
+            if (defs.Count == 0) throw new AlignmentException("要素を 1 つ以上入れてください。");
+            return HorizontalAlignment.FromElements(Vec2.FromSurvey(StartX, StartY), Angles.FromSurveyAzimuth(StartAzimuthDeg * Math.PI / 180),
+                defs, StartStation, StartName);
+        }
         var rows = Rows.Where(r => !string.IsNullOrWhiteSpace(r.Name) || r.X != 0 || r.Y != 0).ToList();
         var ips = rows.Select((r, i) => new IntersectionPoint(
             string.IsNullOrWhiteSpace(r.Name) ? $"IP{i}" : r.Name.Trim(),
@@ -116,8 +219,47 @@ public sealed class AlignmentInput
         return HorizontalAlignment.FromIps(ips, StartStation);
     }
 
-    /// <summary>LandXML から読んだ路線を IP 表にする (文字高は今の値を引き継ぐ)。</summary>
-    public static AlignmentInput FromLandXml(LandXmlAlignment a, double textHeightMm) => new()
+    /// <summary>
+    /// 計算した線形 (IP 法でも要素法でも) の要素を要素表にして、要素法に切り替える (IP 表はそのまま残す)。
+    /// 始点・方向角・各要素の終点名 (主要点の名前) も入れる。
+    /// </summary>
+    public void SetElementsFrom(HorizontalAlignment al)
+    {
+        var first = al.Elements[0];
+        var (x, y) = first.StartPoint.ToSurvey();
+        StartX = x;
+        StartY = y;
+        StartAzimuthDeg = Angles.ToSurveyAzimuth(first.StartDirection) * 180 / Math.PI;
+        StartName = al.MainPoints.Count > 0 ? al.MainPoints[0].Name : "BP";
+        ElementRows = [.. al.Elements.Select(e => ElementRow.FromDef(ElementDef.FromElement(e,
+            al.MainPoints.Skip(1).FirstOrDefault(m => Math.Abs(m.Station - e.EndStation) < 1e-6)?.Name)))];
+        IsElementMethod = true;
+    }
+
+    /// <summary>LandXML から読んだ路線を入力にする (要素法の路線・IP 法で表せない路線は要素表、ほかは IP 表。文字高は今の値を引き継ぐ)。</summary>
+    public static AlignmentInput FromLandXml(LandXmlAlignment a, double textHeightMm)
+    {
+        if ((a.IsElementMethod || !a.HasIps) && a.HasElements)
+        {
+            var (sx, sy) = a.ElementStart.ToSurvey();
+            return new AlignmentInput
+            {
+                Name = a.Name,
+                StartStation = a.StartStation,
+                Pitch = a.Pitch ?? Station.DefaultPitch,
+                TextHeightMm = textHeightMm,
+                IsElementMethod = true,
+                StartName = a.StartName ?? "BP",
+                StartX = sx,
+                StartY = sy,
+                StartAzimuthDeg = Angles.ToSurveyAzimuth(a.ElementStartDirection) * 180 / Math.PI,
+                ElementRows = [.. a.Elements!.Select(ElementRow.FromDef)],
+            };
+        }
+        return FromLandXmlIps(a, textHeightMm);
+    }
+
+    private static AlignmentInput FromLandXmlIps(LandXmlAlignment a, double textHeightMm) => new()
     {
         Name = a.Name,
         StartStation = a.StartStation,
@@ -147,5 +289,11 @@ public sealed class AlignmentInput
         IncludeMainPoints = IncludeMainPoints,
         RegisterPoints = RegisterPoints,
         Rows = [.. Rows.Select(r => new IpRow { Name = r.Name, X = r.X, Y = r.Y, R = r.R, A1 = r.A1, A2 = r.A2 })],
+        IsElementMethod = IsElementMethod,
+        StartName = StartName,
+        StartX = StartX,
+        StartY = StartY,
+        StartAzimuthDeg = StartAzimuthDeg,
+        ElementRows = [.. ElementRows.Select(r => r.Clone())],
     };
 }

@@ -4,13 +4,40 @@ using CivilCad.Core.Geometry;
 
 namespace CivilCad.Alignment;
 
-/// <summary>LandXML (J-LandXML) から読み込んだ 1 路線。IP は CAD 座標。</summary>
+/// <summary>
+/// LandXML (J-LandXML) から読み込んだ 1 路線。IP は CAD 座標。
+/// IsElementMethod = 採用した方法 (読み込み時に決める。IP 法の線形がファイルの点を 5mm 以内で再現できれば IP 法、できなければ要素法)。
+/// FlaggedElementMethod = ファイルの方法の印が「要素法」。Ips は IP 法を採用したときだけ入る (要素法では空)。
+/// Elements・ElementStart・ElementStartDirection は要素の並び (どの線形でも読める)。
+/// </summary>
 public sealed record LandXmlAlignment(
     string Name,
     double StartStation,
     double? Pitch,
     IReadOnlyList<IntersectionPoint> Ips,
-    double FileLength);
+    double FileLength,
+    IReadOnlyList<ElementDef>? Elements = null,
+    Vec2 ElementStart = default,
+    double ElementStartDirection = 0,
+    string? StartName = null,
+    bool IsElementMethod = false,
+    bool FlaggedElementMethod = false)
+{
+    /// <summary>IP 表で線形を作れる (2 点以上)。</summary>
+    public bool HasIps => Ips.Count >= 2;
+
+    /// <summary>採用した方法が要素法 (IsElementMethod と同じ)。</summary>
+    public bool UseElementMethod => IsElementMethod;
+
+    /// <summary>要素の並びがある。</summary>
+    public bool HasElements => Elements is { Count: > 0 };
+
+    /// <summary>平面線形にする。要素法の路線 (または IP 表が無い路線) は要素から、IP 法の路線は IP 表から作る。</summary>
+    public HorizontalAlignment ToHorizontal() =>
+        (IsElementMethod || !HasIps) && HasElements
+            ? HorizontalAlignment.FromElements(ElementStart, ElementStartDirection, Elements!, StartStation, StartName)
+            : HorizontalAlignment.FromIps(Ips, StartStation);
+}
 
 /// <summary>
 /// LandXML の平面線形 (Alignment/CoordGeom の Line・Curve・Spiral) を読み、IP 法の IP 表に直す。
@@ -30,26 +57,77 @@ public static class LandXmlReader
         {
             if (Child(al, "CoordGeom") is not { } geom) continue;
             var name = (string?)al.Attribute("name") is { Length: > 0 } n ? n : $"路線{list.Count + 1}";
+            var elems = ReadElems(name, geom);
+            var flagged = IsElementMethod(al);
+            var fileLength = Num(al.Attribute("length")) ?? double.NaN;
+            var startStation = Num(al.Attribute("staStart")) ?? 0;
+            var defs = elems.Select(e => new ElementDef(e.Kind switch { "Line" => ElementKind.Line, "Curve" => ElementKind.Arc, _ => ElementKind.Clothoid },
+                e.Length, e.RadiusStart, e.RadiusEnd, e.Turn, e.EndName)).ToList();
+            // 方法の判定 (精度優先): IP 表が作れて、IP 法の線形がファイルの要素の点・延長を 5mm 以内で再現できれば IP 法。
+            // そうでなければ (IP が作れない・合わない) 要素法。ファイルの方法の印だけでは決めない。
+            List<IntersectionPoint> ips = [];
+            AlignmentException? ipError = null;
+            try
+            {
+                ips = ToIps(name, elems, ReadAlignPis(al));
+            }
+            catch (AlignmentException ex)
+            {
+                ipError = ex;
+            }
+            var useElement = ips.Count < 2 || !IpsReproduce(ips, elems, startStation, fileLength);
+            if (useElement)
+            {
+                ips = [];
+                // 要素からも線形を作れなければ、IP 変換のエラーをそのまま返す
+                try { HorizontalAlignment.FromElements(elems[0].Start, elems[0].DirStart, defs); }
+                catch (AlignmentException ex) { throw new AlignmentException(ipError?.Message ?? ex.Message); }
+            }
             list.Add(new LandXmlAlignment(
                 name,
-                Num(al.Attribute("staStart")) ?? 0,
+                startStation,
                 ReadPitch(al),
-                ToIps(name, geom, ReadAlignPis(al)),
-                Num(al.Attribute("length")) ?? double.NaN));
+                ips,
+                fileLength,
+                defs,
+                elems[0].Start,
+                elems[0].DirStart,
+                elems[0].StartName,
+                useElement,
+                flagged));
         }
         if (list.Count == 0) throw new AlignmentException("LandXML に平面線形 (Alignment/CoordGeom) がありません。");
         return list;
     }
 
+    /// <summary>IP 表から作った線形が、ファイルの各要素の始点・終点 (5mm 以内) と延長 (5mm 以内) を再現するか。</summary>
+    private static bool IpsReproduce(List<IntersectionPoint> ips, List<Elem> elems, double startStation, double fileLength)
+    {
+        try
+        {
+            var h = HorizontalAlignment.FromIps(ips, startStation);
+            if (!double.IsNaN(fileLength) && fileLength > 0 && Math.Abs(h.Length - fileLength) > 0.005) return false;
+            foreach (var e in elems)
+                foreach (var p in new[] { e.Start, e.End })
+                    if (Math.Abs(h.Project(p).OffsetRight) > 0.005) return false;
+            return true;
+        }
+        catch (AlignmentException)
+        {
+            return false;
+        }
+    }
+
     // ---- 要素 ----
 
     private sealed record Elem(string Kind, string? StartName, string? EndName, Vec2 Start, Vec2 End,
-        double DirStart, double DirEnd, double RadiusStart, double RadiusEnd, double Length, double A)
+        double DirStart, double DirEnd, double RadiusStart, double RadiusEnd, double Length, double A, int Turn)
     {
         public bool IsLine => Kind == "Line";
     }
 
-    private static List<IntersectionPoint> ToIps(string alignmentName, XElement geom, List<(string Name, Vec2 Point)> alignPis)
+    /// <summary>CoordGeom の Line・Curve・Spiral を順に読む (長さ 0 の直線は無視)。</summary>
+    private static List<Elem> ReadElems(string alignmentName, XElement geom)
     {
         var elems = new List<Elem>();
         foreach (var e in geom.Elements())
@@ -65,7 +143,16 @@ public static class LandXmlReader
             });
         }
         if (elems.Count == 0) throw new AlignmentException($"{alignmentName}: 線形要素がありません。");
+        return elems;
+    }
 
+    /// <summary>方法 (Feature Horizontal / method) が「要素法」か。</summary>
+    private static bool IsElementMethod(XElement al) =>
+        al.Elements().Where(e => e.Name.LocalName == "Feature" && (string?)e.Attribute("name") == "Horizontal")
+            .SelectMany(e => e.Elements()).Any(p => (string?)p.Attribute("label") == "method" && (string?)p.Attribute("value") == "要素法");
+
+    private static List<IntersectionPoint> ToIps(string alignmentName, List<Elem> elems, List<(string Name, Vec2 Point)> alignPis)
+    {
         var ips = new List<IntersectionPoint>
         {
             new(PiName(alignPis, elems[0].Start) ?? elems[0].StartName ?? "BP", elems[0].Start),
@@ -128,7 +215,7 @@ public static class LandXmlReader
         var s = Pt(e, "Start");
         var t = Pt(e, "End");
         var dir = (t - s).Angle;
-        return new Elem("Line", Name(e, "Start"), Name(e, "End"), s, t, dir, dir, Inf, Inf, s.DistanceTo(t), 0);
+        return new Elem("Line", Name(e, "Start"), Name(e, "End"), s, t, dir, dir, Inf, Inf, s.DistanceTo(t), 0, 0);
     }
 
     private static Elem ReadCurve(XElement e)
@@ -140,8 +227,10 @@ public static class LandXmlReader
         var r = Num(e.Attribute("radius")) ?? s.DistanceTo(c);
         // 接線方向 = 中心→点 を回転方向に 90° 回したもの
         double Tangent(Vec2 p) => (p - c).Angle + turn * Math.PI / 2;
+        // length が無ければ中心角から求める
+        var sweep = Math.Abs(GeoMath.NormalizeSignedAngle(((t - c).Angle - (s - c).Angle) * turn)) * r;
         return new Elem("Curve", Name(e, "Start"), Name(e, "End"), s, t, Tangent(s), Tangent(t), r, r,
-            Num(e.Attribute("length")) ?? double.NaN, 0);
+            Num(e.Attribute("length")) ?? sweep, 0, turn);
     }
 
     private static Elem ReadSpiral(XElement e, double? prevDir)
@@ -163,7 +252,7 @@ public static class LandXmlReader
         else
         {
             // PI が無ければ 接線角 τ = L / 2R から求める
-            var tau = len / (2 * Math.Min(r0, r1));
+            var tau = len * ((double.IsInfinity(r0) ? 0 : 1 / r0) + (double.IsInfinity(r1) ? 0 : 1 / r1)) / 2;
             dirStart = prevDir ?? (t - s).Angle - turn * tau / 3;
             dirEnd = dirStart + turn * tau;
         }
@@ -174,7 +263,7 @@ public static class LandXmlReader
         var a = e.Descendants().FirstOrDefault(p => p.Name.LocalName == "Property" && (string?)p.Attribute("label") == "A") is { } prop
             ? Num(prop.Attribute("value")) : null;
         a ??= Math.Sqrt(Math.Min(r0, r1) * len);
-        return new Elem("Spiral", Name(e, "Start"), Name(e, "End"), s, t, dirStart, dirEnd, r0, r1, len, a.Value);
+        return new Elem("Spiral", Name(e, "Start"), Name(e, "End"), s, t, dirStart, dirEnd, r0, r1, len, a.Value, turn);
     }
 
     // ---- 補助 ----

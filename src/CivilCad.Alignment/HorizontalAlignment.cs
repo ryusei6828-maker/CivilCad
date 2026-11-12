@@ -28,18 +28,22 @@ public sealed class HorizontalAlignment
 {
     private const double Eps = 1e-9;
 
-    private HorizontalAlignment(List<HorizontalElement> elements, List<CurveResult> curves, List<MainPoint> mainPoints, double startStation)
+    private HorizontalAlignment(List<HorizontalElement> elements, List<CurveResult> curves, List<MainPoint> mainPoints, double startStation, bool isElementMethod = false)
     {
         Elements = elements;
         Curves = curves;
         MainPoints = mainPoints;
         StartStation = startStation;
+        IsElementMethod = isElementMethod;
     }
 
     public IReadOnlyList<HorizontalElement> Elements { get; }
     public IReadOnlyList<CurveResult> Curves { get; }
     public IReadOnlyList<MainPoint> MainPoints { get; }
     public double StartStation { get; }
+
+    /// <summary>要素法で作った線形 (IP・曲線諸元 Curves が無い)。</summary>
+    public bool IsElementMethod { get; }
     public double Length => Elements.Sum(e => e.Length);
     public double EndStation => StartStation + Length;
 
@@ -173,6 +177,97 @@ public sealed class HorizontalAlignment
         AddMainPoint(ips[^1].Name, ips[^1].Point, dirs[^1]);
 
         return new HorizontalAlignment(elements, curves, mainPoints, startStation);
+    }
+
+    /// <summary>
+    /// 要素法: 始点・始点の方向 (CAD の数学角) と、直線・円曲線・クロソイドを順につないだ要素の表から線形を作る。
+    /// 各要素は延長・半径・回転方向で決まり、前の要素の終点から接線がつながる (G1)。IP・Curves は無い。
+    /// 主要点は始点・各要素の終点 (名前は EndName、無ければ BC・EC・KA・KE などを付ける。直線どうしの継ぎ目は付けない)。
+    /// </summary>
+    public static HorizontalAlignment FromElements(Vec2 start, double startDirection, IReadOnlyList<ElementDef> defs,
+        double startStation = 0, string? startName = null)
+    {
+        var used = defs.Where(d => d.Length >= Eps).ToList();
+        if (used.Count == 0) throw new AlignmentException("延長が 0 より大きい要素がありません。");
+
+        var elements = new List<HorizontalElement>();
+        var cur = start;
+        var dir = startDirection;
+        var station = startStation;
+        var points = new List<(double Station, Vec2 Point, double Dir)>();
+        for (var i = 0; i < used.Count; i++)
+        {
+            var d = used[i];
+            var no = $"{i + 1} 番目の要素";
+            if (double.IsNaN(d.Length) || double.IsInfinity(d.Length)) throw new AlignmentException($"{no}: 延長が数値ではありません。");
+            double k1, k2;
+            HorizontalElement e;
+            switch (d.Kind)
+            {
+                case ElementKind.Line:
+                    e = new LineElement(cur, dir, d.Length);
+                    k1 = k2 = 0;
+                    break;
+                case ElementKind.Arc:
+                    if (!(d.RadiusStart > 0) || double.IsInfinity(d.RadiusStart)) throw new AlignmentException($"{no}: 円曲線の半径は 0 より大きい数値にしてください。");
+                    if (d.Turn == 0) throw new AlignmentException($"{no}: 円曲線の回転方向 (右・左) を指定してください。");
+                    e = new ArcElement(cur, dir, d.Length, d.RadiusStart, d.Turn);
+                    k1 = k2 = d.Turn / d.RadiusStart;
+                    break;
+                default:
+                    if (!(d.RadiusStart > 0) || !(d.RadiusEnd > 0)) throw new AlignmentException($"{no}: クロソイドの半径は 0 より大きい数値にしてください (直線側は空か ∞)。");
+                    if (double.IsInfinity(d.RadiusStart) && double.IsInfinity(d.RadiusEnd)) throw new AlignmentException($"{no}: クロソイドの始点と終点の半径が両方 ∞ です。");
+                    if (d.Turn == 0) throw new AlignmentException($"{no}: クロソイドの回転方向 (右・左) を指定してください。");
+                    k1 = double.IsInfinity(d.RadiusStart) ? 0 : d.Turn / d.RadiusStart;
+                    k2 = double.IsInfinity(d.RadiusEnd) ? 0 : d.Turn / d.RadiusEnd;
+                    e = new SpiralElement(cur, dir, d.Length, k1, k2);
+                    break;
+            }
+            e.StartStation = station;
+            elements.Add(e);
+            if (i == 0) points.Add((station, cur, dir));
+            station += e.Length;
+            (cur, dir) = e.Evaluate(e.Length);
+            points.Add((station, cur, dir));
+        }
+
+        // 主要点の名前: 始点 = BP、各要素の終点 = EndName、無ければ曲率の変わり方で BC・EC・KA・KE など、最後は EP
+        var mainPoints = new List<MainPoint>
+        {
+            new(string.IsNullOrWhiteSpace(startName) ? "BP" : startName.Trim(), points[0].Station, points[0].Point, points[0].Dir),
+        };
+        var group = 0;
+        var sub = 0;
+        if (used[0].Kind != ElementKind.Line) group = 1; // 始点から曲がっている (始点の継ぎ目の名前は付けない)
+        for (var i = 0; i < used.Count; i++)
+        {
+            string? name = string.IsNullOrWhiteSpace(used[i].EndName) ? null : used[i].EndName!.Trim();
+            string? auto = null;
+            if (i == used.Count - 1) auto = "EP";
+            else
+            {
+                var curvedIn = used[i].Kind != ElementKind.Line;
+                var curvedOut = used[i + 1].Kind != ElementKind.Line;
+                var arcIn = used[i].Kind == ElementKind.Arc;
+                var arcOut = used[i + 1].Kind == ElementKind.Arc;
+                if (!curvedIn && curvedOut)
+                {
+                    group++;
+                    sub = 0;
+                    auto = arcOut ? $"BC{group}" : $"KA{group}-1";
+                }
+                else if (curvedIn && !curvedOut)
+                    auto = arcIn ? $"EC{group}" : $"KA{group}-2";
+                else if (curvedIn)
+                {
+                    sub++;
+                    auto = !arcIn && arcOut ? $"KE{group}-1" : arcIn && !arcOut ? $"KE{group}-2" : $"CP{group}-{sub}";
+                }
+            }
+            name ??= auto;
+            if (name != null) mainPoints.Add(new MainPoint(name, points[i + 1].Station, points[i + 1].Point, points[i + 1].Dir));
+        }
+        return new HorizontalAlignment(elements, [], mainPoints, startStation, isElementMethod: true);
     }
 
     /// <summary>測点 (追加距離) の中心線上の点と方向。範囲外は端に丸める。</summary>

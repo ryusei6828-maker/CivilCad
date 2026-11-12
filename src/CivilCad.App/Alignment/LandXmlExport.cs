@@ -44,7 +44,8 @@ public static class LandXmlExport
 
     public static void Write(string path, AlignmentInput input, HorizontalAlignment al, int? planeZone)
     {
-        var ips = input.Rows
+        // 要素法には IP が無い (AlignPIs は書かない)
+        var ips = al.IsElementMethod ? null : input.Rows
             .Where(r => !string.IsNullOrWhiteSpace(r.Name) || r.X != 0 || r.Y != 0)
             .Select((r, i) => new IntersectionPoint(string.IsNullOrWhiteSpace(r.Name) ? $"IP{i}" : r.Name.Trim(), Vec2.FromSurvey(r.X, r.Y), r.R, r.A1, r.A2))
             .ToList();

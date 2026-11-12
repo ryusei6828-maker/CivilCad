@@ -1,11 +1,17 @@
 <Window x:Class="CivilCad.App.Alignment.AlignmentWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="路線計算 (IP法)" Width="1000" Height="720"
+        Title="路線計算" Width="1000" Height="720"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <DockPanel Margin="8">
         <!-- 路線の基本情報 -->
         <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+            <TextBlock Text="計算方法" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <ComboBox x:Name="MethodBox" Width="90" Margin="0,0,12,0" SelectionChanged="MethodBox_SelectionChanged"
+                      ToolTip="IP法: IP (交点) と R・A で決める。要素法: 始点・方向角と、直線・円曲線・クロソイドの要素を順に並べて決める (IP法から要素法への変換はできるが、戻せない)">
+                <ComboBoxItem Content="IP法"/>
+                <ComboBoxItem Content="要素法"/>
+            </ComboBox>
             <TextBlock Text="路線名" VerticalAlignment="Center" Margin="0,0,4,0"/>
             <TextBox x:Name="NameBox" Width="120" Margin="0,0,12,0"/>
             <TextBlock Text="開始追加距離 (m)" VerticalAlignment="Center" Margin="0,0,4,0"/>
@@ -39,8 +45,44 @@
                 <RowDefinition Height="3*"/>
             </Grid.RowDefinitions>
 
+            <!-- 要素法の入力 (始点・方向角・要素表) -->
+            <GroupBox x:Name="ElementBox" Visibility="Collapsed" Header="要素表  (始点から順に、直線・円曲線・クロソイドをつなぐ。座標は測量座標 X=北 / Y=東、R が空・0 は ∞)">
+                <DockPanel>
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                        <TextBlock Text="始点名" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBox x:Name="StartNameBox" Width="60" Margin="0,0,10,0"/>
+                        <TextBlock Text="X (北)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBox x:Name="StartXBox" Width="100" Margin="0,0,10,0"/>
+                        <TextBlock Text="Y (東)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBox x:Name="StartYBox" Width="100" Margin="0,0,10,0"/>
+                        <TextBlock Text="始点の方向角" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBox x:Name="StartDirBox" Width="130" ToolTip="北を 0 として時計回り。度の小数 (123.4567) か 度分秒 (123°45'06.7&quot;) で入れる"/>
+                    </WrapPanel>
+                    <StackPanel DockPanel.Dock="Right" Margin="6,0,0,0" Width="90">
+                        <Button Content="行を挿入" Margin="0,0,0,4" Click="InsertElement_Click"/>
+                        <Button Content="行を削除" Margin="0,0,0,4" Click="DeleteElement_Click"/>
+                        <Button Content="XML 読込" Margin="0,0,0,4" Click="LoadXml_Click"
+                                ToolTip="路線の LandXML (J-LandXML) を読み込みます。要素法の路線は要素表になります"/>
+                        <Button Content="XML 出力" Margin="0,0,0,4" Click="SaveXml_Click"
+                                ToolTip="計算した路線を LandXML (J-LandXML) に書き出します"/>
+                    </StackPanel>
+                    <DataGrid x:Name="ElementGrid" AutoGenerateColumns="False" CanUserAddRows="True" CanUserSortColumns="False"
+                              HeadersVisibility="Column" SelectionUnit="FullRow">
+                        <DataGrid.Columns>
+                            <DataGridComboBoxColumn Header="要素" x:Name="ElementKindColumn" SelectedItemBinding="{Binding Kind, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
+                            <DataGridTextColumn Header="延長 (m)" Binding="{Binding Length}" Width="*"/>
+                            <DataGridTextColumn Header="始点 R" Binding="{Binding R1}" Width="*"/>
+                            <DataGridTextColumn Header="終点 R" Binding="{Binding R2}" Width="*"/>
+                            <DataGridComboBoxColumn Header="回転" x:Name="ElementTurnColumn" SelectedItemBinding="{Binding Turn, UpdateSourceTrigger=PropertyChanged}" Width="60"/>
+                            <DataGridTextColumn Header="A" Binding="{Binding A, Mode=OneWay, StringFormat=F3}" IsReadOnly="True" Width="*"/>
+                            <DataGridTextColumn Header="終点名" Binding="{Binding EndName}" Width="90"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </GroupBox>
+
             <!-- IP 入力表 -->
-            <GroupBox Header="IP 表  (座標は測量座標 X=北 / Y=東、R=0 は曲線なし、A=0 はクロソイドなし)">
+            <GroupBox x:Name="IpBox" Header="IP 表  (座標は測量座標 X=北 / Y=東、R=0 は曲線なし、A=0 はクロソイドなし)">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Margin="6,0,0,0" Width="90">
                         <Button Content="行を挿入" Margin="0,0,0,4" Click="InsertRow_Click"/>
@@ -73,7 +115,7 @@
                 <TabItem Header="主要点">
                     <DataGrid x:Name="MainPointGrid" IsReadOnly="True" AutoGenerateColumns="True" HeadersVisibility="Column"/>
                 </TabItem>
-                <TabItem Header="曲線諸元">
+                <TabItem x:Name="CurveTab" Header="曲線諸元">
                     <DataGrid x:Name="CurveGrid" IsReadOnly="True" AutoGenerateColumns="True" HeadersVisibility="Column"/>
                 </TabItem>
                 <TabItem Header="中心線座標 (測点ごと)">

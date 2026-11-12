@@ -82,7 +82,7 @@ public class LandXmlReaderTests
     }
 
     [Fact]
-    public void EggShapedClothoid_IsRejected()
+    public void EggShapedClothoid_HasNoIps_ButReadsAsElements()
     {
         var xml = XDocument.Parse("""
             <LandXML xmlns="http://www.landxml.org/schema/LandXML-1.2"><Alignments><Alignment name="x" staStart="0"><CoordGeom>
@@ -90,7 +90,12 @@ public class LandXmlReaderTests
             <Spiral length="10" radiusStart="300" radiusEnd="200" rot="cw" spiType="clothoid"><Start>0 10</Start><End>0.1 20</End></Spiral>
             </CoordGeom></Alignment></Alignments></LandXML>
             """);
-        Assert.Throws<AlignmentException>(() => LandXmlReader.Parse(xml));
+        // IP 法では表せないので IP 表は空 (読み込みは通り、要素として線形を作れる)
+        var read = Assert.Single(LandXmlReader.Parse(xml));
+        Assert.False(read.HasIps);
+        Assert.Equal(2, read.Elements!.Count);
+        Assert.Equal((300.0, 200.0), (read.Elements[1].RadiusStart, read.Elements[1].RadiusEnd));
+        Assert.Equal(20, read.ToHorizontal().Length, 6);
     }
 
     // ---- LandXML を書き出す (テスト用) ----

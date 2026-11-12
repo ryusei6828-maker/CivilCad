@@ -23,6 +23,9 @@ public partial class AlignmentWindow : Window
         ShoulderCheck.IsChecked = _input.DrawShoulders;
         StakeCheck.IsChecked = _input.DrawStakes;
         IpGrid.ItemsSource = _input.Rows;
+        ElementKindColumn.ItemsSource = ElementRow.Kinds;
+        ElementTurnColumn.ItemsSource = ElementRow.Turns;
+        ShowMethod();
         Loaded += (_, _) => TryCompute();
     }
 
@@ -34,6 +37,8 @@ public partial class AlignmentWindow : Window
     {
         IpGrid.CommitEdit();
         IpGrid.CommitEdit();
+        ElementGrid.CommitEdit();
+        ElementGrid.CommitEdit();
         ErrorText.Text = "";
         try
         {
@@ -49,6 +54,7 @@ public partial class AlignmentWindow : Window
             _input.RightWidths = RightWidthBox.Text.Trim();
             _input.DrawShoulders = ShoulderCheck.IsChecked == true;
             _input.DrawStakes = StakeCheck.IsChecked == true;
+            if (_input.IsElementMethod) ReadStart();
 
             _result = _input.Compute();
             ShowResult(_result);
@@ -188,7 +194,77 @@ public partial class AlignmentWindow : Window
         TextHeightBox.Text = loaded.TextHeightMm.ToString(CultureInfo.InvariantCulture);
         _input.Rows.Clear();
         foreach (var r in loaded.Rows) _input.Rows.Add(r);
+        _input.IsElementMethod = loaded.IsElementMethod;
+        _input.StartName = loaded.StartName;
+        _input.StartX = loaded.StartX;
+        _input.StartY = loaded.StartY;
+        _input.StartAzimuthDeg = loaded.StartAzimuthDeg;
+        _input.ElementRows.Clear();
+        foreach (var r in loaded.ElementRows) _input.ElementRows.Add(r);
+        ShowMethod();
         TryCompute();
+    }
+
+    // ---- 計算方法 (IP 法 / 要素法) ----
+
+    private bool _showing;
+
+    /// <summary>入力の計算方法に合わせて、表の表示 (IP 表 / 要素表) と選択を切り替える。</summary>
+    private void ShowMethod()
+    {
+        _showing = true;
+        MethodBox.SelectedIndex = _input.IsElementMethod ? 1 : 0;
+        IpBox.Visibility = _input.IsElementMethod ? Visibility.Collapsed : Visibility.Visible;
+        ElementBox.Visibility = _input.IsElementMethod ? Visibility.Visible : Visibility.Collapsed;
+        CurveTab.Visibility = _input.IsElementMethod ? Visibility.Collapsed : Visibility.Visible;
+        if (_input.IsElementMethod)
+        {
+            ElementGrid.ItemsSource = _input.ElementRows;
+            StartNameBox.Text = _input.StartName;
+            StartXBox.Text = _input.StartX.ToString("F3", CultureInfo.InvariantCulture);
+            StartYBox.Text = _input.StartY.ToString("F3", CultureInfo.InvariantCulture);
+            StartDirBox.Text = Angles.ToDms(_input.StartAzimuthDeg * Math.PI / 180, 3);
+        }
+        _showing = false;
+    }
+
+    /// <summary>始点の欄 (名前・X・Y・方向角) を入力に読む。</summary>
+    private void ReadStart()
+    {
+        _input.StartName = string.IsNullOrWhiteSpace(StartNameBox.Text) ? "BP" : StartNameBox.Text.Trim();
+        _input.StartX = ParseDouble(StartXBox.Text, "始点の X");
+        _input.StartY = ParseDouble(StartYBox.Text, "始点の Y");
+        if (!Angles.TryParseDegrees(StartDirBox.Text, out var rad)) throw new AlignmentException("始点の方向角が読めません (例: 123.4567 または 123°45'06.7\")。");
+        _input.StartAzimuthDeg = rad * 180 / Math.PI;
+    }
+
+    private void MethodBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_showing) return;
+        var toElement = MethodBox.SelectedIndex == 1;
+        if (toElement == _input.IsElementMethod) return;
+        if (!toElement)
+        {
+            ErrorText.Text = "要素法から IP 法には戻せません (IP 法で作り直すか、IP 法の路線 XML を読み込んでください)。";
+            ShowMethod();
+            return;
+        }
+        // IP 法 → 要素法: 今の IP 表で計算した線形の要素を要素表にする
+        if (!TryCompute()) { ShowMethod(); return; }
+        _input.SetElementsFrom(_result!);
+        ShowMethod();
+        TryCompute();
+    }
+
+    private void InsertElement_Click(object sender, RoutedEventArgs e)
+    {
+        var index = ElementGrid.SelectedItem is ElementRow r ? _input.ElementRows.IndexOf(r) : _input.ElementRows.Count;
+        _input.ElementRows.Insert(Math.Max(0, index), new ElementRow());
+    }
+
+    private void DeleteElement_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var r in ElementGrid.SelectedItems.OfType<ElementRow>().ToList()) _input.ElementRows.Remove(r);
     }
 
     /// <summary>クリップボードの表 (タブ/カンマ区切り: 名称, X, Y, R, A1, A2) で IP 表を置き換える。</summary>
