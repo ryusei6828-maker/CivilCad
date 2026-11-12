@@ -534,9 +534,18 @@ public sealed class AlignTool : CadTool
     /// <summary>2 点間の長さも合わせる (拡大縮小する)。次の 2 点指示でも同じ設定を使う。</summary>
     public static bool ScaleToFit { get; set; } = true;
 
+    /// <summary>
+    /// 選んだ図形は回さない: 選んだ図形は移動 (・拡大縮小) だけにして、ほかの図形 (路線など) を回し、測量座標の向きもそれに合わせて直す。
+    /// 選択が画像だけのときは (画像を図面に合わせる場合) この設定にかかわらず今までどおり選んだ図形を回す。
+    /// </summary>
+    public static bool KeepSelectionUpright { get; set; } = true;
+
     private List<Entity> _targets = [];
     private readonly List<Vec2> _points = [];
     private Vec2 _cursor;
+
+    /// <summary>今の選択に「回さない」方式を使うか (画像だけの選択は回す)。</summary>
+    private bool Upright => KeepSelectionUpright && _targets.Count > 0 && !_targets.All(e => e is ImageEntity);
 
     public override string Name => "2 点指示";
     public override bool RequiresSelection => true;
@@ -559,7 +568,7 @@ public sealed class AlignTool : CadTool
         UpdatePrompt();
     }
 
-    private static string Mode => ScaleToFit ? "回転・移動・大きさ" : "回転・移動のみ";
+    private string Mode => (Upright ? "選んだ図形は回さない・" : "") + (ScaleToFit ? "回転・移動・大きさ" : "回転・移動のみ");
 
     private void UpdatePrompt() => SetPrompt(_points.Count switch
     {
@@ -595,12 +604,31 @@ public sealed class AlignTool : CadTool
             return;
         }
         var (rad, k) = Transform(_points[0], _points[1], _points[2], _points[3]);
-        var pairs = _targets.Where(Doc.Entities.Contains).Select(e => (Old: e, New: Apply(e, _points[0], _points[1], rad, k))).ToList();
-        Execute(new ReplaceEntitiesCommand(pairs, "2 点指示"));
+        var upright = Upright;
+        var selected = _targets.Where(Doc.Entities.Contains).ToList();
+        var pairs = selected.Select(e => (Old: e, New: Apply(e, _points[0], _points[1], upright ? 0 : rad, k))).ToList();
+        if (upright)
+        {
+            // 選んだ図形は移動・拡大縮小だけ。ほかの図形を 1 点目の合わせ先 (Q) を中心に -rad 回し、測量座標が変わらないよう向きを直す
+            var set = selected.ToHashSet();
+            var others = Doc.Entities.Where(e => !set.Contains(e)).ToList();
+            var (frameRot, framePivot) = CadDocument.SurveyFrameAfterRotatingOthers(Doc.SurveyRotation, Doc.SurveyPivot, _points[1], rad);
+            Execute(new CompositeCommand("2 点指示 (図面を回さない)",
+                new RotateTranslateCommand(others, _points[1], -rad, Vec2.Zero, "ほかの図形を回転"),
+                new ReplaceEntitiesCommand(pairs, "2 点指示"),
+                new SetSurveyFrameCommand(frameRot, framePivot)));
+        }
+        else
+        {
+            Execute(new ReplaceEntitiesCommand(pairs, "2 点指示"));
+        }
         _targets = [.. pairs.Select(x => x.New)];
         Canvas.SetSelection(_targets);
-        Canvas.ShowMessage($"2 点指示: {pairs.Count} 個を 回転 {rad * 180 / Math.PI:0.####}°" +
-                           (ScaleToFit ? $"、{k:0.######} 倍" : "") + " で合わせました。");
+        var scaleText = ScaleToFit ? $"、{k:0.######} 倍" : "";
+        Canvas.ShowMessage(upright
+            ? $"2 点指示: 図面は回さず ({pairs.Count} 個を移動{scaleText})、ほかの図形と測量座標の向きを {rad * 180 / Math.PI:0.####}° 回しました。Ctrl+Z で元に戻せます。"
+            : $"2 点指示: {pairs.Count} 個を 回転 {rad * 180 / Math.PI:0.####}°{scaleText} で合わせました" +
+              (KeepSelectionUpright && _targets.Count > 0 ? " (画像だけの選択なので画像を回しました)" : "") + "。");
         // 続けて合わせ直せる (Esc で終了)
         _points.Clear();
         UpdatePrompt();
@@ -636,6 +664,7 @@ public sealed class AlignTool : CadTool
         if (_points.Count != 3 || (_cursor - _points[1]).Length < 1e-9) return;
 
         var (rad, k) = Transform(_points[0], _points[1], _points[2], _cursor);
+        if (Upright) rad = 0; // 選んだ図形は回さずに表示 (ほかの図形が回る)
         if (_targets.Count > MaxPreviewEntities)
         {
             var box = _targets.Aggregate(Box2.Empty, (acc, e) => acc.Union(e.Bounds));

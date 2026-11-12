@@ -482,6 +482,11 @@ public sealed class DrawInputBar : Border
             AddSeparator();
             AddCheck("大きさも合わせる", AlignTool.ScaleToFit, v => { AlignTool.ScaleToFit = v; canvas.Tool.RefreshPrompt(); },
                 "オンなら 2 点間の長さも合わせる (拡大縮小)。オフなら回転と移動だけ");
+            AddCheck("選んだ図形は回さない (ほかの図形と座標の向きを回す)", AlignTool.KeepSelectionUpright,
+                v => { AlignTool.KeepSelectionUpright = v; canvas.Tool.RefreshPrompt(); },
+                "オンなら、選んだ図面は向きを変えずに移動 (・拡大縮小) だけする。代わりに路線などほかの図形を回し、" +
+                "シートの「測量座標の向き」も直すので、座標は正しいまま。\n" +
+                "ただし選択が画像だけのとき (スキャン画像を図面に合わせるとき) は、この設定にかかわらず画像を回して合わせる");
         }
         AddGuideText(tool is ImageTool
             ? "画像をクリックして選ぶ → ボタンか I / C / A / R を入力。Esc で画像コマンドを終える"

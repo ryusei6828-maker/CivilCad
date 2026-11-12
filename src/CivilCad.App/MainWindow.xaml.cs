@@ -275,7 +275,15 @@ public partial class MainWindow : UserControl
                 _doc.History.Execute(new DrawOrderCommand([.. Canvas.Selection], toFront: c == "DF"));
                 Log($"{Canvas.Selection.Count} 個を{(c == "DF" ? "最前面" : "最背面")}にしました。");
                 break;
-            case "AL": StartTool(new AlignTool(), c); break;
+            case "AL":
+                if (_alignment != null && AlignTool.KeepSelectionUpright)
+                {
+                    // 選んだ図形を回さない方式では路線などが回る (図面が動く) ので、測点照会に使う路線は計算し直してもらう
+                    _alignment = null;
+                    Log("2 点指示後は、測点照会の前に路線計算 (RC) をやり直してください。");
+                }
+                StartTool(new AlignTool(), c);
+                break;
             case "CO": StartTool(new MoveCopyTool(copy: true), c); break;
             case "RO": StartTool(new RotateTool(), c); break;
             case "MI": StartTool(new MirrorTool(), c); break;

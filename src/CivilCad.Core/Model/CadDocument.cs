@@ -198,6 +198,28 @@ public sealed class CadDocument : INotifyPropertyChanged
         NotifyChanged();
     }
 
+    /// <summary>
+    /// 図面の「ほかの図形」を q を中心に -theta 回した (p' = R(-theta)p + c, c = q - R(-theta)q) あとも、
+    /// 回した図形の測量座標が変わらない測量座標の向き (回転, 中心) を求める。
+    /// 元の向きは S(p) = R(φ)p + t (t = P - R(φ)P)。新しい向きは S'(p') = R(φ+theta)p' + t - R(φ+theta)c。
+    /// 回転 0 なら中心は原点 (そのとき平行移動分は 0 になるはず)。
+    /// </summary>
+    public static (double Rotation, Vec2 Pivot) SurveyFrameAfterRotatingOthers(double rotation, Vec2 pivot, Vec2 q, double theta)
+    {
+        var t = pivot - pivot.Rotate(rotation);
+        var c = q - q.Rotate(-theta);
+        var total = rotation + theta;
+        var t2 = t - c.Rotate(total);
+        var phi2 = GeoMath.NormalizeSignedAngle(total);
+        if (Math.Abs(phi2) < 1e-12) return (0, Vec2.Zero); // 回転なし (t2 がほぼ 0 でなければ座標がわずかにずれるが、図面の向きを優先する)
+        // (I - R(φ'))P' = t' を解く
+        var cos = Math.Cos(phi2);
+        var sin = Math.Sin(phi2);
+        var det = 2 - 2 * cos;
+        var p2 = new Vec2(((1 - cos) * t2.X - sin * t2.Y) / det, (sin * t2.X + (1 - cos) * t2.Y) / det);
+        return (phi2, p2);
+    }
+
     /// <summary>図面上の点 → 測量座標 (CAD の向き x=東, y=北)。</summary>
     public Vec2 ToSurveyCad(Vec2 p) => SurveyRotation == 0 ? p : SurveyPivot + (p - SurveyPivot).Rotate(SurveyRotation);
 
