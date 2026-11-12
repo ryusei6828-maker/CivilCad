@@ -79,6 +79,37 @@ public class HatchTests
     }
 
     [Fact]
+    public void FindRegion_FrameCrossedByLines_ReturnsOnlyStrip()
+    {
+        var doc = new CadDocument();
+        var layer = doc.CurrentLayer;
+        doc.Entities.Add(new PolylineEntity(layer, Rect(0, 0, 100, 50), true));          // 図枠
+        doc.Entities.Add(new LineEntity(layer, new Vec2(-5, 20), new Vec2(105, 20)));    // 枠を貫く線 2 本
+        doc.Entities.Add(new LineEntity(layer, new Vec2(-5, 30), new Vec2(105, 30)));
+        var cache = new VisibleRegionCache();
+
+        var strip = HatchTool.FindRegion(doc, new Vec2(50, 25), cache)!;
+        Assert.Single(strip);
+        Assert.Equal(100 * 10, Math.Abs(HatchEntity.SignedArea(strip[0])), 6);
+        Assert.Equal(100 * 20, Math.Abs(HatchEntity.SignedArea(HatchTool.FindRegion(doc, new Vec2(50, 5), cache)![0])), 6);
+        Assert.Null(HatchTool.FindRegion(doc, new Vec2(50, 60), cache));
+
+        // 図面が変わったら地図を作り直す (線を足すと帯が狭くなる)
+        doc.Entities.Add(new LineEntity(layer, new Vec2(-5, 25), new Vec2(105, 25)));
+        doc.NotifyChanged();
+        Assert.Equal(100 * 5, Math.Abs(HatchEntity.SignedArea(HatchTool.FindRegion(doc, new Vec2(50, 22), cache)![0])), 6);
+
+        // 非表示のレイヤの線は境界にしない
+        var hidden = new Layer("hidden", RgbColor.White);
+        doc.Layers.Add(hidden);
+        doc.Entities.Add(new LineEntity(hidden, new Vec2(-5, 22), new Vec2(105, 22)));
+        doc.NotifyChanged();
+        Assert.Equal(100 * 2, Math.Abs(HatchEntity.SignedArea(HatchTool.FindRegion(doc, new Vec2(50, 21), cache)![0])), 6);
+        hidden.IsVisible = false;
+        Assert.Equal(100 * 5, Math.Abs(HatchEntity.SignedArea(HatchTool.FindRegion(doc, new Vec2(50, 21), cache)![0])), 6);
+    }
+
+    [Fact]
     public void Tool_ClickInside_ThenSelectAsOneEntity() => RunSta(() =>
     {
         var doc = new CadDocument();

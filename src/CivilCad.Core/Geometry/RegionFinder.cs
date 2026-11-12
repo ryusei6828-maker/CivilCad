@@ -38,13 +38,19 @@ public static class RegionFinder
 
     private readonly record struct Edge(int U, int V, bool IsArc, double R, double Delta);
 
-    private sealed record Face(List<Vec2> Points, double Area, double Perimeter, int Comp);
+    internal sealed record Face(List<Vec2> Points, double Area, double Perimeter, int Comp)
+    {
+        public Box2 Box { get; } = Box2.FromPoints(Points);
+    }
 
     /// <summary>点 p を含む、境界に囲まれた最小の部分。囲まれていなければ null。</summary>
-    public static Region? Find(IEnumerable<BoundaryCurve> input, Vec2 p)
+    public static Region? Find(IEnumerable<BoundaryCurve> input, Vec2 p) => Build(input).Find(p);
+
+    /// <summary>曲線全体から面を一度だけ作る。同じ図面で何度も調べるときは、これを使い回す (<see cref="RegionMap.Find"/>)。</summary>
+    public static RegionMap Build(IEnumerable<BoundaryCurve> input)
     {
         var curves = input.Where(c => c.IsValid).ToList();
-        if (curves.Count == 0) return null;
+        if (curves.Count == 0) return RegionMap.Empty;
 
         // 許容誤差 (図面の大きさに比例)
         var boxes = curves.Select(BoxOf).ToList();
@@ -55,13 +61,18 @@ public static class RegionFinder
 
         // 交点で切る位置 (曲線のパラメータ)
         var splits = curves.Select(c => new List<double> { 0, Length(c) }).ToList();
-        for (var i = 0; i < curves.Count; i++)
+        // MinX 順に並べ、X が重なる範囲だけ調べる (掃引)
+        var order = Enumerable.Range(0, curves.Count).OrderBy(i => boxes[i].Min.X).ToArray();
+        for (var oi = 0; oi < order.Length; oi++)
         {
+            var i = order[oi];
             var bi = Inflate(boxes[i], tol);
-            for (var j = i + 1; j < curves.Count; j++)
+            for (var oj = oi + 1; oj < order.Length; oj++)
             {
+                var j = order[oj];
+                if (boxes[j].Min.X > bi.Max.X) break;
                 if (!bi.Intersects(boxes[j])) continue;
-                Intersect(curves, splits, i, j, tol);
+                Intersect(curves, splits, Math.Min(i, j), Math.Max(i, j), tol);
             }
         }
 
@@ -150,7 +161,7 @@ public static class RegionFinder
                 if (degree[other] == 1) queue.Enqueue(other);
             }
         }
-        if (!alive.Any(a => a)) return null;
+        if (!alive.Any(a => a)) return RegionMap.Empty;
 
         // 半辺: 2e = U→V、2e+1 = V→U。頂点ごとに角度順 (反時計回り) に並べる
         int Origin(int h) => (h & 1) == 0 ? edges[h >> 1].U : edges[h >> 1].V;
@@ -236,21 +247,11 @@ public static class RegionFinder
             }
         }
 
-        var minArea = 1e-12 * extent * extent;
-        var best = faces.Where(f => f.Area > minArea && Contains(f.Points, p)).OrderBy(f => f.Area).FirstOrDefault();
-        if (best == null) return null;
-
-        // 別の連結成分で、この面の中にある閉じた図形 = 中抜き (いちばん外側のものだけ)
-        var holes = faces.Where(f => f.Area < -minArea && f.Comp != best.Comp && Contains(best.Points, f.Points[0]) && !Contains(f.Points, p)).ToList();
-        holes = holes.Where(h => !holes.Any(o => o != h && Math.Abs(o.Area) > Math.Abs(h.Area) && Contains(o.Points, h.Points[0]))).ToList();
-
-        var loops = new List<IReadOnlyList<Vec2>> { best.Points };
-        loops.AddRange(holes.Select(h => (IReadOnlyList<Vec2>)h.Points));
-        return new Region(loops, best.Area + holes.Sum(h => h.Area), best.Perimeter + holes.Sum(h => h.Perimeter));
+        return new RegionMap(faces, 1e-12 * extent * extent);
     }
 
     /// <summary>点が多角形の内側か (偶奇規則)。</summary>
-    private static bool Contains(IReadOnlyList<Vec2> poly, Vec2 p)
+    internal static bool Contains(IReadOnlyList<Vec2> poly, Vec2 p)
     {
         var inside = false;
         for (int i = 0, j = poly.Count - 1; i < poly.Count; j = i++)
@@ -376,5 +377,46 @@ public static class RegionFinder
                 splits[segIsA ? j : i].Add(ua);
             }
         }
+    }
+}
+
+/// <summary>作り終えた面の集まり。<see cref="Find"/> は軽い (面の外接矩形で絞ってから内外判定)。</summary>
+public sealed class RegionMap
+{
+    public static readonly RegionMap Empty = new([], 0);
+
+    private readonly List<RegionFinder.Face> _inner;   // 面積 > 0 (囲まれた部分)
+    private readonly List<RegionFinder.Face> _outer;   // 面積 < 0 (連結成分の外周 = 中抜きの候補)
+
+    internal RegionMap(List<RegionFinder.Face> faces, double minArea)
+    {
+        _inner = faces.Where(f => f.Area > minArea).ToList();
+        _outer = faces.Where(f => f.Area < -minArea).ToList();
+        MinArea = minArea;
+    }
+
+    private double MinArea { get; }
+
+    /// <summary>囲まれた部分の数。</summary>
+    public int FaceCount => _inner.Count;
+
+    /// <summary>点 p を含む最小の部分 (別の連結成分の閉じた図形は中抜き)。囲まれていなければ null。</summary>
+    public Region? Find(Vec2 p)
+    {
+        RegionFinder.Face? best = null;
+        foreach (var f in _inner)
+        {
+            if (best != null && f.Area >= best.Area) continue;
+            if (!f.Box.Contains(p) || !RegionFinder.Contains(f.Points, p)) continue;
+            best = f;
+        }
+        if (best == null) return null;
+
+        var holes = _outer.Where(f => f.Comp != best.Comp && best.Box.Contains(f.Box) && RegionFinder.Contains(best.Points, f.Points[0]) && !RegionFinder.Contains(f.Points, p)).ToList();
+        holes = holes.Where(h => !holes.Any(o => o != h && Math.Abs(o.Area) > Math.Abs(h.Area) && o.Box.Contains(h.Box) && RegionFinder.Contains(o.Points, h.Points[0]))).ToList();
+
+        var loops = new List<IReadOnlyList<Vec2>> { best.Points };
+        loops.AddRange(holes.Select(h => (IReadOnlyList<Vec2>)h.Points));
+        return new Region(loops, best.Area + holes.Sum(h => h.Area), best.Perimeter + holes.Sum(h => h.Perimeter));
     }
 }

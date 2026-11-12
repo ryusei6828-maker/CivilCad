@@ -286,6 +286,7 @@ public sealed class AreaTool : MeasureToolBase
     private bool _picking = true;      // true = 境界の指定中、false = 内側のクリック待ち
     private bool _useAll;              // 何も選ばずに Enter: 表示中のすべての図形を境界にする
     private Region? _region;
+    private readonly VisibleRegionCache _allRegions = new();
 
     private static bool ByRegion => MeasureSettings.AreaByRegion;
 
@@ -392,8 +393,9 @@ public sealed class AreaTool : MeasureToolBase
 
     private void MeasureRegion(Vec2 p)
     {
-        var source = _useAll ? Doc.Entities.Where(Doc.IsVisible) : _boundary.Where(e => Doc.Entities.Contains(e));
-        var region = RegionFinder.Find(source.SelectMany(ToCurves), p);
+        var region = _useAll
+            ? _allRegions.Get(Doc).Find(p)
+            : RegionFinder.Find(_boundary.Where(e => Doc.Entities.Contains(e)).SelectMany(ToCurves), p);
         if (region == null)
         {
             _region = null;
@@ -480,27 +482,8 @@ public sealed class AreaTool : MeasureToolBase
         Canvas.DrawWorldPolyline(dc, CadCanvas.PreviewPen, _closed ? _points : [.. _points, Cursor], true);
     }
 
-    /// <summary>図形を、囲まれた部分を作る境界の曲線にする (対象外の図形は空)。閉じ方はハッチング (HatchTool.ClosedLoop) と同じ。</summary>
-    public static IEnumerable<BoundaryCurve> ToCurves(Entity e)
-    {
-        switch (e)
-        {
-            case LineEntity l:
-                yield return BoundaryCurve.Segment(l.Start, l.End);
-                break;
-            case PolylineEntity pl:
-                var pts = pl.Points;
-                for (var i = 0; i + 1 < pts.Count; i++) yield return BoundaryCurve.Segment(pts[i], pts[i + 1]);
-                if ((pl.IsClosed || pl.Filled) && pts.Count > 2) yield return BoundaryCurve.Segment(pts[^1], pts[0]);
-                break;
-            case ArcEntity a:
-                yield return BoundaryCurve.Arc(a.Center, a.Radius, a.StartAngle, a.Sweep);
-                break;
-            case CircleEntity c:
-                yield return BoundaryCurve.Circle(c.Center, c.Radius);
-                break;
-        }
-    }
+    /// <summary>図形を、囲まれた部分を作る境界の曲線にする (対象外の図形は空)。</summary>
+    public static IEnumerable<BoundaryCurve> ToCurves(Entity e) => BoundaryCurves.FromEntity(e);
 }
 
 /// <summary>クリック位置の測点と幅 (中心線からの離れ) を表示。</summary>

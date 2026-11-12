@@ -168,8 +168,12 @@ public sealed class CadDocument : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>変更通知 (<see cref="NotifyChanged"/>) のたびに増える番号。計算結果のキャッシュの鍵に使う。</summary>
+    public int Revision { get; private set; }
+
     public void NotifyChanged()
     {
+        Revision++;
         AlignNorthArrows();
         Changed?.Invoke(this, EventArgs.Empty);
     }

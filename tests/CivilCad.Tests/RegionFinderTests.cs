@@ -110,4 +110,38 @@ public class RegionFinderTests
         var expected = 2 * 100 * Math.Acos(0.5) - 5 * Math.Sqrt(400 - 100);
         Assert.True(Math.Abs(r!.Area - expected) / expected < 1e-9);
     }
+
+    [Fact]
+    public void RegionMap_BuildOnce_QueryMany()
+    {
+        var map = RegionFinder.Build([S(-2, 0, 12, 0), S(-2, 5, 12, 5), S(0, -3, 0, 8), S(10, -3, 10, 8), S(5, -3, 5, 8)]);
+        Assert.Equal(2, map.FaceCount);
+        Assert.Equal(25, map.Find(new Vec2(2, 2))!.Area, 9);
+        Assert.Equal(25, map.Find(new Vec2(8, 3))!.Area, 9);
+        Assert.Null(map.Find(new Vec2(-1, 2)));
+    }
+
+    [Fact]
+    public void RegionMap_ManySegments_BuildsFast()
+    {
+        var rnd = new Random(1);
+        var curves = new List<BoundaryCurve>();
+        for (var i = 0; i <= 100; i++)
+        {
+            curves.Add(S(0, i * 10, 1000, i * 10));
+            curves.Add(S(i * 10, 0, i * 10, 1000));
+        }
+        for (var i = 0; i < 3000; i++)
+        {
+            var x = rnd.NextDouble() * 1000;
+            var y = rnd.NextDouble() * 1000;
+            curves.Add(S(x, y, x + rnd.NextDouble() * 6 - 3, y + rnd.NextDouble() * 6 - 3));
+        }
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var map = RegionFinder.Build(curves);
+        sw.Stop();
+        Assert.True(sw.Elapsed.TotalSeconds < 2, $"build {sw.Elapsed.TotalSeconds:F2}s");
+        Assert.True(map.FaceCount > 1000);
+        Assert.NotNull(map.Find(new Vec2(55.2, 35.1)));
+    }
 }

@@ -56,6 +56,7 @@ public sealed class HatchTool(bool fill = false) : CadTool, IStyledDrawTool
     private Vec2 _cursor;
     private List<List<Vec2>>? _hoverLoops;
     private bool _selectionHandled;
+    private readonly VisibleRegionCache _regions = new();
 
     public override string Name => fill ? "塗りつぶし" : "ハッチング";
     public override Vec2? BasePoint => _points.Count > 0 ? _points[^1] : null;
@@ -121,7 +122,7 @@ public sealed class HatchTool(bool fill = false) : CadTool, IStyledDrawTool
 
     public override void OnPoint(Vec2 p)
     {
-        if (_points.Count == 0 && FindRegion(Doc, p) is { } loops)
+        if (_points.Count == 0 && FindRegion(Doc, p, _regions) is { } loops)
         {
             Create(loops);
             _hoverLoops = null;
@@ -134,7 +135,7 @@ public sealed class HatchTool(bool fill = false) : CadTool, IStyledDrawTool
     public override void OnMouseMove(Vec2 p)
     {
         _cursor = p;
-        _hoverLoops = _points.Count == 0 ? FindRegion(Doc, p) : null;
+        _hoverLoops = _points.Count == 0 ? FindRegion(Doc, p, _regions) : null;
     }
 
     public override void OnEnter()
@@ -202,29 +203,14 @@ public sealed class HatchTool(bool fill = false) : CadTool, IStyledDrawTool
     // ---- 範囲の検出 ----
 
     /// <summary>
-    /// 点を囲む閉じた図形のうち最も小さいものを外形にし、その内側にある閉じた図形 (いちばん外側のもの) を中抜きにする。
-    /// 見つからなければ null。
+    /// 点を囲む部分 (線・円弧・ポリライン・円が交わってできる閉じた範囲) を外形にし、別の閉じた図形が中にあれば中抜きにする。
+    /// 見つからなければ null。cache を渡すと、図面が変わるまで地図を使い回す。
     /// </summary>
-    public static List<List<Vec2>>? FindRegion(CadDocument doc, Vec2 p)
+    public static List<List<Vec2>>? FindRegion(CadDocument doc, Vec2 p, VisibleRegionCache? cache = null)
     {
-        var best = doc.Entities
-            .Where(e => e is PolylineEntity or CircleEntity && doc.IsVisible(e) && e.Bounds.Contains(p))
-            .Select(e => (Entity: e, Loop: ClosedLoop(e)))
-            .Where(x => x.Loop != null && HatchEntity.IsInside(x.Loop, p))
-            .OrderBy(x => Math.Abs(HatchEntity.SignedArea(x.Loop!)))
-            .FirstOrDefault();
-        if (best.Loop is not { } outer) return null;
-
-        var outerArea = Math.Abs(HatchEntity.SignedArea(outer));
-        var outerBox = best.Entity.Bounds;
-        var inside = doc.Entities
-            .Where(e => e != best.Entity && e is PolylineEntity or CircleEntity && doc.IsVisible(e) && outerBox.Contains(e.Bounds))
-            .Select(ClosedLoop).Where(l => l != null).Select(l => l!)
-            .Where(l => Math.Abs(HatchEntity.SignedArea(l)) < outerArea && l.All(q => HatchEntity.IsInside(outer, q)) && !HatchEntity.IsInside(l, p))
-            .ToList();
-        // 中抜きの中にさらにある図形は除く (いちばん外側の中抜きだけ)
-        var holes = inside.Where(h => !inside.Any(o => o != h && Math.Abs(HatchEntity.SignedArea(o)) > Math.Abs(HatchEntity.SignedArea(h)) && h.All(q => HatchEntity.IsInside(o, q)))).ToList();
-        return [outer, .. holes];
+        var map = (cache ?? new VisibleRegionCache()).Get(doc);
+        if (map.Find(p) is not { } region) return null;
+        return [.. region.Loops.Select(l => l.ToList())];
     }
 
     /// <summary>閉じた図形なら境界の点列 (閉じたポリライン・始点に戻るポリライン・円)。</summary>
