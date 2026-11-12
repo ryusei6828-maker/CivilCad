@@ -131,7 +131,7 @@ public sealed class HorizontalAlignment
                 continue;
             }
 
-            var no = i.ToString();
+            var no = i.ToString(System.Globalization.CultureInfo.InvariantCulture);
             var dirIn = dirs[i - 1];
             var dirOut = dirs[i];
             var start = ips[i].Point - Vec2.FromAngle(dirIn) * c.T1;

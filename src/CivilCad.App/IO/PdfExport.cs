@@ -180,9 +180,6 @@ public static class PdfExport
     /// <summary>用紙 1 枚を描く (canvas の単位は pt、左上が原点)。PDF のほか、確認用に画像にも描ける。</summary>
     public static void Render(CadDocument doc, SKCanvas canvas, Layout layout, PdfOptions o) => new Painter(doc, canvas, layout, o).Draw();
 
-    /// <summary>用紙の大きさ (pt)。</summary>
-    public static SKSize PageSize(Layout layout) => new((float)(layout.Width * PtPerMm), (float)(layout.Height * PtPerMm));
-
     private sealed class Painter(CadDocument doc, SKCanvas canvas, Layout layout, PdfOptions o)
     {
         private readonly SKTypeface _typeface = SKTypeface.FromFamilyName("MS Gothic") ?? SKTypeface.FromFamilyName("Yu Gothic") ?? SKTypeface.Default;

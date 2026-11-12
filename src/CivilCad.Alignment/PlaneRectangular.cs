@@ -168,6 +168,6 @@ public static class PlaneRectangular
         var d = (int)(totalSec / 3600);
         var m = (int)((totalSec - d * 3600) / 60);
         var s = totalSec - d * 3600 - m * 60;
-        return $"{sign}{d}°{m:00}'{s.ToString("00." + new string('0', secDecimals))}\"";
+        return $"{sign}{d}°{m:00}'{s.ToString("00." + new string('0', secDecimals), System.Globalization.CultureInfo.InvariantCulture)}\"";
     }
 }

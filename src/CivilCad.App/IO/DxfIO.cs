@@ -409,9 +409,9 @@ public static class DxfIO
         var spacing = h * 5.0 / 3.0 * (o.LineSpacingFactor > 0 ? o.LineSpacingFactor : 1);
         var total = h + (lines.Length - 1) * spacing;
         var name = o.AttachmentPoint.ToString();
-        var halign = name.EndsWith("Center") ? TextHAlign.Center : name.EndsWith("Right") ? TextHAlign.Right : TextHAlign.Left;
+        var halign = name.EndsWith("Center", StringComparison.Ordinal) ? TextHAlign.Center : name.EndsWith("Right", StringComparison.Ordinal) ? TextHAlign.Right : TextHAlign.Left;
         // 文字ブロックの上端が基準点からどれだけ上にあるか
-        var top = name.StartsWith("Top") ? 0 : name.StartsWith("Middle") ? total / 2 : total;
+        var top = name.StartsWith("Top", StringComparison.Ordinal) ? 0 : name.StartsWith("Middle", StringComparison.Ordinal) ? total / 2 : total;
         var rot = o.Rotation / Deg;
         var up = Vec2.FromAngle(rot).LeftNormal;
         for (var i = 0; i < lines.Length; i++)

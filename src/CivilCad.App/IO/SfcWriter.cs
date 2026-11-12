@@ -120,7 +120,7 @@ public static class SfcWriter
 
             _sb.Append("ISO-10303-21;\nHEADER;\n");
             _sb.Append("FILE_DESCRIPTION(('SCADEC level2 feature_mode'),\n        '2;1');\n");
-            _sb.Append($"FILE_NAME('{HeaderString(fileName)}',\n        '{DateTime.Now:yyyy-M-d\\THH:mm:ss}',\n        (''),\n        (''),\n        'SCADEC_API_Ver3.30$$3.1',\n        'CivilCad',\n        '');\n");
+            _sb.Append(System.Globalization.CultureInfo.InvariantCulture, $"FILE_NAME('{HeaderString(fileName)}',\n        '{DateTime.Now:yyyy-M-d\\THH:mm:ss}',\n        (''),\n        (''),\n        'SCADEC_API_Ver3.30$$3.1',\n        'CivilCad',\n        '');\n");
             _sb.Append("FILE_SCHEMA(('ASSOCIATIVE_DRAUGHTING'));\nENDSEC;\nDATA;\n\n");
 
             foreach (var name in PredefinedColorNames) Feature($"pre_defined_colour_feature({Str(name)})");
@@ -383,7 +383,7 @@ public static class SfcWriter
             foreach (var ch in s.Replace('\'', '’').Replace('\\', '＼'))
             {
                 if (CanEncode(ch)) sb.Append(ch);
-                else sb.Append("\\X2\\").Append(((int)ch).ToString("X4")).Append("\\X0\\");
+                else sb.Append("\\X2\\").Append(((int)ch).ToString("X4", System.Globalization.CultureInfo.InvariantCulture)).Append("\\X0\\");
             }
             return sb.Append("\\'").ToString();
         }
@@ -415,7 +415,7 @@ public static class SfcWriter
                     continue;
                 }
                 sb.Append("\\X2\\");
-                while (i < s.Length && (s[i] >= 0x80 || s[i] == '\'')) sb.Append(((int)s[i++]).ToString("X4"));
+                while (i < s.Length && (s[i] >= 0x80 || s[i] == '\'')) sb.Append(((int)s[i++]).ToString("X4", System.Globalization.CultureInfo.InvariantCulture));
                 sb.Append("\\X0\\");
             }
             return sb.ToString();

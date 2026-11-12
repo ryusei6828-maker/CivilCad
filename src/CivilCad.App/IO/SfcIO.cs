@@ -268,7 +268,7 @@ public static partial class SfcIO
                     case "composite_curve_org_feature":
                         // 直前の「レイヤ0・色0」の図形がこの複合曲線の構成要素 (読み込みで MarkCompositeMembers がそろえる)
                         _composites.Add((a[0], a[2], a[3], compositeMembers));
-                        if (a[3] == "1") top.Add(new Feature("#composite", [(_composites.Count).ToString(), a.ElementAtOrDefault(4) ?? ""]));
+                        if (a[3] == "1") top.Add(new Feature("#composite", [(_composites.Count).ToString(System.Globalization.CultureInfo.InvariantCulture), a.ElementAtOrDefault(4) ?? ""]));
                         compositeMembers = [];
                         break;
                     default:
@@ -435,7 +435,7 @@ public static partial class SfcIO
                     break;
 
                 case "#composite":
-                    EmitComposite(int.Parse(a[0]), a.ElementAtOrDefault(1) is { Length: > 0 } lc ? L(lc) : null, null, t);
+                    EmitComposite(int.Parse(a[0], System.Globalization.CultureInfo.InvariantCulture), a.ElementAtOrDefault(1) is { Length: > 0 } lc ? L(lc) : null, null, t);
                     break;
 
                 case "fill_area_style_colour_feature":

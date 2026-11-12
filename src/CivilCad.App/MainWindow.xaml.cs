@@ -618,13 +618,7 @@ public partial class MainWindow : UserControl
         }
 
         // Ctrl+S・Ctrl+Shift+S: プロジェクトを保存 (まだ無ければ保存先を選ぶ)。DXF・SFC などは「エクスポート」(EXP)
-        if (e.Key == Key.S && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
-        {
-            SaveProject(saveAs: false);
-            e.Handled = true;
-            return;
-        }
-        if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
+        if (e.Key == Key.S && Keyboard.Modifiers is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift))
         {
             SaveProject(saveAs: false);
             e.Handled = true;
@@ -719,8 +713,6 @@ public partial class MainWindow : UserControl
         _doc.History.Execute(new RemoveEntitiesCommand(Canvas.Selection.ToList()));
         Canvas.ClearSelection();
     }
-
-    private void Delete_Click(object sender, RoutedEventArgs e) => DeleteSelection();
 
     /// <summary>コピー (Ctrl+C) / 切り取り (Ctrl+X): 選択した図形を覚える。別のシートにも貼り付けられる。</summary>
     private void CopySelection(bool cut)
@@ -1971,30 +1963,6 @@ public partial class MainWindow : UserControl
             Log($"路線「{_alignmentInput.Name}」を XML (LandXML) に書き出しました: {path}");
     }
 
-    private void CreateRouteFromPoints(List<Vec2> points)
-    {
-        var input = RouteFromPoints(_doc, points, _alignmentInput);
-        Log($"路線作成: {points.Count} 点 (BP・IP{Math.Max(0, points.Count - 2)} 個・EP) を IP 表にしました。各 IP の R・A と幅を入れて「作図して閉じる」を押してください。");
-        OpenAlignmentDialog(input);
-    }
-
-    /// <summary>クリックした点 (図面座標) → IP 表 (測量座標)。測点間隔・文字高・幅は前の路線の設定を引き継ぎ、路線名は使っていない名前にする。</summary>
-    public static AlignmentInput RouteFromPoints(CadDocument doc, IReadOnlyList<Vec2> points, AlignmentInput previous)
-    {
-        var used = doc.Entities.Select(e => e.Tag).Where(t => t != null).ToHashSet();
-        var name = Enumerable.Range(1, 1000).Select(i => $"路線{i}").First(n => !used.Contains("ALIGN:" + n));
-        var input = previous.Clone();
-        input.Name = name;
-        input.StartStation = 0;
-        input.Rows.Clear();
-        for (var i = 0; i < points.Count; i++)
-        {
-            var (x, y) = doc.ToSurvey(points[i]);
-            input.Rows.Add(new IpRow { Name = i == 0 ? "BP" : i == points.Count - 1 ? "EP" : $"IP{i}", X = Math.Round(x, 3), Y = Math.Round(y, 3) });
-        }
-        return input;
-    }
-
     private void OpenAlignmentDialog(AlignmentInput? input = null)
     {
         var dlg = new AlignmentWindow(input ?? _alignmentInput) { Owner = this, PlaneZone = _doc.PlaneZone };
@@ -2342,13 +2310,12 @@ public partial class MainWindow : UserControl
     // ---- ドラッグ＆ドロップ ----
 
     private static readonly string[] DrawingExtensions = [".dxf", ".dwg", ".jww", ".sfc", ".p21", ".p2z", ".ccp", ".ccs"];
-    private static readonly string[] ImageExtensions = [".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif", ".pdf"];
 
     /// <summary>ドロップで開けるファイルか (図面・プロジェクト・画像・PDF)。</summary>
     public static bool CanOpenByDrop(string path)
     {
         var ext = Path.GetExtension(path).ToLowerInvariant();
-        return DrawingExtensions.Contains(ext) || ImageExtensions.Contains(ext);
+        return DrawingExtensions.Contains(ext) || ImageCache.Extensions.Contains(ext);
     }
 
     private static string[] DroppedFiles(DragEventArgs e) =>
@@ -2384,7 +2351,7 @@ public partial class MainWindow : UserControl
                 Log($"フォルダは開けません: {f}");
             else if (DrawingExtensions.Contains(ext))
                 OpenDrawingFile(f);
-            else if (ImageExtensions.Contains(ext))
+            else if (ImageCache.Extensions.Contains(ext))
             {
                 StartTool(new ImageTool(), ImageTool.Code);
                 ImportImageFile(f);

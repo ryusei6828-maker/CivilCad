@@ -449,7 +449,11 @@ public sealed class CadCanvas : FrameworkElement
         if (TextEdit != null && !Document.Entities.Contains(TextEdit.Original)) EndTextEdit(false); // 直している文字が消えた (元に戻すなど)
         // 削除・非表示・ロックされた図形は選択から外す
         var before = Selection.Count;
-        Selection.RemoveWhere(x => !Document.Entities.Contains(x) || !Document.IsEditable(x));
+        if (before > 0)
+        {
+            var alive = Document.Entities.ToHashSet(); // 1 つずつ図面を探すと、全選択のとき図形の数の 2 乗かかる
+            Selection.RemoveWhere(x => !alive.Contains(x) || !Document.IsEditable(x));
+        }
         if (Selection.Count != before) SelectionChanged?.Invoke(this, EventArgs.Empty);
         RedrawScene();
     }

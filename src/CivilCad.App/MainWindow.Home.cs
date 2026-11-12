@@ -99,7 +99,7 @@ public partial class MainWindow
             ("保存", _active.IsModified ? "保存していない変更があります" : "保存済み"),
         };
         if (_filePath != null && File.Exists(_filePath))
-            rows.Add(("最終保存", File.GetLastWriteTime(_filePath).ToString("yyyy/MM/dd HH:mm")));
+            rows.Add(("最終保存", File.GetLastWriteTime(_filePath).ToString("yyyy/MM/dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)));
         BackstageLabels.Text = string.Join(Environment.NewLine, rows.Select(r => r.Label));
         BackstageInfo.Text = string.Join(Environment.NewLine, rows.Select(r => r.Value));
     }

@@ -546,7 +546,7 @@ public static partial class JwwIO
                     EmitText(t, layer, W, k * lengthScale, m);
                     break;
                 case Solid s:
-                    EmitSolid(s, layer, W, k * lengthScale);
+                    EmitSolid(s, layer, W);
                     break;
                 case Sunpou sp:
                     // 寸法線と寸法値 (Ver.4.20 以降の補助線も)
@@ -639,7 +639,7 @@ public static partial class JwwIO
             Add(t, text);
         }
 
-        private void EmitSolid(Solid s, Layer layer, Func<Vec2, Vec2> W, double k)
+        private void EmitSolid(Solid s, Layer layer, Func<Vec2, Vec2> W)
         {
             List<Vec2> loop;
             if (s.Style >= 101)

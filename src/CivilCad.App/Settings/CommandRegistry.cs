@@ -37,6 +37,7 @@ public static class CommandRegistry
         new("SC", "縮尺設定", "IconScale", "文字高・図枠・路線注記の換算に使う"),
         new("CS", "座標設定", "IconCoord", "基準点を測量座標に合わせて図面を移動・回転"),
         new("CM", "座標管理 開く/閉じる", "IconPoints", "登録された座標 (点名・X・Y・Z) の一覧。座標読込の点・幅杭・点コマンドの点"),
+        new("CMF", "座標管理 フロート/ドッキング", "IconPoints", "別ウィンドウに切り離す / 左側に戻す"),
         new("PJO", "プロジェクトを開く", "IconOpen", "CivilCad プロジェクト (.ccp) のシート・図形・登録座標・路線の入力を開く。シートファイル (.ccs) なら 1 枚だけ開く"),
         new("PJS", "プロジェクトを保存", "IconSave", "開いているシートを 1 枚ずつシートファイル (.ccs、プロジェクトと同じ名前のフォルダ) に、シートの一覧をプロジェクト (.ccp) に保存 (Ctrl+S / Ctrl+Shift+S)"),
         new("PJA", "名前を付けてプロジェクトを保存", "IconSave", "保存先を選んで CivilCad プロジェクト (.ccp) に保存"),

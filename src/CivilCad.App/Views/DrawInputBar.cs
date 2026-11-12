@@ -181,7 +181,7 @@ public sealed class DrawInputBar : Border
                         "記号の上の向き。0 = 図面の上、反時計回りが正", allowEmpty: false, allowNegative: true);
                 break;
             case MeasureToolBase:
-                AddMeasureUnit(doc);
+                AddMeasureUnit();
                 AddCheck("結果を文字で記入", MeasureSettings.PlaceText, v => MeasureSettings.PlaceText = v,
                     "オンなら、計測のあと結果の文字がカーソルに付いて動き、クリックした位置に置ける (Enter で置かずに次へ)");
                 AddNumber($"文字高 (mm, {doc.ScaleText})", () => MeasureSettings.TextHeightMm, v => { if (v is double h) MeasureSettings.TextHeightMm = h; },
@@ -622,7 +622,7 @@ public sealed class DrawInputBar : Border
     }
 
     /// <summary>計測結果の単位 (mm / cm / m)。結果は実寸 (縮尺は掛けない)。</summary>
-    private void AddMeasureUnit(CadDocument doc)
+    private void AddMeasureUnit()
     {
         AddLabel("単位");
         var units = new[] { LengthUnit.Mm, LengthUnit.Cm, LengthUnit.M };

@@ -166,9 +166,10 @@
                 <MenuItem Header="面積 (AA)" Tag="AA" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconArea}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>
             <MenuItem Header="路線(_R)">
-                <MenuItem Header="路線作成 (図面で IP をクリック) (RL)" Tag="RL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="路線作成 (路線パネル) (RL)" Tag="RL" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="路線計算 IP法 (RC)..." Tag="RC" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="路線 XML (LandXML) 読込 (RX)..." Tag="RX" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
+                <MenuItem Header="路線 XML (LandXML) 出力 (RXO)..." Tag="RXO" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="縦横断図 (LandXML の縦断・横断から) (VX)..." Tag="VX" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconRoute}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
                 <MenuItem Header="測点照会 (ST)" Tag="ST" Click="Tool_Click"><MenuItem.Icon><Image Source="{StaticResource IconStation}" Width="16" Height="16"/></MenuItem.Icon></MenuItem>
             </MenuItem>

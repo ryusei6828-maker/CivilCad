@@ -306,7 +306,7 @@ public sealed class CoordinatePanel : DockPanel
         if (_syncing || _canvas == null) return;
         _syncing = true;
         _grid.SelectedItems.Clear();
-        foreach (var i in _items.Where(i => _canvas.Selection.Contains(i.Point))) _grid.SelectedItems.Add(i);
+        foreach (var i in _items.Where(i => i.Point is { } p && _canvas.Selection.Contains(p))) _grid.SelectedItems.Add(i);
         _syncing = false;
     }
 

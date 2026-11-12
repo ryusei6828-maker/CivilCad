@@ -3,7 +3,6 @@ using System.Runtime.ExceptionServices;
 using CivilCad.App.IO;
 using CivilCad.App.Tools;
 using CivilCad.App.Views;
-using CivilCad.Core.Commands;
 using CivilCad.Core.Geometry;
 using CivilCad.Core.Model;
 using SkiaSharp;

@@ -286,8 +286,8 @@ public static partial class DwgIO
             var spacing = h * 5.0 / 3.0 * (o.LineSpacing > 0 ? o.LineSpacing : 1);
             var total = h + (lines.Length - 1) * spacing;
             var name = o.AttachmentPoint.ToString();
-            var halign = name.EndsWith("Center") ? TextHAlign.Center : name.EndsWith("Right") ? TextHAlign.Right : TextHAlign.Left;
-            var top = name.StartsWith("Top") ? 0 : name.StartsWith("Middle") ? total / 2 : total;
+            var halign = name.EndsWith("Center", StringComparison.Ordinal) ? TextHAlign.Center : name.EndsWith("Right", StringComparison.Ordinal) ? TextHAlign.Right : TextHAlign.Left;
+            var top = name.StartsWith("Top", StringComparison.Ordinal) ? 0 : name.StartsWith("Middle", StringComparison.Ordinal) ? total / 2 : total;
             var rot = Math.Atan2(o.AlignmentPoint.Y, o.AlignmentPoint.X); // 文字の向き (X 軸方向ベクトル)
             var up = Vec2.FromAngle(rot).LeftNormal;
             for (var i = 0; i < lines.Length; i++)

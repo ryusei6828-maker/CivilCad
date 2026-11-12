@@ -53,7 +53,7 @@ public sealed class PerpendicularTool : CadTool, IStyledDrawTool
     {
         if (_base == null) return p;
         if (_foot is not Vec2 foot) return Foot(p);
-        var n = Normal(foot, p);
+        var n = Normal(foot);
         var t = n.Dot(p - foot);
         if (FixedLength is double l) t = t < 0 ? -l : l;
         return foot + n * t;
@@ -122,7 +122,7 @@ public sealed class PerpendicularTool : CadTool, IStyledDrawTool
     }
 
     /// <summary>足での垂線の向き (単位ベクトル)。p の側を正にはしない (符号は呼び出し側で決める)。</summary>
-    private Vec2 Normal(Vec2 foot, Vec2 p)
+    private Vec2 Normal(Vec2 foot)
     {
         if (_segment is { } seg) return (seg.B - seg.A).Normalized().LeftNormal;
         var (c, _) = _round!.Value;

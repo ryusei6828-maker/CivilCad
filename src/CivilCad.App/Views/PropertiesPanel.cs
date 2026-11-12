@@ -187,7 +187,7 @@ public sealed class PropertiesPanel : UserControl
             case LineEntity l:
                 AddReadOnly("始点", Xy(l.Start));
                 AddReadOnly("終点", Xy(l.End));
-                AddEditable("長さ (m)", l.Length.ToString("F3"), s =>
+                AddEditable("長さ (m)", l.Length.ToString("F3", System.Globalization.CultureInfo.InvariantCulture), s =>
                     TryPositive(s, out var len) && l.Length > 0 &&
                     Apply(x => ((LineEntity)x).End = l.Start + (l.End - l.Start).Normalized() * len, "長さ変更"));
                 var d = l.End - l.Start;
@@ -196,7 +196,7 @@ public sealed class PropertiesPanel : UserControl
                 break;
 
             case PolylineEntity p:
-                AddReadOnly("頂点数", p.Points.Count.ToString());
+                AddReadOnly("頂点数", p.Points.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 AddReadOnly("長さ", $"{p.Length:F3} m");
                 AddReadOnly("閉じている", p.IsClosed ? "はい" : "いいえ");
                 if (p.IsClosed || p.Filled) AddReadOnly("面積", $"{p.Area:F3} m²");
@@ -204,9 +204,9 @@ public sealed class PropertiesPanel : UserControl
                 break;
 
             case PointEntity pt:
-                AddEditable("x (m)", pt.Position.X.ToString("F3"), s =>
+                AddEditable("x (m)", pt.Position.X.ToString("F3", System.Globalization.CultureInfo.InvariantCulture), s =>
                     TryNumber(s, out var x) && Apply(e2 => ((PointEntity)e2).Position = new Vec2(x, ((PointEntity)e2).Position.Y), "点の移動"));
-                AddEditable("y (m)", pt.Position.Y.ToString("F3"), s =>
+                AddEditable("y (m)", pt.Position.Y.ToString("F3", System.Globalization.CultureInfo.InvariantCulture), s =>
                     TryNumber(s, out var y) && Apply(e2 => ((PointEntity)e2).Position = new Vec2(((PointEntity)e2).Position.X, y), "点の移動"));
                 var (sx, sy) = Doc.ToSurvey(pt.Position);
                 AddReadOnly("測量座標", $"X {sx:F3}, Y {sy:F3}");
@@ -214,7 +214,7 @@ public sealed class PropertiesPanel : UserControl
 
             case CircleEntity c:
                 AddReadOnly("中心", Xy(c.Center));
-                AddEditable("半径 (m)", c.Radius.ToString("F3"), s =>
+                AddEditable("半径 (m)", c.Radius.ToString("F3", System.Globalization.CultureInfo.InvariantCulture), s =>
                     TryPositive(s, out var r) && Apply(x => ((CircleEntity)x).Radius = r, "半径変更"));
                 AddReadOnly("直径", $"{c.Radius * 2:F3} m");
                 AddReadOnly("円周", $"{2 * Math.PI * c.Radius:F3} m");
@@ -223,7 +223,7 @@ public sealed class PropertiesPanel : UserControl
 
             case ArcEntity a:
                 AddReadOnly("中心", Xy(a.Center));
-                AddEditable("半径 (m)", a.Radius.ToString("F3"), s =>
+                AddEditable("半径 (m)", a.Radius.ToString("F3", System.Globalization.CultureInfo.InvariantCulture), s =>
                     TryPositive(s, out var r) && Apply(x => ((ArcEntity)x).Radius = r, "半径変更"));
                 AddReadOnly("開始角 / 終了角", $"{Deg(a.StartAngle):F4}° / {Deg(a.EndAngle):F4}°");
                 AddReadOnly("中心角", Angles.ToDms(a.Sweep));
@@ -357,7 +357,7 @@ public sealed class PropertiesPanel : UserControl
                         hx.SetPatterns(hx.Patterns.Select(p => p with { Spacing = p.Spacing * ratio }));
                     }, "ハッチ間隔変更"));
                 AddReadOnly("間隔 (図面上)", $"{p0.Spacing:F3} m");
-                AddReadOnly("線の本数", h.Lines.Count.ToString());
+                AddReadOnly("線の本数", h.Lines.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 break;
 
             case TextEntity t:
@@ -488,7 +488,7 @@ public sealed class PropertiesPanel : UserControl
         }));
         // 画面で一定の文字は、保存するときの大きさ (用紙上 1px = 0.26mm) を出す
         var heights = texts.Select(t => Math.Round(t.ScreenHeightPx is double px ? px * TextEntity.MmPerPixel : t.Height / Doc.ScaleDenominator * 1000, 3)).Distinct().ToList();
-        AddEditable("文字高 (mm)", heights.Count == 1 ? heights[0].ToString("0.###") : "", s =>
+        AddEditable("文字高 (mm)", heights.Count == 1 ? heights[0].ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "", s =>
             TryPositive(s, out var h) && Apply(x =>
             {
                 if (x is not TextEntity t) return;
@@ -498,7 +498,7 @@ public sealed class PropertiesPanel : UserControl
             $"用紙上の文字の高さ。図面の縮尺 {Doc.ScaleText} で m に換算されます");
 
         var pxs = texts.Select(t => t.ScreenHeightPx).Distinct().ToList();
-        AddEditable("画面で一定 (px)", pxs.Count == 1 && pxs[0] is double onePx ? onePx.ToString("0.#") : "", s =>
+        AddEditable("画面で一定 (px)", pxs.Count == 1 && pxs[0] is double onePx ? onePx.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) : "", s =>
             string.IsNullOrWhiteSpace(s)
                 ? Apply(x => { if (x is TextEntity t) t.ScreenHeightPx = null; }, "文字の大きさを図面に固定")
                 : TryPositive(s, out var px) && Apply(x =>
@@ -510,7 +510,7 @@ public sealed class PropertiesPanel : UserControl
             "数値 (ピクセル) を入れると、縮尺・拡大率によらず画面上でこの大きさに見える。空欄にすると今の大きさで図面に固定");
 
         var factors = texts.Select(t => Math.Round(t.WidthFactor, 3)).Distinct().ToList();
-        AddEditable("幅係数", factors.Count == 1 ? factors[0].ToString("0.###") : "", s =>
+        AddEditable("幅係数", factors.Count == 1 ? factors[0].ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "", s =>
             TryPositive(s, out var f) && Apply(x =>
             {
                 if (x is not TextEntity t) return;
@@ -589,7 +589,7 @@ public sealed class PropertiesPanel : UserControl
             Committed?.Invoke(this, EventArgs.Empty);
         }, Brushes.Black));
         if (Tools.TextTool.ScreenFixed)
-            AddEditable("文字の大きさ (画面 px)", Tools.TextTool.DefaultScreenPx.ToString("0.#"), s =>
+            AddEditable("文字の大きさ (画面 px)", Tools.TextTool.DefaultScreenPx.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture), s =>
             {
                 if (!TryPositive(s, out var px)) return false;
                 Tools.TextTool.DefaultScreenPx = px;
@@ -598,7 +598,7 @@ public sealed class PropertiesPanel : UserControl
                 return true;
             }, "文字ツールで書く文字の、画面上の高さ。縮尺・拡大率によらず一定 (文字ツールの入力欄で用紙 mm に切り替えられる)");
         else
-        AddEditable("文字高 (mm)", Tools.TextTool.DefaultHeightMm.ToString("0.###"), s =>
+        AddEditable("文字高 (mm)", Tools.TextTool.DefaultHeightMm.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture), s =>
         {
             if (!TryPositive(s, out var h)) return false;
             Tools.TextTool.DefaultHeightMm = h;
@@ -695,9 +695,6 @@ public sealed class PropertiesPanel : UserControl
     // ---- 文字の入力欄 ----
 
     private TextBox? _entryBox;
-
-    /// <summary>今出している文字の入力欄 (無ければ null)。</summary>
-    public TextBox? EntryBox => _entryBox;
 
     /// <summary>
     /// 文字の入力欄: Enter で確定、Shift+Enter で改行 (複数行を入れられるツールのみ)、Esc でやめる。

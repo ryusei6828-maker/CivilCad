@@ -303,7 +303,7 @@ internal sealed class StepWriter
                 continue;
             }
             sb.Append("\\X2\\");
-            while (i < s.Length && (s[i] >= 0x7F || s[i] < 0x20)) sb.Append(((int)s[i++]).ToString("X4"));
+            while (i < s.Length && (s[i] >= 0x7F || s[i] < 0x20)) sb.Append(((int)s[i++]).ToString("X4", System.Globalization.CultureInfo.InvariantCulture));
             sb.Append("\\X0\\");
         }
         return sb.Append('\'').ToString();

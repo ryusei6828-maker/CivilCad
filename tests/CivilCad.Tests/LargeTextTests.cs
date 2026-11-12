@@ -1,6 +1,5 @@
 using System.Runtime.ExceptionServices;
 using System.Windows;
-using System.Windows.Controls;
 using CivilCad.App.Tools;
 using CivilCad.App.Views;
 using CivilCad.Core.Geometry;

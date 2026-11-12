@@ -1,5 +1,4 @@
 using System.Windows.Media;
-using CivilCad.App.Views;
 using CivilCad.Core.Commands;
 using CivilCad.Core.Geometry;
 using CivilCad.Core.Model;

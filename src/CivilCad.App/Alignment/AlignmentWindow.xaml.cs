@@ -2,7 +2,6 @@
 using System.Windows;
 using CivilCad.Alignment;
 using HorizontalAlignment = CivilCad.Alignment.HorizontalAlignment;
-using CivilCad.Core.Geometry;
 
 namespace CivilCad.App.Alignment;
 
@@ -73,9 +72,9 @@ public partial class AlignmentWindow : Window
             {
                 名称 = m.Name,
                 測点 = Station.Format(m.Station, pitch),
-                追加距離 = m.Station.ToString("F3"),
-                X = x.ToString("F3"),
-                Y = y.ToString("F3"),
+                追加距離 = m.Station.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
+                X = x.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
+                Y = y.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
                 方向角 = Angles.ToDms(Angles.ToSurveyAzimuth(m.Direction)),
             };
         }).ToList();
@@ -88,12 +87,12 @@ public partial class AlignmentWindow : Window
             R = c.Radius,
             A1 = c.A1,
             A2 = c.A2,
-            L1 = c.L1.ToString("F3"),
-            L2 = c.L2.ToString("F3"),
-            円曲線長 = c.Lc.ToString("F3"),
-            曲線全長 = c.CurveLength.ToString("F3"),
-            TL1 = c.T1.ToString("F3"),
-            TL2 = c.T2.ToString("F3"),
+            L1 = c.L1.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
+            L2 = c.L2.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
+            円曲線長 = c.Lc.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
+            曲線全長 = c.CurveLength.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
+            TL1 = c.T1.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
+            TL2 = c.T2.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
         }).ToList();
 
         var rows = new List<StationRow>();
@@ -110,7 +109,7 @@ public partial class AlignmentWindow : Window
         var (p, dir) = al.Evaluate(st);
         var (x, y) = p.ToSurvey();
         return new StationRow(Station.Format(st, _input.Pitch), name, Math.Round(st, 3),
-            x.ToString("F3"), y.ToString("F3"), Angles.ToDms(Angles.ToSurveyAzimuth(dir)));
+            x.ToString("F3", System.Globalization.CultureInfo.InvariantCulture), y.ToString("F3", System.Globalization.CultureInfo.InvariantCulture), Angles.ToDms(Angles.ToSurveyAzimuth(dir)));
     }
 
     private static double ParseDouble(string text, string label) =>

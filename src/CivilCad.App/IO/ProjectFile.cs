@@ -117,7 +117,7 @@ public static class ProjectFile
         Format = format,
         Version = CurrentVersion,
         Application = "CivilCad " + (appVersion ?? ""),
-        Saved = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+        Saved = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture),
     };
 
     /// <summary>使っている登録プリセット (組み込みの方位記号などは入れない)。無ければ null。</summary>

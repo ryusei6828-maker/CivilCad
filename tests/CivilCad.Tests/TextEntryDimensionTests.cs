@@ -1,6 +1,5 @@
 using System.IO;
 using System.Runtime.ExceptionServices;
-using System.Windows;
 using CivilCad.App.IO;
 using CivilCad.App.Tools;
 using CivilCad.App.Views;
