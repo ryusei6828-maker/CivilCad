@@ -152,6 +152,35 @@ public class EditingTests
     }
 
     [Fact]
+    public void ExtendTo_MovesNearEndToClickedPosition()
+    {
+        // 線: クリックに近い端を、線の向きのまま指定した位置 (垂線の足) まで
+        var line = Line(0, 0, 5, 0);
+        var ext = (LineEntity)TrimExtend.ExtendTo(line, new Vec2(4.5, 0), new Vec2(12, 3))!;
+        Assert.Equal((Vec2.Zero, new Vec2(12, 0)), (ext.Start, ext.End));
+        var back = (LineEntity)TrimExtend.ExtendTo(line, new Vec2(0.5, 0), new Vec2(-3, -1))!;
+        Assert.Equal((new Vec2(-3, 0), new Vec2(5, 0)), (back.Start, back.End));
+        // 縮めるのも可。反対の端より先は不可
+        Assert.Equal(new Vec2(2, 0), ((LineEntity)TrimExtend.ExtendTo(line, new Vec2(4.5, 0), new Vec2(2, 1))!).End);
+        Assert.Null(TrimExtend.ExtendTo(line, new Vec2(4.5, 0), new Vec2(-1, 0)));
+
+        // 開いたポリライン: 端の点だけ動く
+        var pl = new PolylineEntity(L, [new Vec2(0, 0), new Vec2(5, 0), new Vec2(5, 5)]);
+        var plExt = (PolylineEntity)TrimExtend.ExtendTo(pl, new Vec2(5, 4), new Vec2(7, 9))!;
+        Assert.Equal([new Vec2(0, 0), new Vec2(5, 0), new Vec2(5, 9)], plExt.Points);
+        Assert.Null(TrimExtend.ExtendTo(new PolylineEntity(L, pl.Points, true), new Vec2(5, 4), new Vec2(7, 9)));
+
+        // 円弧: 中心から見た向きまで
+        var arc = new ArcEntity(L, Vec2.Zero, 5, 0, Math.PI / 2);
+        var arcExt = (ArcEntity)TrimExtend.ExtendTo(arc, arc.EndPoint, new Vec2(-8, 0))!;
+        Assert.Equal(0, arcExt.StartAngle, 9);
+        Assert.Equal(Math.PI, arcExt.Sweep, 9);
+
+        // 円は対象外
+        Assert.Null(TrimExtend.ExtendTo(new CircleEntity(L, Vec2.Zero, 5), new Vec2(5, 0), new Vec2(9, 0)));
+    }
+
+    [Fact]
     public void Extend_ArcToLine()
     {
         var arc = new ArcEntity(L, new Vec2(0, 0), 5, 0, Math.PI / 4);

@@ -10,9 +10,9 @@ using CivilCad.Core.Model;
 namespace CivilCad.App.Tools;
 
 /// <summary>
-/// トリム・延長の共通部分。
+/// 境界を使うトリム (と、その Shift+クリックの「境界まで延長」) の共通部分。
 /// 1. 境界にする図形を選ぶ (先に選択してあればそれを使う。何も選ばず Enter で全図形)
-/// 2. 対象をクリックして切り取る / 伸ばす (Shift+クリックで逆の操作)
+/// 2. 対象をクリックして切り取る (Shift+クリックで境界まで伸ばす)
 /// </summary>
 public abstract class EdgeEditTool : CadTool
 {
@@ -145,12 +145,94 @@ public sealed class TrimTool : EdgeEditTool
     protected override bool ExtendsByDefault => false;
 }
 
-public sealed class ExtendTool : EdgeEditTool
+/// <summary>
+/// 延長 (EX): 線をクリック (伸ばす端の近く) → 伸ばす先をクリック。線の向きは変えず、クリックした所まで端を動かす (スナップ可)。
+/// 線・開いたポリライン・円弧が対象。続けて別の線にも使える。境界まで伸ばすのはトリム (TR) の Shift+クリック。
+/// </summary>
+public sealed class ExtendTool : CadTool
 {
+    private static readonly RgbColor PreviewColor = new(0x66, 0xCC, 0xFF);
+
+    private Entity? _target;
+    private Vec2 _pick;
+    private Entity? _hover;
+    private Vec2 _cursor;
+
     public override string Name => "延長";
-    protected override string EdgePrompt => "延長先の境界にする図形を選択";
-    protected override string TargetPrompt => "伸ばす図形の端の近くをクリック";
-    protected override bool ExtendsByDefault => true;
+    /// <summary>線を選ぶ間はスナップしない (線そのものをクリックする)。伸ばす先はスナップする。</summary>
+    public override bool WantsSnap => _target != null;
+    public override bool CanStepBack => _target != null;
+    public override string? ConfirmLabel => "終了 (Enter)";
+
+    /// <summary>線を選び直す。</summary>
+    public override void StepBack() => PromptTarget();
+
+    protected override void OnActivated()
+    {
+        Canvas.ClearSelection();
+        PromptTarget();
+    }
+
+    private void PromptTarget()
+    {
+        _target = null;
+        SetPrompt("伸ばす線をクリック (伸ばす端の近く) (Enter・Esc で終了)");
+    }
+
+    private static bool CanExtend(Entity e) => e is LineEntity or ArcEntity or PolylineEntity { IsClosed: false };
+
+    public override void OnPoint(Vec2 p)
+    {
+        if (_target == null || !Doc.Entities.Contains(_target))
+        {
+            if (Canvas.HitTest(p) is not { } hit) return;
+            if (!CanExtend(hit))
+            {
+                Canvas.ShowMessage("延長: 線・円弧・開いたポリラインが対象です。");
+                return;
+            }
+            _target = hit;
+            _pick = p;
+            SetPrompt("伸ばす先をクリック (線の向きのまま、その位置まで伸ばす) (Esc で線を選び直す)");
+            return;
+        }
+        if (TrimExtend.ExtendTo(_target, _pick, p) is not { } extended)
+        {
+            Canvas.ShowMessage("延長: その位置までは伸ばせません (反対の端より先を指定してください)。");
+            return;
+        }
+        Execute(new ReplaceEntitiesCommand([(_target, extended)], "延長"));
+        _hover = null;
+        PromptTarget();
+    }
+
+    public override void OnMouseMove(Vec2 p)
+    {
+        _cursor = p;
+        _hover = _target == null ? Canvas.HitTest(p) : null;
+    }
+
+    public override void OnEnter() => Finish();
+
+    public override void OnCancel()
+    {
+        if (_target != null) PromptTarget();
+        else Finish();
+    }
+
+    public override void DrawPreview(DrawingContext dc)
+    {
+        if (_target != null && Doc.Entities.Contains(_target))
+        {
+            Canvas.DrawEntity(dc, _target, PreviewColor, selected: true);
+            // 伸びた形を先に見せる
+            if (TrimExtend.ExtendTo(_target, _pick, _cursor) is { } extended) Canvas.DrawEntity(dc, extended, PreviewColor, selected: true);
+        }
+        else if (_hover != null && Doc.Entities.Contains(_hover) && CanExtend(_hover))
+        {
+            Canvas.DrawEntity(dc, _hover, PreviewColor);
+        }
+    }
 }
 
 /// <summary>距離を入力 → 図形をクリック → ずらす側をクリック。距離はそのままで続けて別の図形に使える。</summary>

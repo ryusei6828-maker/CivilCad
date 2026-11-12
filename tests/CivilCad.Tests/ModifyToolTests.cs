@@ -65,15 +65,29 @@ public class ModifyToolTests
             doc.History.Undo(); // トリムも戻す。描画順も元どおり
             Assert.Equal(0, doc.Entities.IndexOf(h));
 
-            // 延長: 先に境界 (v2) を選んでおく → 短い線の端をクリック
+            // 延長: 短い線の端の近くをクリック → 伸ばす先をクリック (線の向きのまま、その位置まで)
             var shortLine = new LineEntity(layer, new Vec2(0, 10), new Vec2(50, 10));
             doc.Entities.Add(shortLine);
-            canvas.SetSelection([v2]);
             canvas.SetTool(new ExtendTool());
+            Assert.False(canvas.Tool.WantsSnap); // 線を選ぶ間はスナップしない
             canvas.Tool.OnMouseMove(new Vec2(49, 10));
             Preview(canvas);
             canvas.Tool.OnPoint(new Vec2(49, 10));
+            Assert.True(canvas.Tool.WantsSnap); // 伸ばす先はスナップする
+            canvas.Tool.OnMouseMove(new Vec2(70, 13));
+            Preview(canvas);
+            canvas.Tool.OnPoint(new Vec2(70, 13)); // 線から外れた所をクリックしても、線の向きは変わらない
             Assert.Equal(new Vec2(70, 10), doc.Entities.OfType<LineEntity>().Single(l => l.Start == new Vec2(0, 10)).End);
+            Assert.DoesNotContain(shortLine, doc.Entities);
+            // 続けて同じ線の始点の側を伸ばす。反対の端より先は伸ばせない
+            canvas.Tool.OnPoint(new Vec2(1, 10));
+            canvas.Tool.OnPoint(new Vec2(80, 10));
+            Assert.Contains(doc.Entities.OfType<LineEntity>(), l => l.Start == new Vec2(0, 10) && l.End == new Vec2(70, 10));
+            canvas.Tool.OnPoint(new Vec2(-5, 10));
+            Assert.Contains(doc.Entities.OfType<LineEntity>(), l => l.Start == new Vec2(-5, 10) && l.End == new Vec2(70, 10));
+            doc.History.Undo();
+            doc.History.Undo();
+            Assert.Contains(shortLine, doc.Entities);
             canvas.Tool.OnCancel();
 
             // オフセット: 距離 5 → 横線 → 上側

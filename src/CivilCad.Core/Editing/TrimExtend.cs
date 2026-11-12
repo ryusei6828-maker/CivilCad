@@ -85,6 +85,53 @@ public static class TrimExtend
         }
     }
 
+    /// <summary>
+    /// 図形の端 (pick に近い方) を、指定した点 to まで伸ばす (縮めるのも可)。境界は要らない。
+    /// 線・開いたポリラインは向きを変えず、to から線の延長へ下ろした垂線の足まで。円弧は中心から to を見た向きまで。
+    /// 対象外の図形・反対の端を越える点なら null。
+    /// </summary>
+    public static Entity? ExtendTo(Entity target, Vec2 pick, Vec2 to)
+    {
+        switch (target)
+        {
+            case LineEntity line:
+            {
+                var atEnd = pick.DistanceTo(line.End) <= pick.DistanceTo(line.Start);
+                if (MoveEnd(atEnd ? line.Start : line.End, atEnd ? line.End : line.Start, to) is not Vec2 p) return null;
+                return EditUtil.CopyStyle(line, atEnd ? new LineEntity(line.Layer, line.Start, p) : new LineEntity(line.Layer, p, line.End));
+            }
+            case PolylineEntity pl when !pl.IsClosed && pl.Points.Count >= 2:
+            {
+                var pts = pl.Points;
+                var atEnd = pick.DistanceTo(pts[^1]) <= pick.DistanceTo(pts[0]);
+                if ((atEnd ? MoveEnd(pts[^2], pts[^1], to) : MoveEnd(pts[1], pts[0], to)) is not Vec2 p) return null;
+                var result = (PolylineEntity)pl.Clone();
+                result.Points[atEnd ? pts.Count - 1 : 0] = p;
+                return result;
+            }
+            case ArcEntity arc when to.DistanceTo(arc.Center) > Eps:
+            {
+                var atEnd = pick.DistanceTo(arc.EndPoint) <= pick.DistanceTo(arc.StartPoint);
+                var angle = (to - arc.Center).Angle;
+                var result = (ArcEntity)arc.Clone();
+                if (atEnd) result.EndAngle = angle;
+                else result.StartAngle = angle;
+                var eps = Eps / Math.Max(arc.Radius, 1e-9);
+                return result.Sweep > eps && result.Sweep < GeoMath.TwoPi - eps ? result : null;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>動かさない端 fixedEnd から moving へ向かう直線の上で、to にいちばん近い点。fixedEnd より手前になるなら null。</summary>
+    private static Vec2? MoveEnd(Vec2 fixedEnd, Vec2 moving, Vec2 to)
+    {
+        var dir = (moving - fixedEnd).Normalized();
+        var t = (to - fixedEnd).Dot(dir);
+        return dir != Vec2.Zero && t > Eps * Math.Max(1, fixedEnd.DistanceTo(moving)) ? fixedEnd + dir * t : null;
+    }
+
     /// <summary>線分 a-b を伸ばす向きの先 (終点側は t &gt; 1、始点側は t &lt; 0) で一番近い交点。</summary>
     private static Vec2? ExtendSegment(Vec2 a, Vec2 b, bool atEnd, List<Curve> edges)
     {
