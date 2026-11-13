@@ -109,4 +109,33 @@ public class PresetTests
             }
         }
     }
+
+    [Fact]
+    public void ControlPointSymbols_AreBuiltIn_AndFilledDotBecomesSolidHatch()
+    {
+        var kinds = new[]
+        {
+            SymbolLibrary.ControlTriangulation, SymbolLibrary.ControlLevel, SymbolLibrary.ControlElectronic,
+            SymbolLibrary.ControlPoint, SymbolLibrary.ControlPointDouble, SymbolLibrary.BoundaryMark,
+        };
+        var doc = new CadDocument { ScaleDenominator = 500 };
+        foreach (var kind in kinds)
+        {
+            var def = SymbolLibrary.Get(kind);
+            Assert.Equal(kind, def.Kind);
+            Assert.False(def.PointsNorth);
+            Assert.Equal(3, def.DefaultSizeMm);
+            var mark = new SymbolEntity(doc.CurrentLayer, kind, new Vec2(100, 200), 3, doc.PaperMmToMeters(3));
+            var hatches = mark.Explode().OfType<HatchEntity>().ToList();
+            if (kind == SymbolLibrary.BoundaryMark)
+            {
+                Assert.Empty(hatches);
+                continue;
+            }
+            var dot = Assert.Single(hatches);
+            Assert.True(dot.Solid);
+            Assert.True(dot.Contains(new Vec2(100, 200)));
+        }
+        Assert.Equal(SymbolLibrary.NorthArrow, SymbolLibrary.BuiltIn[0].Kind);
+    }
 }

@@ -47,6 +47,17 @@ public static class SymbolLibrary
     public const string NorthArrow = "NorthArrow";
     public const string NorthArrowSimple = "NorthArrowSimple";
     public const string NorthArrowCross = "NorthArrowCross";
+    public const string ControlTriangulation = "ControlTriangulation";
+    public const string ControlLevel = "ControlLevel";
+    public const string ControlElectronic = "ControlElectronic";
+    public const string ControlPoint = "ControlPoint";
+    public const string ControlPointDouble = "ControlPointDouble";
+    public const string BoundaryMark = "BoundaryMark";
+
+    // 正三角形 (辺 0.9、重心が原点、上向き)
+    private static readonly double TriR = 0.9 / Math.Sqrt(3);
+    private static SymbolPoly Triangle() => new(
+        [new(0, TriR), new(-0.45, -TriR / 2), new(0.45, -TriR / 2)], true);
 
     public static IReadOnlyList<SymbolDefinition> BuiltIn { get; } =
     [
@@ -76,6 +87,47 @@ public static class SymbolLibrary
             new SymbolPoly([new(0, -0.42), new(-0.08, 0), new(0.08, 0)], true),
             new SymbolText(new Vec2(0, 0.6), "N", 0.2),
         ], 20, PointsNorth: true),
+
+        // 測量の基準点の記号 (大きさ 1、原点が点の位置)
+        new(ControlTriangulation, "三角点",
+        [
+            Triangle(),
+            new SymbolCircle(Vec2.Zero, 0.06, Filled: true),
+        ], 3),
+
+        new(ControlLevel, "水準点",
+        [
+            new SymbolPoly([new(-0.38, -0.38), new(0.38, -0.38), new(0.38, 0.38), new(-0.38, 0.38)], true),
+            new SymbolCircle(Vec2.Zero, 0.06, Filled: true),
+        ], 3),
+
+        new(ControlElectronic, "電子基準点",
+        [
+            Triangle(),
+            new SymbolCircle(Vec2.Zero, 0.06, Filled: true),
+            new SymbolPoly([new(0, TriR), new(0, TriR + 0.25)], false),
+            new SymbolPoly([new(-0.1, TriR + 0.25), new(0.1, TriR + 0.25)], false),
+        ], 3),
+
+        new(ControlPoint, "基準点 (多角点)",
+        [
+            new SymbolCircle(Vec2.Zero, 0.4),
+            new SymbolCircle(Vec2.Zero, 0.06, Filled: true),
+        ], 3),
+
+        new(ControlPointDouble, "基準点 (二重丸)",
+        [
+            new SymbolCircle(Vec2.Zero, 0.4),
+            new SymbolCircle(Vec2.Zero, 0.25),
+            new SymbolCircle(Vec2.Zero, 0.05, Filled: true),
+        ], 3),
+
+        new(BoundaryMark, "境界杭",
+        [
+            new SymbolCircle(Vec2.Zero, 0.35),
+            new SymbolPoly([new(-0.35, 0), new(0.35, 0)], false),
+            new SymbolPoly([new(0, -0.35), new(0, 0.35)], false),
+        ], 3),
     ];
 
     private static readonly List<SymbolDefinition> _user = [];
@@ -225,6 +277,8 @@ public sealed class SymbolEntity(Layer layer, string kind, Vec2 position, double
             {
                 SymbolPoly { Filled: true } p => new HatchEntity(Layer, [p.Points.Select(Map)], [], solid: true),
                 SymbolPoly p => new PolylineEntity(Layer, p.Points.Select(Map), p.Closed),
+                SymbolCircle { Filled: true } c => new HatchEntity(Layer,
+                    [Enumerable.Range(0, 32).Select(k => Map(c.Center + Vec2.FromAngle(k * 2 * Math.PI / 32) * c.Radius))], [], solid: true),
                 SymbolCircle c => new CircleEntity(Layer, Map(c.Center), c.Radius * Size),
                 SymbolArc a => new ArcEntity(Layer, Map(a.Center), a.Radius * Size, a.StartAngle + Rotation, a.EndAngle + Rotation),
                 SymbolText t => new TextEntity(Layer, Map(t.Position), t.Text, t.Height * Size, t.Rotation + Rotation)
