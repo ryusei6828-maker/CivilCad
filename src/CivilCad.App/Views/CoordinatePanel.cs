@@ -26,6 +26,28 @@ public sealed class CoordinateItem
     public bool ShowName { get; set; }
 }
 
+/// <summary>行をまとめて選べる一覧 (1 行ずつ選ぶと、行が多いとき行の数の 2 乗の時間がかかる)。</summary>
+public sealed class BulkSelectGrid : DataGrid
+{
+    /// <summary>items だけが選ばれた状態にする。</summary>
+    public void SelectOnly(IEnumerable<object> items)
+    {
+        var list = items.ToList();
+        if (list.Count == 0 && SelectedItems.Count == 0) return;
+        UnselectAll();
+        if (list.Count == 0) return;
+        BeginUpdateSelectedItems();
+        try
+        {
+            foreach (var i in list) SelectedItems.Add(i);
+        }
+        finally
+        {
+            EndUpdateSelectedItems();
+        }
+    }
+}
+
 /// <summary>
 /// 座標管理: 登録された座標 (点名のある点。座標読込の点・幅杭・点コマンドの点) を 点名・X・Y・Z の一覧で表示する。
 /// 一覧で点名・座標・標高を直す、削除する、図面で点を追加する、CSV / SIMA に書き出す・読み込む。
@@ -33,7 +55,7 @@ public sealed class CoordinateItem
 /// </summary>
 public sealed class CoordinatePanel : DockPanel
 {
-    private readonly DataGrid _grid = new()
+    private readonly BulkSelectGrid _grid = new()
     {
         AutoGenerateColumns = false,
         CanUserAddRows = true, // 最後の空の行に打ち込むと点を登録する
@@ -63,6 +85,9 @@ public sealed class CoordinatePanel : DockPanel
     public Button FloatButton { get; } = new() { Content = "⧉", Padding = new Thickness(6, 0, 6, 0), BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent, Focusable = false, ToolTip = "フロート (別ウィンドウに切り離す)" };
 
     public IReadOnlyList<CoordinateItem> Items => _items;
+
+    /// <summary>一覧で選んでいる点の数。</summary>
+    public int SelectedCount => Selected().Count;
 
     /// <summary>今のタグの絞り込み (「(すべて)」など)。</summary>
     public string FilterLabel => _filter.SelectedItem as string ?? AllTagsLabel;
@@ -250,7 +275,7 @@ public sealed class CoordinatePanel : DockPanel
         _items.Clear();
         foreach (var r in all.Where(r => Matches(r.Point, (string)_filter.SelectedItem)))
             _items.Add(new CoordinateItem { Point = r.Point, Name = r.Name, X = F(r.X), Y = F(r.Y), Z = r.Z is double z ? F(z) : "", Tags = r.Tags, ShowName = r.Point.ShowName });
-        foreach (var i in _items.Where(i => i.Point != null && selected.Contains(i.Point))) _grid.SelectedItems.Add(i);
+        _grid.SelectOnly(_items.Where(i => i.Point != null && selected.Contains(i.Point)));
         RestoreCurrentCell(currentRow, currentColumn, hadFocus);
         _syncing = false;
         _title.Text = _items.Count == all.Count ? $"座標管理  ({all.Count} 点)" : $"座標管理  ({_items.Count} / {all.Count} 点)";
@@ -327,8 +352,7 @@ public sealed class CoordinatePanel : DockPanel
     {
         if (_syncing || _canvas == null) return;
         _syncing = true;
-        _grid.SelectedItems.Clear();
-        foreach (var i in _items.Where(i => i.Point is { } p && _canvas.Selection.Contains(p))) _grid.SelectedItems.Add(i);
+        _grid.SelectOnly(_items.Where(i => i.Point is { } p && _canvas.Selection.Contains(p)));
         _syncing = false;
     }
 
