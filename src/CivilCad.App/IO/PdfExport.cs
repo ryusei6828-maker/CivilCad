@@ -339,6 +339,12 @@ public static class PdfExport
                     var d = Math.Max(PointDiameterMm, 2 * (e.LineWeight ?? 0));
                     using var dot = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Color = Color(e) };
                     canvas.DrawCircle(P(pt.Position), (float)(d / 2 * PtPerMm), dot);
+                    if (pt.ShowName && pt.Name.Length > 0)
+                    {
+                        // 点名: 点の右上に用紙上 2.5mm
+                        var gap = doc.PaperMmToMeters(0.8);
+                        DrawText(new TextEntity(pt.Layer, pt.Position + new Vec2(gap, gap), pt.Name, doc.PaperMmToMeters(PointEntity.NameHeightMm), 0) { Color = pt.Color });
+                    }
                     break;
                 }
                 case ArcEntity a:

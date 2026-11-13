@@ -378,7 +378,9 @@ public static partial class DwgIO
                 var strings = values.OfType<string>().ToList();
                 p.Name = strings.ElementAtOrDefault(0) ?? "";
                 p.Tags = strings.ElementAtOrDefault(1) ?? "";
-                if (values.OfType<short>().FirstOrDefault() != 0) p.Z = pt.Location.Z;
+                var flags = values.OfType<short>().ToList(); // 「標高あり」「点名を表示」の順
+                if (flags.ElementAtOrDefault(0) != 0) p.Z = pt.Location.Z;
+                p.ShowName = flags.ElementAtOrDefault(1) != 0;
             }
             else if (Math.Abs(pt.Location.Z) > 1e-12)
             {

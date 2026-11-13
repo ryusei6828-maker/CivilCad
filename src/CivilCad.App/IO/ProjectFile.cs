@@ -171,7 +171,7 @@ public static class ProjectFile
             PolylineEntity p => new PolylineDto { Points = [.. p.Points], Closed = p.IsClosed, Filled = p.Filled, FillOpacity = p.FillOpacity < 1 ? p.FillOpacity : null },
             CircleEntity c => new CircleDto { Center = c.Center, Radius = c.Radius },
             ArcEntity a => new ArcDto { Center = a.Center, Radius = a.Radius, StartAngle = a.StartAngle, EndAngle = a.EndAngle },
-            PointEntity p => new PointDto { Position = p.Position, Name = p.Name, Z = p.Z, Tags = p.Tags },
+            PointEntity p => new PointDto { Position = p.Position, Name = p.Name, Z = p.Z, Tags = p.Tags, ShowName = p.ShowName ? true : null },
             TextEntity t => new TextDto
             {
                 Position = t.Position, Text = t.Text, Height = t.Height, Rotation = t.Rotation, HAlign = t.HAlign, VAlign = t.VAlign,
@@ -362,7 +362,7 @@ public static class ProjectFile
         PolylineDto p when p.Points is { Count: > 0 } => new PolylineEntity(layer, p.Points, p.Closed) { Filled = p.Filled, FillOpacity = p.FillOpacity ?? 1 },
         CircleDto c => new CircleEntity(layer, c.Center, c.Radius),
         ArcDto a => new ArcEntity(layer, a.Center, a.Radius, a.StartAngle, a.EndAngle),
-        PointDto p => new PointEntity(layer, p.Position) { Name = p.Name ?? "", Z = p.Z, Tags = p.Tags ?? "" },
+        PointDto p => new PointEntity(layer, p.Position) { Name = p.Name ?? "", Z = p.Z, Tags = p.Tags ?? "", ShowName = p.ShowName == true },
         TextDto t => new TextEntity(layer, t.Position, t.Text ?? "", t.Height, t.Rotation)
         {
             HAlign = t.HAlign, VAlign = t.VAlign, WidthFactor = t.WidthFactor is > 0 ? t.WidthFactor : 1, FitWidth = t.FitWidth,
@@ -493,6 +493,7 @@ public static class ProjectFile
         public string? Name { get; set; }
         public double? Z { get; set; }
         public string? Tags { get; set; }
+        public bool? ShowName { get; set; }
     }
 
     private sealed class TextDto : EntityDto

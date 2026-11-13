@@ -13,6 +13,12 @@ public sealed class PointEntity(Layer layer, Vec2 position) : Entity(layer)
     /// <summary>点名。空なら座標管理の一覧に出さない。</summary>
     public string Name { get; set; } = "";
 
+    /// <summary>点名を点の右上に表示するか (画面・PDF 印刷。大きさは画面で一定・用紙上 2.5mm)。座標管理で点ごと・まとめて切り替える。</summary>
+    public bool ShowName { get; set; }
+
+    /// <summary>点名の文字高 (用紙上の mm。PDF 印刷)。</summary>
+    public const double NameHeightMm = 2.5;
+
     /// <summary>標高 (m)。無ければ null。</summary>
     public double? Z { get; set; }
 
@@ -29,6 +35,6 @@ public sealed class PointEntity(Layer layer, Vec2 position) : Entity(layer)
     public override void Mirror(Vec2 a, Vec2 b) => Position = Position.ReflectAcross(a, b);
     public override void Rotate(Vec2 origin, double rad) => Position = Position.RotateAround(origin, rad);
     public override void Scale(Vec2 origin, double k) => Position = ScalePoint(Position, origin, k);
-    public override Entity Clone() => CopyPropertiesTo(new PointEntity(Layer, Position) { Name = Name, Z = Z, Tags = Tags });
+    public override Entity Clone() => CopyPropertiesTo(new PointEntity(Layer, Position) { Name = Name, Z = Z, Tags = Tags, ShowName = ShowName });
     public override IEnumerable<SnapPoint> SnapPoints => [new(Position, SnapKind.Node)];
 }

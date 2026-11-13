@@ -310,6 +310,7 @@ public partial class MainWindow : UserControl
             case "CM": SetPanelOpen(_coordDock, !_coordDock.IsOpen); break;
             case "CMF": SetPanelFloating(_coordDock, !_coordDock.IsFloating); break;
             case "CD": DrawCoordinates(); break;
+            case "PN": CoordPanel.ToggleNames(); break;
             case "PJO": OpenProjectDialog(); break;
             case "PJS": SaveProject(saveAs: false); break;
             case "PJA": SaveProject(saveAs: true); break;

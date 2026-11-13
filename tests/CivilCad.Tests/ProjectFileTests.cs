@@ -24,7 +24,7 @@ public class ProjectFileTests
             new PolylineEntity(l0, [new(0, 0), new(1, 0), new(1, 1)], isClosed: true) { Filled = true },
             new CircleEntity(l0, new Vec2(5, 5), 2),
             new ArcEntity(l0, new Vec2(5, 5), 3, 0.5, 2.5),
-            new PointEntity(l0, new Vec2(30, 40)) { Name = "BM1", Z = 12.345, Tags = "BM, 境界" },
+            new PointEntity(l0, new Vec2(30, 40)) { Name = "BM1", Z = 12.345, Tags = "BM, 境界", ShowName = true },
             new TextEntity(l0, new Vec2(1, 2), "工事名", 3.5, 0.2) { HAlign = TextHAlign.Center, VAlign = TextVAlign.Middle, FontName = "ＭＳ 明朝", FitWidth = 20, WidthFactor = 0.8 },
             new HatchEntity(hidden, [[new(0, 0), new(4, 0), new(4, 4)]], [new HatchPattern(0.7, 1.5, new Vec2(0, 0))]) { Opacity = 0.5, PatternName = "ANSI31" },
             new ImageEntity(l0, @"C:\写真\オルソ.jpg", 400, 300, new Vec2(0, 0), new Vec2(40, 0), new Vec2(0, 30)) { Page = 2, CropLeft = 0.1, CropRight = 0.9, InFront = true, TransparencyPercent = 30 },
@@ -79,6 +79,7 @@ public class ProjectFileTests
             Assert.Equal((3.0, 0.5, 2.5), (arc.Radius, arc.StartAngle, arc.EndAngle));
             var pt = (PointEntity)d.Entities[4];
             Assert.Equal(("BM1", 12.345, "BM, 境界"), (pt.Name, pt.Z!.Value, pt.Tags));
+            Assert.True(pt.ShowName);
             var text = (TextEntity)d.Entities[5];
             Assert.Equal(("工事名", TextHAlign.Center, TextVAlign.Middle, "ＭＳ 明朝", 20.0, 0.8), (text.Text, text.HAlign, text.VAlign, text.FontName, text.FitWidth!.Value, text.WidthFactor));
             var hatch = (HatchEntity)d.Entities[6];

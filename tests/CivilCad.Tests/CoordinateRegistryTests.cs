@@ -340,6 +340,82 @@ public class CoordinateTagTests
         }
     }
 
+    [Fact]
+    public void Panel_TogglesPointNames_PerPointAndAll() => RunSta((doc, canvas) =>
+    {
+        doc.Entities.AddRange(
+        [
+            new PointEntity(doc.CurrentLayer, new Vec2(0, 0)) { Name = "K1", Tags = "幅杭" },
+            new PointEntity(doc.CurrentLayer, new Vec2(1, 0)) { Name = "K2", Tags = "幅杭" },
+            new PointEntity(doc.CurrentLayer, new Vec2(2, 0)) { Name = "B1" },
+            new PointEntity(doc.CurrentLayer, new Vec2(3, 0)), // 点名の無い点は対象外
+        ]);
+        var panel = new CoordinatePanel();
+        panel.Attach(canvas);
+        List<string> Shown() => [.. doc.Entities.OfType<PointEntity>().Where(p => p.ShowName).Select(p => p.Name)];
+        Assert.All(panel.Items, i => Assert.False(i.ShowName)); // 既定は表示しない
+
+        // 点ごと: K2 だけ表示 (一覧のチェックと同じ)
+        Assert.Equal(1, panel.SetNamesVisible([panel.Items.Single(i => i.Name == "K2").Point!], true));
+        Assert.Equal(["K2"], Shown());
+        Assert.True(panel.Items.Single(i => i.Name == "K2").ShowName);
+        Assert.Equal(0, panel.SetNamesVisible([panel.Items.Single(i => i.Name == "K2").Point!], true)); // 同じなら何もしない
+
+        // まとめて: 何も選んでいなければ一覧の点すべて。1 つでも表示していなければ全部表示 → もう一度で全部消す
+        panel.ToggleNames();
+        Assert.Equal(["K1", "K2", "B1"], Shown());
+        panel.ToggleNames();
+        Assert.Empty(Shown());
+        doc.History.Undo(); // 1 回で戻る
+        Assert.Equal(["K1", "K2", "B1"], Shown());
+        panel.ToggleNames();
+        Assert.Empty(Shown());
+
+        // 選んでいれば選んだ点だけ。選択はそのまま残る
+        canvas.SetSelection(doc.Entities.OfType<PointEntity>().Where(p => p.Name == "B1"));
+        panel.ToggleNames();
+        Assert.Equal(["B1"], Shown());
+        Assert.Equal("B1", Assert.IsType<PointEntity>(Assert.Single(canvas.Selection)).Name);
+        canvas.ClearSelection();
+
+        // タグで絞り込んでいれば、一覧に出ている点だけ
+        panel.FilterByTag("幅杭");
+        panel.ToggleNames();
+        Assert.Equal(["K1", "K2", "B1"], Shown());
+        panel.ToggleNames();
+        Assert.Equal(["B1"], Shown());
+
+        // 複写しても表示のまま
+        Assert.True(((PointEntity)doc.Entities.OfType<PointEntity>().Single(p => p.Name == "B1").Clone()).ShowName);
+    });
+
+    [Theory]
+    [InlineData(".dxf")]
+    [InlineData(".dwg")]
+    public void Save_KeepsShowName(string ext)
+    {
+        var doc = new CadDocument();
+        doc.Entities.Add(new PointEntity(doc.CurrentLayer, new Vec2(10, 20)) { Name = "K1", Z = 3, ShowName = true });
+        doc.Entities.Add(new PointEntity(doc.CurrentLayer, new Vec2(30, 40)) { Name = "K2" });
+        var path = Temp(ext);
+        try
+        {
+            DrawingFiles.Save(doc, path);
+            var back = new CadDocument();
+            DrawingFiles.Open(back, path);
+            var k1 = back.Entities.OfType<PointEntity>().Single(p => p.Name == "K1");
+            Assert.True(k1.ShowName);
+            Assert.Equal(3, k1.Z);
+            var k2 = back.Entities.OfType<PointEntity>().Single(p => p.Name == "K2");
+            Assert.False(k2.ShowName);
+            Assert.Null(k2.Z);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Theory]
     [InlineData(".dxf")]
     [InlineData(".dwg")]

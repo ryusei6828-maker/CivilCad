@@ -22,6 +22,8 @@ public sealed class CoordinateItem
     public string Y { get; set; } = "";
     public string Z { get; set; } = "";
     public string Tags { get; set; } = "";
+    /// <summary>点名を図面に表示するか。</summary>
+    public bool ShowName { get; set; }
 }
 
 /// <summary>
@@ -95,6 +97,7 @@ public sealed class CoordinatePanel : DockPanel
         B("削除", "一覧で選んだ点を図面から消す", DeleteSelected);
         B("描画", "座標の描画 (CD): 点にマーク (十字＋〇など) と点名を描く", () => RunCommand?.Invoke("CD"));
         B("表示", "一覧で選んだ点が見えるように拡大する", ZoomToSelected);
+        B("点名の表示", "点名を図面に表示する / 消す (選んでいれば選んだ点、選んでいなければ一覧の点すべて)", ToggleNames);
         B("CSV 書き出し", "点名,X,Y,Z の CSV に書き出す (選んでいれば選んだ点だけ)", () => Export(csv: true));
         B("SIMA 書き出し", "SIMA (A01) に書き出す (選んでいれば選んだ点だけ)", () => Export(csv: false));
         B("読込", "SIMA / CSV の座標を読み込んで登録する", () => RunCommand?.Invoke("PI"));
@@ -146,6 +149,25 @@ public sealed class CoordinatePanel : DockPanel
             Binding = new System.Windows.Data.Binding(path) { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus },
             Width = new DataGridLength(width, DataGridLengthUnitType.Star),
         };
+        // 点名の表示: 1 回のクリックで切り替わるチェック (点ごと)
+        var check = new FrameworkElementFactory(typeof(CheckBox));
+        check.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            new System.Windows.Data.Binding(nameof(CoordinateItem.ShowName)) { Mode = System.Windows.Data.BindingMode.OneWay });
+        check.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        check.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
+        check.SetValue(FocusableProperty, false);
+        check.SetValue(ToolTipProperty, "この点の点名を図面に表示する");
+        check.AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler((s, _) =>
+        {
+            if (s is CheckBox { DataContext: CoordinateItem { Point: { } p } } box) SetNamesVisible([p], box.IsChecked == true);
+        }));
+        _grid.Columns.Add(new DataGridTemplateColumn
+        {
+            Header = "名表示",
+            CellTemplate = new DataTemplate { VisualTree = check },
+            Width = DataGridLength.SizeToHeader,
+            IsReadOnly = true,
+        });
         _grid.Columns.Add(Col("点名", nameof(CoordinateItem.Name), 1.4));
         _grid.Columns.Add(Col("X (北)", nameof(CoordinateItem.X), 1.2));
         _grid.Columns.Add(Col("Y (東)", nameof(CoordinateItem.Y), 1.2));
@@ -227,7 +249,7 @@ public sealed class CoordinatePanel : DockPanel
         var all = CoordinateRegistry.Rows(doc);
         _items.Clear();
         foreach (var r in all.Where(r => Matches(r.Point, (string)_filter.SelectedItem)))
-            _items.Add(new CoordinateItem { Point = r.Point, Name = r.Name, X = F(r.X), Y = F(r.Y), Z = r.Z is double z ? F(z) : "", Tags = r.Tags });
+            _items.Add(new CoordinateItem { Point = r.Point, Name = r.Name, X = F(r.X), Y = F(r.Y), Z = r.Z is double z ? F(z) : "", Tags = r.Tags, ShowName = r.Point.ShowName });
         foreach (var i in _items.Where(i => i.Point != null && selected.Contains(i.Point))) _grid.SelectedItems.Add(i);
         RestoreCurrentCell(currentRow, currentColumn, hadFocus);
         _syncing = false;
@@ -279,7 +301,7 @@ public sealed class CoordinatePanel : DockPanel
         }
         var name = item.Name.Trim().Length > 0 ? item.Name.Trim() : CoordinateRegistry.NextName(doc);
         var tags = item.Tags.Trim().Length > 0 ? item.Tags.Trim() : CoordinateRegistry.DefaultTag;
-        var p = new PointEntity(doc.CurrentLayer, doc.FromSurvey(x, y)) { Name = name, Z = z, Tags = tags };
+        var p = new PointEntity(doc.CurrentLayer, doc.FromSurvey(x, y)) { Name = name, Z = z, Tags = tags, ShowName = item.ShowName };
         doc.History.Execute(new AddEntitiesCommand([p], $"座標の登録 {name}"));
         item.Point = p;
         Refresh();
@@ -338,6 +360,46 @@ public sealed class CoordinatePanel : DockPanel
         _canvas.SetSelection([made]);
         Refresh();
         return true;
+    }
+
+    /// <summary>
+    /// 点名の表示をまとめて切り替える: 選んだ点 (選んでいなければ一覧の点すべて) に、1 つでも表示していない点があれば全部表示、
+    /// 全部表示していれば全部消す。
+    /// </summary>
+    public void ToggleNames()
+    {
+        if (_canvas == null) return;
+        if (!_editing) Refresh(); // 元に戻した直後などでも、今の図面の点で
+        var chosen = _canvas.Selection.OfType<PointEntity>().Where(p => p.Name.Length > 0).ToList();
+        var targets = chosen.Count > 0 ? chosen : [.. _items.Select(i => i.Point).OfType<PointEntity>()];
+        if (targets.Count == 0)
+        {
+            _canvas.ShowMessage("点名の表示: 登録した座標がありません。");
+            return;
+        }
+        var show = targets.Any(p => !p.ShowName);
+        SetNamesVisible(targets, show);
+        _canvas.ShowMessage($"点名の表示: {targets.Count} 点の点名を{(show ? "表示しました" : "消しました")} ({(chosen.Count > 0 ? "選んだ点" : "一覧の点すべて")}。Ctrl+Z で戻せます)。");
+    }
+
+    /// <summary>点の点名を図面に表示する / 消す (元に戻せる)。変わった点の数。</summary>
+    public int SetNamesVisible(IReadOnlyCollection<PointEntity> points, bool show)
+    {
+        if (_watched is not { } doc || _canvas == null) return 0;
+        var pairs = points.Where(p => p.ShowName != show && doc.Entities.Contains(p)).Select(p =>
+        {
+            var made = (PointEntity)p.Clone();
+            made.ShowName = show;
+            return (Old: (Entity)p, New: (Entity)made);
+        }).ToList();
+        if (pairs.Count == 0) return 0;
+        // 差し替えても選択はそのまま
+        var selection = _canvas.Selection.ToList();
+        doc.History.Execute(new ReplaceEntitiesCommand(pairs, show ? "点名を表示" : "点名を消す"));
+        var map = pairs.ToDictionary(x => x.Old, x => x.New);
+        _canvas.SetSelection(selection.Select(e => map.GetValueOrDefault(e, e)));
+        Refresh();
+        return pairs.Count;
     }
 
     private List<CoordinateItem> Selected() => [.. _grid.SelectedItems.OfType<CoordinateItem>().Where(i => i.Point != null)];

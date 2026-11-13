@@ -725,6 +725,9 @@ public sealed class CadCanvas : FrameworkElement
     /// <summary>点の印の半径 (画面 px)。拡大率によらず同じ大きさ。</summary>
     public const double PointRadiusPx = 2.5;
 
+    /// <summary>点名の文字の大きさ (画面 px)。</summary>
+    public const double PointNamePx = 12;
+
     /// <summary>点: 大きさ一定の黒丸 (線幅が太ければ少し大きく)。選択中は周りに破線の丸。</summary>
     private void DrawPoint(DrawingContext dc, PointEntity pt, RgbColor color, bool selected, Pen pen)
     {
@@ -732,6 +735,13 @@ public sealed class CadCanvas : FrameworkElement
         var r = Math.Max(PointRadiusPx, pen.Thickness / 2 + 1);
         dc.DrawEllipse(GetBrush(color), null, c, r, r);
         if (selected) dc.DrawEllipse(null, pen, c, r + 4, r + 4);
+        if (pt.ShowName && pt.Name.Length > 0)
+        {
+            // 点名: 点の右上に、拡大率によらず同じ大きさで
+            var ft = new FormattedText(pt.Name, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, _typeface, PointNamePx,
+                GetBrush(color), VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            dc.DrawText(ft, new Point(c.X + r + 3, c.Y - r - 2 - ft.Height));
+        }
     }
 
     // ---- 画像 ----
