@@ -4,12 +4,15 @@ using System.Windows.Media;
 using CivilCad.App.Views;
 using CivilCad.Core.Commands;
 using CivilCad.Core.Geometry;
+using CivilCad.Core.Model;
 
 namespace CivilCad.App.Tools;
 
 /// <summary>
 /// 座標設定: 図面上の基準点と、その測量座標 (X=北, Y=東) を指定して、図面全体を移動・回転し
 /// 図面の座標 = 測量座標 にする。基準点 2 点なら方向も合わせる (1 点なら移動だけ)。
+/// 測量座標は「X,Y」の入力のほか、登録した座標の点 (図面の点・座標管理の一覧の行) のクリックでも入る。
+/// クリックで入れたときは、登録した座標 (点名のある点と、その描画のマーク) は図面と一緒に動かさず、測量座標がそのままになる位置に置く。
 /// </summary>
 public sealed class CoordinateSetTool : CadTool
 {
@@ -19,6 +22,12 @@ public sealed class CoordinateSetTool : CadTool
     private Vec2 _p1, _p2;
     private Vec2 _s1; // 基準点1 の測量座標を CAD 座標 (x=東, y=北) にしたもの
     private Vec2 _cursor;
+    private bool _picked; // 測量座標を登録した座標の点のクリックで入れた
+
+    private const string SurveyHow = "「X,Y」で入力 (X=北, Y=東。例: -95537.12,-60760.90)、または登録した座標の点 (図面の点・座標管理の一覧の行) をクリック";
+
+    /// <summary>測量座標の入力を待っているか (座標管理の一覧の行のクリックを受け取る)。</summary>
+    public bool WaitingForSurvey => _step is Step.Survey1 or Step.Survey2;
 
     public override string Name => "座標設定";
     public override Vec2? BasePoint => _step >= Step.Point2 ? _p1 : null;
@@ -40,7 +49,8 @@ public sealed class CoordinateSetTool : CadTool
                 break;
             case Step.Point2:
                 _step = Step.Survey1;
-                SetPrompt("基準点1 の測量座標を「X,Y」で入力 (X=北, Y=東。例: -95537.12,-60760.90)");
+                _picked = false; // 基準点1 の測量座標を入れ直す
+                SetPrompt("基準点1 の測量座標を" + SurveyHow);
                 break;
             case Step.Survey2:
                 _step = Step.Point2;
@@ -56,7 +66,7 @@ public sealed class CoordinateSetTool : CadTool
             case Step.Point1:
                 _p1 = p;
                 _step = Step.Survey1;
-                SetPrompt("基準点1 の測量座標を「X,Y」で入力 (X=北, Y=東。例: -95537.12,-60760.90)");
+                SetPrompt("基準点1 の測量座標を" + SurveyHow);
                 break;
             case Step.Point2:
                 if (p.DistanceTo(_p1) < 1e-6)
@@ -66,8 +76,53 @@ public sealed class CoordinateSetTool : CadTool
                 }
                 _p2 = p;
                 _step = Step.Survey2;
-                SetPrompt("基準点2 の測量座標を「X,Y」で入力 (X=北, Y=東)");
+                SetPrompt("基準点2 の測量座標を" + SurveyHow);
                 break;
+            case Step.Survey1 or Step.Survey2:
+                // 登録した座標の点をクリック: その点の測量座標を入れる
+                if (RegisteredPointAt(p) is { } point) UsePoint(point);
+                else Canvas.ShowMessage("座標設定: 登録した座標の点 (点名のある点) をクリックするか、測量座標を「X,Y」で入力してください。");
+                break;
+        }
+    }
+
+    /// <summary>p にある登録した座標の点 (スナップした位置にある点、無ければクリックで当たった点)。</summary>
+    private PointEntity? RegisteredPointAt(Vec2 p)
+    {
+        var tolerance = Math.Max(Doc.PaperMmToMeters(0.01), 1e-9);
+        return Doc.Entities.OfType<PointEntity>().Where(q => q.Name.Length > 0 && Doc.IsVisible(q) && q.Position.DistanceTo(p) <= tolerance)
+                   .MinBy(q => q.Position.DistanceTo(p))
+               ?? (Canvas.HitTest(p) is PointEntity { Name.Length: > 0 } hit ? hit : null);
+    }
+
+    /// <summary>登録した座標の点の測量座標を、今の基準点の測量座標として入れる (図面の点・座標管理の一覧の行のクリック)。待っていなければ false。</summary>
+    public bool UsePoint(PointEntity point)
+    {
+        if (!WaitingForSurvey) return false;
+        var s = Doc.ToSurveyCad(point.Position);
+        if (_step == Step.Survey2 && s.DistanceTo(_s1) < 1e-9)
+        {
+            Canvas.ShowMessage("座標設定: 基準点2 の測量座標は、基準点1 と別の点にしてください。");
+            return true;
+        }
+        _picked = true;
+        var (x, y) = s.ToSurvey();
+        Canvas.ShowMessage($"座標設定: {point.Name} (X={x:F3}, Y={y:F3}) を基準点{(_step == Step.Survey1 ? 1 : 2)} の測量座標にしました。");
+        SetSurvey(s);
+        return true;
+    }
+
+    private void SetSurvey(Vec2 s)
+    {
+        if (_step == Step.Survey1)
+        {
+            _s1 = s;
+            _step = Step.Point2;
+            SetPrompt("基準点2 を指定 (方向も合わせる) / Enter で移動だけ行う");
+        }
+        else
+        {
+            Apply(_p2, s);
         }
     }
 
@@ -79,16 +134,7 @@ public sealed class CoordinateSetTool : CadTool
             Canvas.ShowMessage("測量座標は「X,Y」の形で入力してください (X=北, Y=東)。");
             return true;
         }
-        if (_step == Step.Survey1)
-        {
-            _s1 = s;
-            _step = Step.Point2;
-            SetPrompt("基準点2 を指定 (方向も合わせる) / Enter で移動だけ行う");
-        }
-        else
-        {
-            Apply(_p2, s);
-        }
+        SetSurvey(s);
         return true;
     }
 
@@ -105,9 +151,16 @@ public sealed class CoordinateSetTool : CadTool
         // 図面は回さない: 基準点1 が測量座標に来るよう移動するだけにし、2 点の向きの違いは「測量座標の向き」としてシートに持つ
         // (座標の表示・入力、計測の方向角、座標読込、路線、方位記号はこの向きで計算する)
         var r = ComputeTransform(_p1, _s1, p2, s2);
-        Execute(new CompositeCommand("座標設定",
-            new TranslateEntitiesCommand(Doc.Entities.ToList(), r.Delta),
-            new SetSurveyFrameCommand(r.Angle, _s1)));
+        // 登録した座標の点のクリックで合わせたときは、登録した座標 (と、その描画のマーク) は図面と一緒に動かさない。
+        // 測量座標がそのままになる位置 (新しい向きでの位置) へ移す
+        var kept = _picked ? Doc.Entities.Where(IsRegisteredCoordinate).ToList() : [];
+        var keptSet = kept.ToHashSet();
+        Vec2 Keep(Vec2 p) => _s1 + (Doc.ToSurveyCad(p) - _s1).Rotate(-r.Angle);
+        var commands = new List<IUndoableCommand> { new TranslateEntitiesCommand(Doc.Entities.Where(e => !keptSet.Contains(e)).ToList(), r.Delta) };
+        if (kept.Count > 0)
+            commands.Add(new RotateTranslateCommand(kept, Vec2.Zero, Doc.SurveyRotation - r.Angle, Keep(Vec2.Zero), "登録した座標を測量座標の位置へ"));
+        commands.Add(new SetSurveyFrameCommand(r.Angle, _s1));
+        Execute(new CompositeCommand("座標設定", [.. commands]));
 
         var (x, y) = _s1.ToSurvey();
         var msg = $"座標を設定しました: 基準点1 → X={x:F3}, Y={y:F3}";
@@ -118,10 +171,15 @@ public sealed class CoordinateSetTool : CadTool
             if (Math.Abs(r.ScaleRatio - 1) > 0.005)
                 msg += $"  ※距離が {Math.Abs(r.ScaleRatio - 1) * 100:F1}% 違います。縮尺や点の指定を確認してください (大きさは変えていません)";
         }
+        if (kept.Count > 0) msg += $"。登録した座標 {kept.OfType<PointEntity>().Count()} 点の測量座標はそのままです";
         Canvas.ShowMessage(msg + "。Ctrl+Z で元に戻せます。");
         Canvas.ZoomExtents();
         Finish();
     }
+
+    /// <summary>登録した座標 (点名のある点) と、その描画 (CD) のマーク・点名。</summary>
+    private static bool IsRegisteredCoordinate(Entity e) =>
+        e is PointEntity { Name.Length: > 0 } || e.Tag?.StartsWith(CoordinateMarks.TagPrefix, StringComparison.Ordinal) == true;
 
     public readonly record struct TransformResult(double Angle, Vec2 Delta, double DrawingDistance, double SurveyDistance)
     {

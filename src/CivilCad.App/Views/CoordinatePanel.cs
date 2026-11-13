@@ -86,6 +86,14 @@ public sealed class CoordinatePanel : DockPanel
 
     public IReadOnlyList<CoordinateItem> Items => _items;
 
+    /// <summary>点名の行を 1 つだけ選ぶ (行のクリックと同じ)。無ければ false。</summary>
+    public bool SelectRow(string name)
+    {
+        if (_items.FirstOrDefault(i => i.Name == name) is not { } item) return false;
+        _grid.SelectOnly([item]);
+        return true;
+    }
+
     /// <summary>一覧で選んでいる点の数。</summary>
     public int SelectedCount => Selected().Count;
 
@@ -209,6 +217,14 @@ public sealed class CoordinatePanel : DockPanel
         _grid.SelectionChanged += (_, _) =>
         {
             if (_syncing || _canvas == null) return;
+            // 座標設定 (CS) が測量座標を待っている間は、クリックした行の点の座標をそこへ入れる (図面の選択は変えない)
+            if (_canvas.Tool is CoordinateSetTool { WaitingForSurvey: true } set && _grid.SelectedItems.Count == 1 &&
+                _grid.SelectedItem is CoordinateItem { Point: { } picked })
+            {
+                set.UsePoint(picked);
+                _canvas.RedrawOverlay();
+                return;
+            }
             _syncing = true;
             _canvas.SetSelection(_grid.SelectedItems.OfType<CoordinateItem>().Select(i => i.Point).OfType<PointEntity>());
             _syncing = false;
