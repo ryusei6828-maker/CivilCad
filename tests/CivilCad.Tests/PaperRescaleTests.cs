@@ -81,4 +81,66 @@ public class PaperRescaleTests
         Assert.Contains(text, doc.Entities);
         Assert.Equal(0.35, text.Height, 9);
     }
+
+    [Fact]
+    public void KeepPaper_AfterCoordinateSet_ScalesAboutSurveyPivot_AndKeepsRegisteredCoordinatesAndRoute()
+    {
+        var doc = new CadDocument { ScaleDenominator = 100 };
+        var pivot = new Vec2(-70857.888, -127271.935);
+        doc.SetSurveyFrame(0, pivot); // 座標設定 (向き 0 でも基準点は残る)
+        var body = new LineEntity(doc.CurrentLayer, pivot + new Vec2(1, 2), pivot + new Vec2(11, 2));
+        var point = new PointEntity(doc.CurrentLayer, pivot + new Vec2(5, 5)) { Name = "A1" };
+        var mark = new CircleEntity(doc.CurrentLayer, point.Position, 0.15) { Tag = "POINT:A1" };
+        var tagged = new TextEntity(doc.CurrentLayer, point.Position + new Vec2(0.2, 0.1), "A1", 0.25) { Tag = "POINT:A1" };
+        var legacy = new TextEntity(doc.CurrentLayer, point.Position + new Vec2(0.2, 0.1), "A1", 0.25); // Tag なし (点の近く)
+        var other = new TextEntity(doc.CurrentLayer, pivot + new Vec2(300, 0), "A1", 0.25); // 点から遠い同名の文字は図面の物
+        var routeLine = new LineEntity(doc.CurrentLayer, pivot + new Vec2(-3, 0), pivot + new Vec2(40, 9)) { Tag = "ALIGN:CD" };
+        var routeText = new TextEntity(doc.CurrentLayer, pivot + new Vec2(20, 3), "No.1", 0.35) { Tag = "ALIGN:CD" };
+        doc.Entities.AddRange([body, point, mark, tagged, legacy, other, routeLine, routeText]);
+
+        doc.History.Execute(PaperRescale.Command(doc, 1000, ScaleChangeMode.KeepPaper));
+        Assert.Equal(1000, doc.ScaleDenominator);
+
+        // 図形は作り直される (並びは同じ) ので、いまの図形を取り直す
+        var now = doc.Entities.ToList();
+        var (nb, np, nm, nt, nl, no, nrl, nrt) = ((LineEntity)now[0], (PointEntity)now[1], (CircleEntity)now[2], (TextEntity)now[3], (TextEntity)now[4], (TextEntity)now[5], (LineEntity)now[6], (TextEntity)now[7]);
+
+        // 図面は基準点を中心に 10 倍 (基準点との位置関係が保たれる)
+        Assert.True(nb.Start.DistanceTo(pivot + new Vec2(10, 20)) < 1e-6);
+        Assert.True(nb.End.DistanceTo(pivot + new Vec2(110, 20)) < 1e-6);
+        Assert.True(no.Position.DistanceTo(pivot + new Vec2(3000, 0)) < 1e-6);
+        // 登録した座標の点・路線の線は動かない
+        Assert.Equal(pivot + new Vec2(5, 5), np.Position);
+        Assert.Equal(pivot + new Vec2(-3, 0), nrl.Start);
+        Assert.Equal(pivot + new Vec2(40, 9), nrl.End);
+        // マーク・点名は点の位置を基準に 10 倍 (用紙上の大きさのまま)
+        Assert.Equal(np.Position, nm.Center);
+        Assert.Equal(1.5, nm.Radius, 9);
+        Assert.True(nt.Position.DistanceTo(np.Position + new Vec2(2, 1)) < 1e-6);
+        Assert.Equal(2.5, nt.Height, 9);
+        Assert.True(nl.Position.DistanceTo(np.Position + new Vec2(2, 1)) < 1e-6);
+        // 路線の文字は位置そのまま・大きさだけ用紙上のまま
+        Assert.Equal(pivot + new Vec2(20, 3), nrt.Position);
+        Assert.Equal(3.5, nrt.Height, 9);
+
+        doc.History.Undo();
+        Assert.Equal(100, doc.ScaleDenominator);
+        Assert.True(body.Start.DistanceTo(pivot + new Vec2(1, 2)) < 1e-6);
+        Assert.Equal(0.15, mark.Radius, 9);
+        Assert.Equal(0.35, routeText.Height, 9);
+    }
+
+    [Fact]
+    public void KeepPaper_NoCoordinateSet_StillScalesAboutOrigin_ButKeepsRegisteredPoints()
+    {
+        var doc = new CadDocument { ScaleDenominator = 100 };
+        var line = new LineEntity(doc.CurrentLayer, new Vec2(1, 2), new Vec2(11, 2));
+        var point = new PointEntity(doc.CurrentLayer, new Vec2(5, 5)) { Name = "A1" };
+        var unnamed = new PointEntity(doc.CurrentLayer, new Vec2(5, 5));
+        doc.Entities.AddRange([line, point, unnamed]);
+        doc.History.Execute(PaperRescale.Command(doc, 200, ScaleChangeMode.KeepPaper));
+        Assert.Equal(new Vec2(2, 4), doc.Entities.OfType<LineEntity>().Single().Start);
+        Assert.Equal(new Vec2(5, 5), doc.Entities.OfType<PointEntity>().Single(p => p.Name == "A1").Position);
+        Assert.Equal(new Vec2(10, 10), doc.Entities.OfType<PointEntity>().Single(p => p.Name == "").Position);
+    }
 }

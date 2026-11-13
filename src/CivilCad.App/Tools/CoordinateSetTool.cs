@@ -153,7 +153,8 @@ public sealed class CoordinateSetTool : CadTool
         var r = ComputeTransform(_p1, _s1, p2, s2);
         // 登録した座標の点のクリックで合わせたときは、登録した座標 (と、その描画のマーク) は図面と一緒に動かさない。
         // 測量座標がそのままになる位置 (新しい向きでの位置) へ移す
-        var kept = _picked ? Doc.Entities.Where(IsRegisteredCoordinate).ToList() : [];
+        var registered = _picked ? RegisteredCoordinates.Anchors(Doc) : [];
+        var kept = Doc.Entities.Where(registered.ContainsKey).ToList();
         var keptSet = kept.ToHashSet();
         Vec2 Keep(Vec2 p) => _s1 + (Doc.ToSurveyCad(p) - _s1).Rotate(-r.Angle);
         var commands = new List<IUndoableCommand> { new TranslateEntitiesCommand(Doc.Entities.Where(e => !keptSet.Contains(e)).ToList(), r.Delta) };
@@ -176,10 +177,6 @@ public sealed class CoordinateSetTool : CadTool
         Canvas.ZoomExtents();
         Finish();
     }
-
-    /// <summary>登録した座標 (点名のある点) と、その描画 (CD) のマーク・点名。</summary>
-    private static bool IsRegisteredCoordinate(Entity e) =>
-        e is PointEntity { Name.Length: > 0 } || e.Tag?.StartsWith(CoordinateMarks.TagPrefix, StringComparison.Ordinal) == true;
 
     public readonly record struct TransformResult(double Angle, Vec2 Delta, double DrawingDistance, double SurveyDistance)
     {

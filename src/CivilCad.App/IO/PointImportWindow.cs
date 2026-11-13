@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using CivilCad.App.Tools;
 using CivilCad.Core.Geometry;
 using CivilCad.Core.Model;
 
@@ -36,13 +37,13 @@ public sealed class PointImportOptions
         foreach (var p in file.Points)
         {
             var c = doc.FromSurvey(p.X, p.Y); // 座標設定の向きで図面上の点に
-            list.Add(new CircleEntity(layer, c, r) { Tag = "POINT:" + p.Label });
+            list.Add(new CircleEntity(layer, c, r) { Tag = RegisteredCoordinates.ImportTagPrefix + p.Label });
             list.Add(new PointEntity(layer, c) { Name = p.Label, Z = p.Z, Tags = p.Tag }); // 座標管理の一覧に出す
             var x = c.X + r * 1.5;
             if (ShowName && p.Label.Length > 0)
-                list.Add(new TextEntity(layer, new Vec2(x, c.Y + r * 0.5), p.Label, h));
+                list.Add(new TextEntity(layer, new Vec2(x, c.Y + r * 0.5), p.Label, h) { Tag = RegisteredCoordinates.ImportTagPrefix + p.Label });
             if (ShowElevation && p.Z is double z)
-                list.Add(new TextEntity(layer, new Vec2(x, c.Y - r * 0.5), z.ToString("F3", CultureInfo.InvariantCulture), h * 0.8) { VAlign = TextVAlign.Top });
+                list.Add(new TextEntity(layer, new Vec2(x, c.Y - r * 0.5), z.ToString("F3", CultureInfo.InvariantCulture), h * 0.8) { VAlign = TextVAlign.Top, Tag = RegisteredCoordinates.ImportTagPrefix + p.Label });
         }
         if (DrawLots)
         {

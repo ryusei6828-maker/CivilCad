@@ -121,6 +121,33 @@ public class SurveyFrameTests
     });
 
     [Fact]
+    public void CoordinateSet_ClickRegisteredPoints_KeepsImportMarksAndNameTexts() => RunSta((doc, canvas) =>
+    {
+        // 座標読込 (PI) の円 (Tag POINT:名) と点名の文字、古い読込の Tag の無い点名の文字も、点と一緒に動かさない
+        var line = new LineEntity(doc.CurrentLayer, Vec2.Zero, new Vec2(10, 0));
+        var k1 = new PointEntity(doc.CurrentLayer, doc.FromSurvey(100, 200)) { Name = "K1" };
+        var k2 = new PointEntity(doc.CurrentLayer, doc.FromSurvey(110, 200)) { Name = "K2" };
+        var circle = new CircleEntity(doc.CurrentLayer, k1.Position, 0.2) { Tag = "POINT:K1" };
+        var tagged = new TextEntity(doc.CurrentLayer, k1.Position + new Vec2(0.4, 0.1), "K1", 0.5) { Tag = "POINT:K1" };
+        var legacy = new TextEntity(doc.CurrentLayer, k1.Position + new Vec2(0.4, 0.1), "K1", 0.5); // Tag なし (点の近く)
+        var far = new TextEntity(doc.CurrentLayer, k1.Position + new Vec2(500, 0), "K1", 0.5);      // 点から遠い同名の文字は図面の物
+        doc.Entities.AddRange([line, k1, k2, circle, tagged, legacy, far]);
+
+        var tool = new CoordinateSetTool();
+        canvas.SetTool(tool);
+        tool.OnPoint(Vec2.Zero);
+        tool.OnPoint(k1.Position);
+        tool.OnPoint(new Vec2(10, 0));
+        tool.OnPoint(k2.Position);
+
+        Near(line.Start, k1.Position);
+        Near(k1.Position, circle.Center);
+        Assert.True(tagged.Position.DistanceTo(k1.Position) < 0.5);
+        Assert.True(legacy.Position.DistanceTo(k1.Position) < 0.5);
+        Assert.True(far.Position.DistanceTo(k1.Position) > 400); // 図面と一緒に動いている (遠いまま)
+    });
+
+    [Fact]
     public void CoordinateSet_TypedOnly_MovesRegisteredPointsWithDrawing() => RunSta((doc, canvas) =>
     {
         // 「X,Y」の入力だけなら今までどおり、登録した座標も図面と一緒に動く

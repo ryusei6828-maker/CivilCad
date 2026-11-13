@@ -1,3 +1,4 @@
+using CivilCad.App.Tools;
 using CivilCad.Core.Commands;
 using CivilCad.Core.Geometry;
 using CivilCad.Core.Model;
@@ -8,8 +9,11 @@ namespace CivilCad.App.Drawing;
 public enum ScaleChangeMode
 {
     /// <summary>
-    /// 図面をそのまま (図寸固定): 用紙上の大きさを保つ。図形をすべて縮尺の比で拡大・縮小する (原点 0,0 を基準) ので、
-    /// 画面の見た目は変わらず、計測の値が新しい縮尺の値になる (1:100 で 10m の線は 1:250 で 25m)。
+    /// 図面をそのまま (図寸固定): 用紙上の大きさを保つ。図形を縮尺の比で拡大・縮小するので、画面の見た目は変わらず、
+    /// 計測の値が新しい縮尺の値になる (1:100 で 10m の線は 1:250 で 25m)。基準は、座標設定をした図面なら測量座標の基準点
+    /// (SurveyPivot。拡大しても図面と測量座標のずれが出ない)、していなければ原点 (0,0)。
+    /// 測量座標の位置に置く物 (登録した座標の点・そのマークと点名・路線) は位置を動かさない:
+    /// 点は何もせず、マーク・点名は点の位置を基準に (用紙上の大きさを保つ)、路線 (Tag "ALIGN:") は文字の高さだけ変える。
     /// </summary>
     KeepPaper,
 
@@ -64,10 +68,23 @@ public static class PaperRescale
         var outers = doc.Entities.OfType<PolylineEntity>()
             .Where(p => p.Tag == DrawingFrame.Tag && p.Layer.Name == DrawingFrame.LayerFrame)
             .Select(p => p.Bounds).ToList();
+        // 座標設定をしてあれば (基準点が原点でない・向きがある) その基準点を中心に拡大する
+        var bodyOrigin = doc.SurveyRotation != 0 || doc.SurveyPivot != Vec2.Zero ? doc.SurveyPivot : Vec2.Zero;
+        var registered = mode == ScaleChangeMode.KeepPaper ? RegisteredCoordinates.Anchors(doc) : [];
         foreach (var e in doc.Entities)
         {
             Vec2 origin;
-            if (mode == ScaleChangeMode.KeepPaper) origin = Vec2.Zero;
+            if (mode == ScaleChangeMode.KeepPaper)
+            {
+                if (RegisteredCoordinates.IsPoint(e)) continue; // 登録した座標の点は測量座標の位置のまま
+                if (registered.TryGetValue(e, out var anchor)) origin = anchor; // マーク・点名は点の位置を基準に
+                else if (e.Tag?.StartsWith("ALIGN:", StringComparison.Ordinal) == true)
+                {
+                    if (e is not TextEntity at) continue; // 路線の線形は測量座標のまま
+                    origin = at.Position; // 路線の文字は位置を変えず、用紙上の大きさだけ保つ
+                }
+                else origin = bodyOrigin;
+            }
             else if (e.Tag == DrawingFrame.Tag)
             {
                 var b = e.Bounds;
