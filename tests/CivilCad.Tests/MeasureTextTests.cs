@@ -27,6 +27,8 @@ public class MeasureTextTests
                 MeasureSettings.Decimals = 3;
                 MeasureSettings.TextHeightMm = 2.5;
                 MeasureSettings.Unit = LengthUnit.M;
+                MeasureSettings.StationOffset = true;
+                MeasureSettings.StationMark = false;
             }
         });
         t.SetApartmentState(ApartmentState.STA);
@@ -125,5 +127,41 @@ public class MeasureTextTests
         tool.OnEnter();
         Assert.Single(doc.Entities.OfType<TextEntity>());
         Assert.Null(tool.BasePoint);
+    });
+
+    [Fact]
+    public void StationQuery_PlacesStationText() => RunSta((doc, canvas) =>
+    {
+        // 直線の路線 (0,0)→(100,0)。(32.5, -5) は 南側 = 進行方向の右
+        var al = CivilCad.Alignment.HorizontalAlignment.FromIps(
+        [
+            new("BP", Vec2.Zero),
+            new("EP", new Vec2(100, 0)),
+        ]);
+        var tool = new StationQueryTool(al, 20);
+        canvas.SetTool(tool);
+        tool.OnPoint(new Vec2(32.5, -5));
+        Assert.Empty(doc.Entities);
+        tool.OnPoint(new Vec2(40, -8));        // 置く位置
+        var t = Assert.Single(doc.Entities.OfType<TextEntity>());
+        Assert.Single(doc.Entities);           // 印はオフ
+        Assert.Equal("No.1+12.500  右 5.000m", t.Text);
+        Assert.Equal(new Vec2(40, -8), t.Position);
+        Assert.Equal(0, t.Rotation, 9);
+
+        // 幅なし・印あり・左側
+        MeasureSettings.StationOffset = false;
+        MeasureSettings.StationMark = true;
+        tool.OnPoint(new Vec2(50, 4));
+        tool.OnPoint(new Vec2(55, 6));
+        Assert.Equal("No.2+10.000", doc.Entities.OfType<TextEntity>().Last().Text);
+        var line = Assert.Single(doc.Entities.OfType<LineEntity>());
+        Assert.True(line.Start.DistanceTo(new Vec2(50, 0)) < 1e-5);
+        Assert.True(line.End.DistanceTo(new Vec2(50, 4)) < 1e-9);
+
+        MeasureSettings.StationOffset = true;
+        tool.OnPoint(new Vec2(60, 3));
+        tool.OnPoint(new Vec2(61, 5));
+        Assert.Contains("左 3.000m", doc.Entities.OfType<TextEntity>().Last().Text);
     });
 }

@@ -35,6 +35,12 @@ public static class MeasureSettings
     /// <summary>距離なら方向角、面積なら周長も書く。</summary>
     public static bool Detail { get; set; }
 
+    /// <summary>測点照会: 測点に加えて、左右と幅も書く。</summary>
+    public static bool StationOffset { get; set; } = true;
+
+    /// <summary>測点照会: 文字を置くとき、路線上の点から照会した点への線も一緒に置く。</summary>
+    public static bool StationMark { get; set; }
+
     /// <summary>計測結果の単位 (mm / cm / m)。</summary>
     public static LengthUnit Unit { get; set; } = LengthUnit.M;
 
@@ -125,13 +131,18 @@ public abstract class MeasureToolBase : CadTool, IStyledDrawTool
         if (Pending is { } t)
         {
             t.Position = p;
-            Execute(new AddEntitiesCommand([Styled(t)], $"{Name}の記入"));
+            var added = new List<Entity> { Styled(t) };
+            added.AddRange(ExtraEntities().Select(Styled));
+            Execute(new AddEntitiesCommand(added, $"{Name}の記入"));
             Pending = null;
             Restart();
             return;
         }
         OnMeasurePoint(p);
     }
+
+    /// <summary>文字と一緒に置く図形 (測点照会の印の線など)。</summary>
+    protected virtual IEnumerable<Entity> ExtraEntities() => [];
 
     protected abstract void OnMeasurePoint(Vec2 p);
 
@@ -486,29 +497,65 @@ public sealed class AreaTool : MeasureToolBase
     public static IEnumerable<BoundaryCurve> ToCurves(Entity e) => BoundaryCurves.FromEntity(e);
 }
 
-/// <summary>クリック位置の測点と幅 (中心線からの離れ) を表示。</summary>
-public sealed class StationQueryTool(HorizontalAlignment alignment, double pitch) : CadTool
+/// <summary>クリック位置の測点と幅 (中心線からの離れ) を表示。結果は路線に沿った文字で記入できる。</summary>
+public sealed class StationQueryTool(HorizontalAlignment alignment, double pitch) : MeasureToolBase
 {
-    private Vec2 _cursor;
+    private Vec2? _foot;    // 路線上の点 (図面座標)
+    private Vec2? _queried; // 照会した点 (図面座標)
 
     public override string Name => "測点照会";
+    public override Vec2? BasePoint => null;
+    protected override bool CanStepBackMeasure => false;
     protected override void OnActivated() => SetPrompt("照会する点を指定 (Esc で終了)");
+    protected override void StepBackMeasure() { }
 
-    public override void OnPoint(Vec2 p)
+    protected override void Restart()
+    {
+        _foot = _queried = null;
+        OnActivated();
+    }
+
+    protected override void BackToMeasuring()
+    {
+        _foot = _queried = null;
+        OnActivated();
+    }
+
+    protected override void OnMeasurePoint(Vec2 p)
     {
         var survey = Doc.ToSurveyCad(p); // 路線は測量座標で持っている
         var (st, off) = alignment.Project(survey);
         var (x, y) = survey.ToSurvey();
         var side = off >= 0 ? "右" : "左";
         Canvas.ShowMessage($"{Station.Format(st, pitch)} (追加距離 {st:F3})   幅 {side} {Math.Abs(off):F3} m   X = {x:F3}  Y = {y:F3}");
+
+        var foot = Doc.FromSurveyCad(alignment.PointAt(st));
+        _foot = foot;
+        _queried = p;
+        var text = Station.Format(st, pitch, MeasureSettings.Decimals);
+        if (MeasureSettings.StationOffset)
+            text += $"  {side} {MeasureSettings.Num(MeasureSettings.Length(Math.Abs(off)))}{MeasureSettings.UnitLabel}";
+        // 文字は、その測点での路線の接線の向きに沿わせる
+        var (pt, dir) = alignment.Evaluate(st);
+        var a = Doc.FromSurveyCad(pt);
+        var b = Doc.FromSurveyCad(pt + Vec2.FromAngle(dir));
+        Measured(text, MeasureSettings.ReadableAngle(a, b), TextHAlign.Left, TextVAlign.Bottom);
     }
 
-    public override void OnMouseMove(Vec2 p) => _cursor = p;
-    public override void OnEnter() { }
-
-    public override void DrawPreview(DrawingContext dc)
+    protected override IEnumerable<Entity> ExtraEntities()
     {
-        var (st, _) = alignment.Project(Doc.ToSurveyCad(_cursor));
-        Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, Doc.FromSurveyCad(alignment.PointAt(st)), _cursor);
+        if (MeasureSettings.StationMark && _foot is Vec2 f && _queried is Vec2 q && f.DistanceTo(q) >= 1e-6)
+            yield return new LineEntity(Doc.CurrentLayer, f, q);
+    }
+
+    protected override void DrawMeasurePreview(DrawingContext dc)
+    {
+        if (Pending != null)
+        {
+            if (_foot is Vec2 f && _queried is Vec2 q) Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, f, q);
+            return;
+        }
+        var (st, _) = alignment.Project(Doc.ToSurveyCad(Cursor));
+        Canvas.DrawWorldLine(dc, CadCanvas.PreviewDashPen, Doc.FromSurveyCad(alignment.PointAt(st)), Cursor);
     }
 }

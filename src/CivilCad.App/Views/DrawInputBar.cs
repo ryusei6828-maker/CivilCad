@@ -212,6 +212,14 @@ public sealed class DrawInputBar : Border
                 if (tool is AreaTool)
                     AddCheck("測った部分を塗りつぶして残す", MeasureSettings.KeepAreaFill, v => MeasureSettings.KeepAreaFill = v,
                         "オンなら、測った部分を薄い水色の塗りつぶし (レイヤ「面積-塗り」、透明度 50%) として図面に残す。文字の記入とは別に、元に戻せる");
+                if (tool is StationQueryTool)
+                {
+                    AddCheck("幅も記入", MeasureSettings.StationOffset, v => MeasureSettings.StationOffset = v,
+                        "例: No.3+12.345  右 5.000m");
+                    AddCheck("照会した点に印を描く", MeasureSettings.StationMark, v => MeasureSettings.StationMark = v,
+                        "オンなら、文字を置くとき、路線上の点から照会した点への線も一緒に置く");
+                    break;
+                }
                 AddCheck(tool is DistanceTool ? "方向角も記入" : "周長も記入", MeasureSettings.Detail, v => MeasureSettings.Detail = v,
                     tool is DistanceTool ? "例: L=12.345m  θ=45°00'00\"" : "例: A=123.456m²  (周長 45.678m)");
                 break;
