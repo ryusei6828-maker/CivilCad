@@ -62,7 +62,7 @@ public sealed class RoutePanel : DockPanel
     /// <summary>メッセージ欄に出す。</summary>
     public Action<string>? Log { get; set; }
 
-    public Button FloatButton { get; } = new() { Content = "⧉", Padding = new Thickness(6, 0, 6, 0), BorderThickness = new Thickness(0), Background = Brushes.Transparent, Focusable = false, ToolTip = "フロート (別ウィンドウに切り離す)" };
+    public Button FloatButton { get; } = new() { Content = "⧉", Padding = PanelHeader.ButtonPadding, FontSize = PanelHeader.ButtonFontSize, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Focusable = false, ToolTip = "フロート (別ウィンドウに切り離す)" };
 
     public ObservableCollection<RouteRow> Rows => _rows;
     public IReadOnlyList<PassingRow> Passing => _passing;
@@ -83,14 +83,14 @@ public sealed class RoutePanel : DockPanel
 
         // 見出し
         var header = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
-        var close = new Button { Content = "×", Padding = new Thickness(6, 0, 6, 0), BorderThickness = new Thickness(0), Background = Brushes.Transparent, Focusable = false, ToolTip = "閉じる" };
+        var close = new Button { Content = "×", Padding = PanelHeader.ButtonPadding, FontSize = PanelHeader.ButtonFontSize, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Focusable = false, ToolTip = "閉じる" };
         close.Click += (_, _) => CloseRequested?.Invoke(this, EventArgs.Empty);
         FloatButton.Click += (_, _) => FloatToggleRequested?.Invoke(this, EventArgs.Empty);
         SetDock(close, Dock.Right);
         SetDock(FloatButton, Dock.Right);
         header.Children.Add(close);
         header.Children.Add(FloatButton);
-        header.Children.Add(new TextBlock { Text = "路線", FontWeight = FontWeights.Bold, VerticalAlignment = System.Windows.VerticalAlignment.Center });
+        header.Children.Add(new TextBlock { Text = "路線", FontWeight = FontWeights.Bold, FontSize = PanelHeader.TitleFontSize, VerticalAlignment = System.Windows.VerticalAlignment.Center });
         SetDock(header, Dock.Top);
         Children.Add(header);
 

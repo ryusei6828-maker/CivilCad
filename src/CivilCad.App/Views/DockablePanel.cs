@@ -1,9 +1,23 @@
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace CivilCad.App.Views;
+
+/// <summary>パネルの見出し (名前と、フロート・閉じるのボタン) の大きさ。どのパネルも同じにする。</summary>
+public static class PanelHeader
+{
+    /// <summary>見出しの名前 (「座標管理」など) の文字の大きさ。</summary>
+    public const double TitleFontSize = 14;
+
+    /// <summary>フロート (⧉)・閉じる (×) のボタンの文字の大きさ。</summary>
+    public const double ButtonFontSize = 16;
+
+    public static readonly Thickness ButtonPadding = new(8, 0, 8, 2);
+}
 
 /// <summary>パネルの状態 (設定ファイルに保存する)。</summary>
 public sealed class PanelState
@@ -99,7 +113,9 @@ public sealed class DockablePanel
         {
             Title = _title,
             Owner = Window.GetWindow(_owner), // 本体より前に表示され、本体を最小化すると一緒に隠れる
-            WindowStyle = WindowStyle.ToolWindow,
+            // 普通の窓のタイトルバーにする (ツールウィンドウの形式は、タイトルの文字と閉じるボタンが小さい)
+            WindowStyle = WindowStyle.SingleBorderWindow,
+            Icon = Window.GetWindow(_owner)?.Icon,
             ShowInTaskbar = false,
             ShowActivated = false,
             WindowStartupLocation = WindowStartupLocation.Manual,
@@ -130,7 +146,26 @@ public sealed class DockablePanel
         w.LocationChanged += (_, _) => RememberBounds();
         w.SizeChanged += (_, _) => RememberBounds();
         w.PreviewKeyDown += (s, e) => FloatingKeyDown?.Invoke(s, e);
+        w.SourceInitialized += (_, _) => HideMinMaxButtons(w);
         return w;
+    }
+
+    private const int GwlStyle = -16;
+    private const int WsMinimizeBox = 0x20000;
+    private const int WsMaximizeBox = 0x10000;
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    private static extern int GetWindowLong(IntPtr hWnd, int index);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    private static extern int SetWindowLong(IntPtr hWnd, int index, int value);
+
+    /// <summary>タイトルバーの最小化・最大化のボタンを消す (閉じるボタンだけ残す。パネルは本体と一緒に隠れるので要らない)。</summary>
+    private static void HideMinMaxButtons(Window w)
+    {
+        var hwnd = new WindowInteropHelper(w).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        SetWindowLong(hwnd, GwlStyle, GetWindowLong(hwnd, GwlStyle) & ~(WsMinimizeBox | WsMaximizeBox));
     }
 
     private void RememberBounds()

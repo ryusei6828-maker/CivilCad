@@ -64,7 +64,7 @@ public sealed class CoordinatePanel : DockPanel
         SelectionMode = DataGridSelectionMode.Extended,
         GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
     };
-    private readonly TextBlock _title = new() { Text = "座標管理", FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _title = new() { Text = "座標管理", FontWeight = FontWeights.Bold, FontSize = PanelHeader.TitleFontSize, VerticalAlignment = VerticalAlignment.Center };
     private readonly ObservableCollection<CoordinateItem> _items = [];
     private readonly ComboBox _filter = new() { Width = 130, Margin = new Thickness(0, 0, 12, 0), ToolTip = "このタグの点だけ一覧に出す" };
     private readonly TextBox _defaultTag = new() { Width = 100, ToolTip = "点を登録・座標計測で登録するときに付けるタグ (空ならタグなし)" };
@@ -82,7 +82,7 @@ public sealed class CoordinatePanel : DockPanel
     public event EventHandler? CloseRequested;
     public event EventHandler? FloatToggleRequested;
 
-    public Button FloatButton { get; } = new() { Content = "⧉", Padding = new Thickness(6, 0, 6, 0), BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent, Focusable = false, ToolTip = "フロート (別ウィンドウに切り離す)" };
+    public Button FloatButton { get; } = new() { Content = "⧉", Padding = PanelHeader.ButtonPadding, FontSize = PanelHeader.ButtonFontSize, BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent, Focusable = false, ToolTip = "フロート (別ウィンドウに切り離す)" };
 
     public IReadOnlyList<CoordinateItem> Items => _items;
 
@@ -107,7 +107,7 @@ public sealed class CoordinatePanel : DockPanel
         Background = System.Windows.Media.Brushes.White;
 
         var header = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
-        var close = new Button { Content = "×", Padding = new Thickness(6, 0, 6, 0), BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent, Focusable = false, ToolTip = "閉じる" };
+        var close = new Button { Content = "×", Padding = PanelHeader.ButtonPadding, FontSize = PanelHeader.ButtonFontSize, BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent, Focusable = false, ToolTip = "閉じる" };
         close.Click += (_, _) => CloseRequested?.Invoke(this, EventArgs.Empty);
         FloatButton.Click += (_, _) => FloatToggleRequested?.Invoke(this, EventArgs.Empty);
         DockPanel.SetDock(close, Dock.Right);

@@ -39,7 +39,7 @@ public sealed class PropertiesPanel : UserControl
         DockPanel.SetDock(_floatButton, Dock.Right);
         header.Children.Add(_closeButton);
         header.Children.Add(_floatButton);
-        header.Children.Add(new TextBlock { Text = "プロパティ", FontWeight = FontWeights.Bold, Margin = new Thickness(6, 3, 0, 3) });
+        header.Children.Add(new TextBlock { Text = "プロパティ", FontWeight = FontWeights.Bold, FontSize = PanelHeader.TitleFontSize, Margin = new Thickness(6, 3, 0, 3) });
         header.MouseLeftButtonDown += (_, e) =>
         {
             if (e.ClickCount == 2 && e.OriginalSource is not Button) FloatToggleRequested?.Invoke(this, EventArgs.Empty);
@@ -71,7 +71,8 @@ public sealed class PropertiesPanel : UserControl
     {
         Content = text,
         ToolTip = tip,
-        Padding = new Thickness(6, 0, 6, 0),
+        Padding = PanelHeader.ButtonPadding,
+        FontSize = PanelHeader.ButtonFontSize,
         BorderThickness = new Thickness(0),
         Background = Brushes.Transparent,
         Focusable = false,

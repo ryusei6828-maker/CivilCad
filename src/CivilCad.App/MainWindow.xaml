@@ -394,9 +394,9 @@
         <DockPanel x:Name="LayerPanel" Width="320" Margin="4" Background="White">
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4" Background="Transparent"
                        ToolTip="ダブルクリックでフロート / ドッキング切り替え" MouseLeftButtonDown="LayerHeader_MouseDown">
-                <Button x:Name="LayerFloatButton" DockPanel.Dock="Right" Content="⧉" Padding="6,0" BorderThickness="0"
+                <Button x:Name="LayerFloatButton" DockPanel.Dock="Right" Content="⧉" Padding="8,0,8,2" FontSize="16" BorderThickness="0"
                         Background="Transparent" Focusable="False" Click="LayerFloat_Click" ToolTip="フロート (別ウィンドウに切り離す)"/>
-                <TextBlock Text="レイヤ" FontWeight="Bold"/>
+                <TextBlock Text="レイヤ" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
             </DockPanel>
             <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
                 <CheckBox x:Name="OnlyCurrentCheck" Content="現在レイヤのみ編集 (他はグレー表示・選択不可)" Margin="0,0,0,6"
