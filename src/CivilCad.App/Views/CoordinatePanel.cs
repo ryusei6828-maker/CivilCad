@@ -108,6 +108,7 @@ public sealed class CoordinatePanel : DockPanel
 
         var header = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
         var close = new Button { Content = "×", Padding = PanelHeader.ButtonPadding, FontSize = PanelHeader.ButtonFontSize, BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent, Focusable = false, ToolTip = "閉じる" };
+        PanelHeader.MakeCloseButton(close);
         close.Click += (_, _) => CloseRequested?.Invoke(this, EventArgs.Empty);
         FloatButton.Click += (_, _) => FloatToggleRequested?.Invoke(this, EventArgs.Empty);
         DockPanel.SetDock(close, Dock.Right);

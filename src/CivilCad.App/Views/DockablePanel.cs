@@ -17,6 +17,42 @@ public static class PanelHeader
     public const double ButtonFontSize = 20;
 
     public static readonly Thickness ButtonPadding = new(8, 0, 8, 2);
+
+    /// <summary>Windows の窓の閉じるボタンと同じ赤 (カーソルを乗せたとき)。</summary>
+    public static readonly Color CloseHoverColor = Color.FromRgb(0xC4, 0x2B, 0x1C);
+
+    /// <summary>押している間の赤 (少し明るい)。</summary>
+    public static readonly Color ClosePressedColor = Color.FromRgb(0xE0, 0x6A, 0x5F);
+
+    /// <summary>
+    /// 閉じる (×) のボタンを、Windows の窓の閉じるボタンと同じ見た目にする:
+    /// ふだんは背景なし、カーソルを乗せると赤い背景に白い ×、押している間は少し明るい赤。
+    /// </summary>
+    public static void MakeCloseButton(Button button)
+    {
+        var border = new FrameworkElementFactory(typeof(Border), "Bd");
+        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        border.SetBinding(Border.PaddingProperty, new System.Windows.Data.Binding(nameof(Control.Padding)) { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
+        var content = new FrameworkElementFactory(typeof(ContentPresenter));
+        content.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        content.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        border.AppendChild(content);
+
+        var template = new ControlTemplate(typeof(Button)) { VisualTree = border };
+        template.Triggers.Add(ColorTrigger(UIElement.IsMouseOverProperty, CloseHoverColor));
+        template.Triggers.Add(ColorTrigger(System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty, ClosePressedColor)); // 後に書いた方が勝つ
+        button.Template = template;
+    }
+
+    private static Trigger ColorTrigger(DependencyProperty property, Color background)
+    {
+        var brush = new SolidColorBrush(background);
+        brush.Freeze();
+        var trigger = new Trigger { Property = property, Value = true };
+        trigger.Setters.Add(new Setter(Border.BackgroundProperty, brush, "Bd"));
+        trigger.Setters.Add(new Setter(System.Windows.Documents.TextElement.ForegroundProperty, Brushes.White, "Bd"));
+        return trigger;
+    }
 }
 
 /// <summary>パネルの状態 (設定ファイルに保存する)。</summary>

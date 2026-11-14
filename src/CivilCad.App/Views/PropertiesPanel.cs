@@ -30,6 +30,7 @@ public sealed class PropertiesPanel : UserControl
     public PropertiesPanel()
     {
         _closeButton = HeaderButton("×", "閉じる");
+        PanelHeader.MakeCloseButton(_closeButton);
         _closeButton.Click += (_, _) => CloseRequested?.Invoke(this, EventArgs.Empty);
         _floatButton = HeaderButton("⧉", "フロート (別ウィンドウに切り離す)");
         _floatButton.Click += (_, _) => FloatToggleRequested?.Invoke(this, EventArgs.Empty);
