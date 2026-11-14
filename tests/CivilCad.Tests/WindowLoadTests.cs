@@ -319,6 +319,12 @@ public class WindowLoadTests
                     Assert.True(CivilCad.App.MainWindow.IsTearOff(new System.Windows.Point(10, 80), 30));
                     Assert.False(CivilCad.App.MainWindow.IsTearOff(new System.Windows.Point(10, 10), 30));
                     Assert.False(CivilCad.App.MainWindow.IsTearOff(new System.Windows.Point(10, -20), 30));
+
+                    // 別ウィンドウは、タブを放した位置がタイトルバーではなく作図領域の中に来る所に出す (出た窓がカーソルにくっついて動かないように)
+                    var (popLeft, popTop) = CivilCad.App.MainWindow.PopupOrigin(new System.Windows.Point(500, 400));
+                    Assert.True(popLeft < 500);
+                    var titleBarBottom = popTop + System.Windows.SystemParameters.WindowCaptionHeight + System.Windows.SystemParameters.ResizeFrameHorizontalBorderHeight + 8;
+                    Assert.True(titleBarBottom < 400, $"タイトルバーの下端 {titleBarBottom} がカーソル (400) より上にあること");
                 }
                 var scale = new CivilCad.App.Drawing.ScaleWindow(500);
                 Assert.NotNull(scale.Content);

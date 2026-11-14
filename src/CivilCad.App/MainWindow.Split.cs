@@ -1,7 +1,10 @@
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using CivilCad.App.Views;
 using CivilCad.Core.Geometry;
 
@@ -95,16 +98,44 @@ public partial class MainWindow
             {
                 var dip = target.TransformFromDevice.Transform(p);
                 w.WindowStartupLocation = WindowStartupLocation.Manual;
-                (w.Left, w.Top) = (dip.X - 80, dip.Y - 12); // つかんだあたりがタイトルバーに来るように
+                (w.Left, w.Top) = PopupOrigin(dip);
             }
         }
 
         _popups[sheet] = w;
         if (_mainSheet == sheet || _mainSheet == null) _mainSheet = NearestMainSheet(sheet);
         PlaceEditSurface();
-        if (show) w.Show();
+        if (show)
+        {
+            Mouse.Capture(null); // タブのドラッグでつかんでいたマウスを、窓を出す前に必ず放す
+            w.Show();
+            // ボタンを放しているのに窓が「移動中」のまま (カーソルにくっついて動く) なら、移動を打ち切る
+            w.Dispatcher.BeginInvoke(DispatcherPriority.Background, () => CancelStuckMove(w));
+        }
         Log($"シート「{SheetName(sheet)}」を別ウィンドウにしました。クリックした方の窓が編集の対象です (窓を閉じると本体のタブに戻ります)。");
         return true;
+    }
+
+    /// <summary>タブを放した位置から、別ウィンドウの左上までのずらし (DIP)。カーソルが作図領域の中に来るようにする。</summary>
+    public static readonly Vector PopupGrabOffset = new(80, 70);
+
+    /// <summary>
+    /// タブを放した位置 (DIP) に出す別ウィンドウの左上。
+    /// タイトルバーをカーソルの下に置かない (置くと、放した直後の窓がカーソルにくっついて動くことがある)。
+    /// </summary>
+    public static (double Left, double Top) PopupOrigin(Point cursor) => (cursor.X - PopupGrabOffset.X, cursor.Y - PopupGrabOffset.Y);
+
+    private const int WmCancelMode = 0x001F;
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    /// <summary>左ボタンを押していないのに窓がマウスでの移動・サイズ変更の途中なら、それをやめさせる (途中でなければ何も起きない)。</summary>
+    private static void CancelStuckMove(Window w)
+    {
+        if (Mouse.LeftButton == MouseButtonState.Pressed) return;
+        var hwnd = new WindowInteropHelper(w).Handle;
+        if (hwnd != IntPtr.Zero) SendMessage(hwnd, WmCancelMode, IntPtr.Zero, IntPtr.Zero);
     }
 
     /// <summary>

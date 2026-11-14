@@ -1235,8 +1235,10 @@ public partial class MainWindow : UserControl
             EndTabDrag();
             if (IsTearOff(dropped, SheetTabs.ActualHeight))
             {
-                PopOutSheet(dragged, SheetTabs.PointToScreen(dropped));
+                // 窓は、ボタンを放す処理がすっかり終わってから出す (放している最中に出すと、出た窓がカーソルにくっついて動くことがある)
+                var screen = SheetTabs.PointToScreen(dropped);
                 e.Handled = true;
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () => PopOutSheet(dragged, screen));
                 return;
             }
             ActivateSheet(dragged);
