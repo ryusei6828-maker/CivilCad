@@ -11,10 +11,10 @@ namespace CivilCad.App.Views;
 public static class PanelHeader
 {
     /// <summary>見出しの名前 (「座標管理」など) の文字の大きさ。</summary>
-    public const double TitleFontSize = 14;
+    public const double TitleFontSize = 18;
 
     /// <summary>フロート (⧉)・閉じる (×) のボタンの文字の大きさ。</summary>
-    public const double ButtonFontSize = 16;
+    public const double ButtonFontSize = 20;
 
     public static readonly Thickness ButtonPadding = new(8, 0, 8, 2);
 }
