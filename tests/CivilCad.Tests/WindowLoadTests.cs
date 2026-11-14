@@ -244,6 +244,82 @@ public class WindowLoadTests
                 tabs.SelectedItem = tabs.Items.OfType<System.Windows.Controls.TabItem>().Single(t => (string)t.Header == "座標管理");
                 Assert.Equal(System.Windows.Visibility.Visible, coordHost.Visibility);
                 tabs.SelectedIndex = 0;
+                {
+                    // 分割画面: シートを別ウィンドウに出す。編集用の作図領域は 1 つで、クリックした窓 (編集の対象) へ移る
+                    var splitFlags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                    var mt = typeof(CivilCad.App.MainWindow);
+                    CivilCad.App.Sheet Add() => (CivilCad.App.Sheet)mt.GetMethod("AddSheet", splitFlags)!.Invoke(main, null)!;
+                    CivilCad.App.Sheet Active() => (CivilCad.App.Sheet)mt.GetField("_active", splitFlags)!.GetValue(main)!;
+                    var splitCanvas = (CivilCad.App.Views.CadCanvas)main.FindName("Canvas");
+                    var splitHost = (System.Windows.Controls.Panel)main.FindName("CanvasHost");
+                    // 本体の画面にシートを 1 枚は残す: 全部を出そうとしても、最後の 1 枚は出せない
+                    var allSheets = ((System.Collections.Generic.IEnumerable<CivilCad.App.Sheet>)mt.GetField("_sheets", splitFlags)!.GetValue(main)!).ToList();
+                    var popped = allSheets.Select(s => main.PopOutSheet(s, show: false)).ToList();
+                    Assert.Equal(allSheets.Count - 1, popped.Count(x => x));
+                    Assert.False(popped[^1]);
+                    foreach (var s in allSheets) main.ClosePopup(s);
+                    Assert.Empty(main.PoppedOutSheets);
+                    Assert.Same(splitHost, main.EditSurfaceHost);
+                    var a = Active();
+                    var b = Add();
+                    Assert.Same(a, Active());
+                    Assert.Same(splitHost, main.EditSurfaceHost);
+
+                    // b を別ウィンドウに: 編集の対象は a のまま。別ウィンドウは b を「見るだけ」で映す
+                    Assert.True(main.PopOutSheet(b, show: false));
+                    Assert.False(main.PopOutSheet(b, show: false)); // 2 回は出さない
+                    var splitPopup = main.PopupOf(b)!;
+                    Assert.Same(splitHost, main.EditSurfaceHost);
+                    Assert.Equal(System.Windows.Visibility.Visible, splitPopup.Mirror.Visibility);
+                    Assert.Same(b.Doc, splitPopup.Mirror.Document);
+                    // 本体で描いた図形は、同じ図面を映しているのですぐ見える (図面は 1 つ)
+                    Assert.Same(a.Doc, splitCanvas.Document);
+
+                    // 別ウィンドウをクリック: b が編集の対象になり、作図領域が別ウィンドウへ移る。本体は a を「見るだけ」で映す
+                    main.ActivateByClick(b);
+                    Assert.Same(b, Active());
+                    Assert.Same(splitPopup.Root, main.EditSurfaceHost);
+                    Assert.Same(b.Doc, splitCanvas.Document);
+                    Assert.Equal(System.Windows.Visibility.Collapsed, splitPopup.Mirror.Visibility);
+                    Assert.Same(a, main.MainSheet);
+                    var mainMirror = splitHost.Children.OfType<CivilCad.App.Views.CadCanvas>().Single();
+                    Assert.Equal(System.Windows.Visibility.Visible, mainMirror.Visibility);
+                    Assert.Same(a.Doc, mainMirror.Document);
+
+                    // 本体で選んだコマンド (線) は、クリックした窓のシートで最初から続けて使える
+                    main.GetType().GetMethod("RunCommand", splitFlags)!.Invoke(main, ["L"]);
+                    Assert.IsType<CivilCad.App.Tools.LineTool>(splitCanvas.Tool);
+                    main.ActivateByClick(a);
+                    Assert.Same(a, Active());
+                    Assert.Same(splitHost, main.EditSurfaceHost);
+                    Assert.Same(a.Doc, splitCanvas.Document);
+                    Assert.IsType<CivilCad.App.Tools.LineTool>(splitCanvas.Tool);
+                    Assert.Equal(System.Windows.Visibility.Collapsed, mainMirror.Visibility);
+                    Assert.Equal(System.Windows.Visibility.Visible, splitPopup.Mirror.Visibility);
+                    splitCanvas.SetTool(new CivilCad.App.Tools.SelectTool());
+
+                    // 別ウィンドウで編集中に窓を閉じる: シートは閉じず、本体の画面でそのまま続ける
+                    main.ActivateByClick(b);
+                    main.ClosePopup(b);
+                    Assert.Empty(main.PoppedOutSheets);
+                    Assert.Same(splitHost, main.EditSurfaceHost);
+                    Assert.Same(b, Active());
+                    Assert.Same(b, main.MainSheet);
+
+                    // 別ウィンドウのシートを閉じると、窓も閉じる
+                    main.ActivateByClick(a);
+                    Assert.True(main.PopOutSheet(b, show: false));
+                    mt.GetMethod("RemoveSheet", splitFlags)!.Invoke(main, [b, a]);
+                    Assert.Empty(main.PoppedOutSheets);
+                    Assert.Same(a, Active());
+                    Assert.Same(splitHost, main.EditSurfaceHost);
+
+                    // タブを、タブの並びから上下に 40px より離して放すと別ウィンドウ
+                    Assert.True(CivilCad.App.MainWindow.IsTearOff(new System.Windows.Point(10, -60), 30));
+                    Assert.True(CivilCad.App.MainWindow.IsTearOff(new System.Windows.Point(10, 80), 30));
+                    Assert.False(CivilCad.App.MainWindow.IsTearOff(new System.Windows.Point(10, 10), 30));
+                    Assert.False(CivilCad.App.MainWindow.IsTearOff(new System.Windows.Point(10, -20), 30));
+                }
                 var scale = new CivilCad.App.Drawing.ScaleWindow(500);
                 Assert.NotNull(scale.Content);
                 scale.Close();

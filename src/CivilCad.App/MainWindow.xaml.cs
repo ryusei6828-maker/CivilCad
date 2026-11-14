@@ -1067,6 +1067,7 @@ public partial class MainWindow : UserControl
     private void ActivateSheet(Sheet sheet)
     {
         if (_active == sheet) return;
+        TakeMirrorView(sheet);
         if (_active != null)
         {
             _active.ViewCenter = Canvas.ViewCenter;
@@ -1082,6 +1083,7 @@ public partial class MainWindow : UserControl
         sheet.Doc.Changed += ActiveDoc_Changed;
 
         Canvas.Document = sheet.Doc;
+        OnSheetActivatedForSplit(sheet); // 分割画面: 作図領域を、このシートの窓 (別ウィンドウか本体) へ
         // 複写は基点の後ならシートをまたいで続ける (別のシートへ複写)
         if (Canvas.Tool is not MoveCopyTool { KeepsAcrossSheets: true }) Canvas.SetTool(new SelectTool());
         else Canvas.RedrawOverlay();
@@ -1136,8 +1138,10 @@ public partial class MainWindow : UserControl
 
     private void RemoveSheet(Sheet sheet, Sheet? next)
     {
+        ClosePopup(sheet); // 別ウィンドウに出していたら閉じる
         if (_active == sheet) ActivateSheet(next ?? AddSheet());
         _sheets.Remove(sheet);
+        PlaceEditSurface();
         FocusCommandBox();
     }
 
@@ -1163,7 +1167,7 @@ public partial class MainWindow : UserControl
     private Point _tabDragStart;
     private bool _tabDragging;
 
-    /// <summary>タブを押した: 少し動かしたらドラッグで並べ替え (× ボタンは除く)。</summary>
+    /// <summary>タブを押した: 少し動かしたらドラッグで並べ替え、タブの並びの外へ出して放すと別ウィンドウ (× ボタンは除く)。</summary>
     private void SheetTab_LeftDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: Sheet s } || e.OriginalSource is Button) return;
@@ -1183,12 +1187,15 @@ public partial class MainWindow : UserControl
         var p = e.GetPosition(SheetTabs);
         if (!_tabDragging)
         {
-            if (Math.Abs(p.X - _tabDragStart.X) < SystemParameters.MinimumHorizontalDragDistance) return;
+            if (Math.Abs(p.X - _tabDragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(p.Y - _tabDragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
             _tabDragging = true;
             SheetTabs.CaptureMouse();
-            SheetTabs.Cursor = Cursors.SizeWE;
         }
-        MoveDraggedTab(dragged, p.X);
+        // タブの並びから上下に離したら、放したときに別ウィンドウにする (並べ替えはしない)
+        var tear = IsTearOff(p, SheetTabs.ActualHeight);
+        SheetTabs.Cursor = tear ? Cursors.Hand : Cursors.SizeWE;
+        if (!tear) MoveDraggedTab(dragged, p.X);
     }
 
     /// <summary>
@@ -1224,7 +1231,14 @@ public partial class MainWindow : UserControl
     {
         if (_tabDragging && _tabDragSheet is { } dragged)
         {
+            var dropped = e.GetPosition(SheetTabs);
             EndTabDrag();
+            if (IsTearOff(dropped, SheetTabs.ActualHeight))
+            {
+                PopOutSheet(dragged, SheetTabs.PointToScreen(dropped));
+                e.Handled = true;
+                return;
+            }
             ActivateSheet(dragged);
             FocusCommandBox();
             e.Handled = true; // ドラッグの終わりはクリック (切り替え) にしない

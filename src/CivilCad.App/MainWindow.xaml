@@ -531,7 +531,9 @@
             </Border>
             <!-- 作図入力バー (線・円などの作図中だけ表示) -->
             <v:DrawInputBar x:Name="InputBar" DockPanel.Dock="Top"/>
-            <Grid>
+            <!-- CanvasHost: 本体の画面の作図領域の場所。EditSurface: 編集用の作図領域と、その上の入力欄 (分割画面では、編集の対象の窓へ移す) -->
+            <Grid x:Name="CanvasHost">
+            <Grid x:Name="EditSurface">
                 <v:CadCanvas x:Name="Canvas"/>
                 <!-- グループ編集中の表示 (右上。クリックは下の作図領域へ通す) -->
                 <Border x:Name="GroupEditBadge" Visibility="Collapsed" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -547,6 +549,7 @@
                     <TextBox x:Name="EditTextBox" Visibility="Collapsed" BorderThickness="1" Padding="0" AcceptsReturn="True" TextWrapping="NoWrap"
                              BorderBrush="#FF66CCFF" Background="#D81E1E1E" Foreground="White" CaretBrush="White" SelectionBrush="#FF3399FF"/>
                 </Canvas>
+            </Grid>
             </Grid>
         </DockPanel>
     </DockPanel>
